@@ -169,8 +169,8 @@ export default function NewTournament() {
                             <input
                                 id="size"
                                 type="number"
-                                min="4"
-                                step="4"
+                                min="3"
+                                step="1"
                                 max="1000"
                                 value={size}
                                 onChange={(e) => setSize(parseInt(e.target.value) || 4)}
@@ -178,7 +178,7 @@ export default function NewTournament() {
                                 required
                             />
                             <p className="text-xs text-muted-foreground mt-2">
-                                For Swiss format, size should ideally be a multiple of 4 (tables of 4).
+                                Players will be distributed into tables of 3 or 4 automatically.
                             </p>
                         </div>
 
