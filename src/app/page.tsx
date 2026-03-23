@@ -1,65 +1,120 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useTournaments } from "@/lib/store";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import Link from "next/link";
+import { Trophy, Calendar, Users, ChevronRight, Trash2 } from "lucide-react";
+
+export default function Dashboard() {
+  const { tournaments, isLoaded, deleteTournament } = useTournaments();
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <Trophy className="w-12 h-12 text-primary opacity-50" />
+          <p className="text-muted-foreground">Loading tournaments...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Dashboard</h1>
+          <p className="text-muted-foreground text-lg">
+            Manage your tournaments or start a new one.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <Link href="/tournaments/new">
+          <Button size="lg" className="gap-2">
+            <Trophy className="w-5 h-5" />
+            Create Tournament
+          </Button>
+        </Link>
+      </div>
+
+      {tournaments.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed border-2">
+          <div className="bg-primary/10 p-4 rounded-full mb-4">
+            <Trophy className="w-10 h-10 text-primary" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">No Tournaments Yet</h3>
+          <p className="text-muted-foreground mb-6 max-w-md">
+            You havent created any tournaments. Click the button below to set up your first bracket!
+          </p>
+          <Link href="/tournaments/new">
+            <Button>Create Your First Tournament</Button>
+          </Link>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tournaments.map((tournament) => (
+            <Link key={tournament.id} href={`/tournaments/${tournament.id}`}>
+              <Card className="hover:border-primary/50 transition-colors group cursor-pointer h-full flex flex-col relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-destructive z-10 hover:bg-destructive/10"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (confirm("Are you sure you want to delete this tournament?")) {
+                      deleteTournament(tournament.id);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <span
+                  className={`absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-medium ${tournament.status === "completed"
+                    ? "bg-green-500/10 text-green-500 border border-green-500/20"
+                    : tournament.status === "in_progress"
+                      ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                      : "bg-orange-500/10 text-orange-500 border border-orange-500/20"
+                    }`}
+                >
+                  {tournament.status.replace("_", " ").toUpperCase()}
+                </span>
+                <CardContent className="flex-1 flex flex-col items-center justify-between p-6 pt-12">
+                  <div className="flex flex-col items-center justify-center flex-1 w-full">
+                    {tournament.logoUrl ? (
+                      <img 
+                        src={tournament.logoUrl} 
+                        alt={`${tournament.name} logo`}
+                        className="w-32 h-32 object-contain mb-4"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-32 h-32 flex items-center justify-center bg-muted/30 rounded-lg mb-4">
+                        <Trophy className="w-16 h-16 text-muted-foreground/50" />
+                      </div>
+                    )}
+                    <h3 className="text-lg font-bold text-center mb-2">{tournament.name}</h3>
+                  </div>
+                  <div className="w-full pt-4 border-t border-border">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>{new Date(tournament.eventDate).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        <span>{tournament.participants.length} / {tournament.size}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
         </div>
-      </main>
+      )}
     </div>
   );
 }
