@@ -40,8 +40,11 @@ const CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
 
 const CORPORATIONS = [
     "Select Corporation",
-    "Ares Studio", "Cheeseman", "Credicor", "Ecoline", "Helion", "Interplanetary Cinematics",
-    "Inventrix", "Mining Guild", "Phobolog", "Saturn Systems", "Terractor", "Tharsis Republic", "UNMI",
+    "Arcadian Communities", "Cheung Shing Mars", "Credicor", "Desertron", "Ecoline", "Ecotec", "Green Power",
+    "Guilde des Voleurs", "Guilde Ouvrière", "Helion", "Interplanetary Cinematics", "Inventrix", "Kuiper Cooperative", 
+    "Ludophiles d'Asnières et d'ailleurs","Mining Guild", "Nirgal Enterprise", "Palladin Shipping", "Phobolog", "Point Luna", "Recyclon", 
+    "Robinson Industries", "Sagitta", "Saturn Systems", "Soleil Vert", "Spire", "Teractor", "Tharsis Republic", "Thorgate", 
+    "Tycho Magnetics", "United Nations Mars Initiative", "Valley Trust", "Vitor"
 ];
 
 export default function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, tableId: string }> }) {
@@ -56,11 +59,14 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     const [scores, setScores] = useState<Record<string, PlayerScore>>({});
 
     useEffect(() => {
-        fetch(`/api/tournaments`)
-            .then(res => res.json())
-            .then((data: Tournament[]) => {
-                const t = data.find(t => t.id === tournamentId);
-                setTournament(t || null);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Not found");
+                return res.json();
+            })
+            .then((data: Tournament) => {
+                setTournament(data);
                 setLoading(false);
             })
             .catch(() => setLoading(false));
@@ -127,10 +133,11 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
             return b.megacredits - a.megacredits; // Tiebreaker
         });
 
-        // TODO: Check if point for 3 players is correct
         const placementPoints = activePlayers.length === 3 ? [5, 3, 2] : [5, 3, 2, 1];
 
-        const rankings: Record<string, { rank: number, displayRank: string, points: number }> = {};
+        const winnerTotal = playersWithSums[0]?.total ?? 0;
+
+        const rankings: Record<string, { rank: number, displayRank: string, points: number, base: number, bonus: number }> = {};
 
         playersWithSums.forEach((p, index) => {
             let rankStr = `${index + 1}th`;
@@ -138,10 +145,15 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
             if (index === 1) rankStr = `2nd`;
             if (index === 2) rankStr = `3rd`;
 
+            const base = placementPoints[index] || 0;
+            const bonus = index > 0 && (winnerTotal - p.total) <= 5 ? 1 : 0;
+
             rankings[p.id] = {
                 rank: index + 1,
                 displayRank: rankStr,
-                points: placementPoints[index] || 0
+                points: base + bonus,
+                base,
+                bonus
             };
         });
 
@@ -161,7 +173,8 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                 pointsToSubmit[pId] = rankings[pId]?.points || 0;
             });
 
-            await fetch(`/api/tournaments/${tournamentId}/table/${tableId}`, {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+            await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}/table/${tableId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ results: pointsToSubmit, scorecards: scores })
@@ -287,7 +300,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                     {rankings[pId] && rankings[pId].rank === 1 && <span className="text-yellow-500 text-xl drop-shadow-md">🥇</span>}
                                     {rankings[pId] && rankings[pId].rank === 2 && <span className="text-gray-300 text-xl drop-shadow-md">🥈</span>}
                                     {rankings[pId] && rankings[pId].rank === 3 && <span className="text-orange-500 text-xl drop-shadow-md">🥉</span>}
-                                    {rankings[pId] ? rankings[pId].displayRank : ""} <span className="text-xs text-muted-foreground font-medium ml-1">({rankings[pId]?.points || 0} pts)</span>
+                                    {rankings[pId] ? rankings[pId].displayRank : ""}
                                 </div>
                             ))}
                         </div>

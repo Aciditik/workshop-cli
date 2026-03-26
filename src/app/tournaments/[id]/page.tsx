@@ -1,92 +1,47 @@
 "use client";
 
-import { useState, use } from "react";
+import { use } from "react";
 import { useTournaments } from "@/lib/store";
-import { TableMatch } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SwissRounds } from "@/components/SwissRounds";
-import { Trophy, Users, Play, ChevronLeft, Plus, ListOrdered } from "lucide-react";
+import {
+    generateEliminationRound2,
+    generateSwissRound,
+    determineQualifiedPlayers,
+    getFormatLabel,
+} from "@/lib/qualifier-rules";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const { getTournament, updateTournament, isLoaded } = useTournaments();
 
-    const [newParticipant, setNewParticipant] = useState("");
     const tournament = isLoaded ? getTournament(id) : null;
 
     if (!isLoaded) return <div className="p-8 animate-pulse text-muted-foreground">Loading...</div>;
     if (!tournament) return <div className="p-8 text-destructive">Tournament not found.</div>;
 
-    const handleAddParticipant = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newParticipant.trim() || tournament.participants.length >= tournament.size || tournament.status !== "draft") return;
-
-        updateTournament({
-            ...tournament,
-            participants: [
-                ...tournament.participants,
-                { id: crypto.randomUUID(), name: newParticipant.trim(), score: 0 }
-            ]
-        });
-        setNewParticipant("");
-    };
+    const format = tournament.format || "swiss";
+    const maxRounds = tournament.maxRounds || 3;
+    const qualifiedCount = tournament.qualifiedCount || 2;
 
     const currentRound = tournament.currentRound || 0;
 
     const generateNextRound = () => {
-        const participants = [...tournament.participants];
         const nextRound = currentRound + 1;
-        if (nextRound > 3) return; // Max 3 rounds
+        if (nextRound > maxRounds) return;
 
-        const pool = [...participants];
+        let newMatches;
 
-        // Round 1: Random Shuffle
-        if (nextRound === 1) {
-            pool.sort(() => Math.random() - 0.5);
+        if (format === "elimination" && nextRound === 2) {
+            // Elimination Round 2: crossed finalist tables
+            const round1Matches = tournament.matches.filter(m => m.round === 1);
+            newMatches = generateEliminationRound2(tournament.id, playerCount, round1Matches);
         } else {
-            // Round 2/3: Sort by descending score
-            pool.sort((a, b) => b.score - a.score);
-        }
-
-        // Distribute players into tables of 3 or 4 — no byes, no nulls.
-        // For n < 6: only one table (can't split into two groups of ≥ 3 otherwise).
-        // For n >= 6: find T tables and k 3-player tables so that: 3k + 4(T-k) = n → k = 4T - n
-        //   r=0 → k=0 (all 4), r=1 → k=3, r=2 → k=2, r=3 → k=1
-        const n = pool.length;
-        let tableSizes: number[];
-
-        if (n < 6) {
-            // Too few to meaningfully split; one table of all players
-            tableSizes = [n];
-        } else {
-            const remainder = n % 4;
-            const k = remainder === 0 ? 0 : (4 - remainder); // number of 3-player tables
-            const T = Math.floor(n / 4) + (remainder === 0 ? 0 : 1); // total tables
-            tableSizes = [
-                ...Array(T - k).fill(4),
-                ...Array(k).fill(3),
-            ];
-        }
-
-        const newMatches: TableMatch[] = [];
-        let cursor = 0;
-
-        for (let i = 0; i < tableSizes.length; i++) {
-            const tableSize = tableSizes[i];
-            const tablePlayers = pool.slice(cursor, cursor + tableSize);
-            cursor += tableSize;
-
-            newMatches.push({
-                id: crypto.randomUUID(),
-                tournamentId: tournament.id,
-                round: nextRound,
-                tableNumber: i + 1,
-                participantIds: tablePlayers.map(p => p.id),
-                results: {},
-                isCompleted: false
-            });
+            // Swiss rounds 2-3: sorted by score
+            newMatches = generateSwissRound(tournament.id, tournament.participants, currentRound);
         }
 
         updateTournament({
@@ -106,7 +61,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
         // Update overall participant scores based on these results
         const updatedParticipants = tournament.participants.map(p => {
-            // Calculate fresh sum of all completed match scores to be safe (idempotent design)
             let newTotal = 0;
             updatedMatches.forEach(m => {
                 if (m.isCompleted && m.results[p.id]) {
@@ -119,28 +73,52 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const newTournamentData = {
             ...tournament,
             matches: updatedMatches,
-            participants: updatedParticipants
+            participants: updatedParticipants,
+            qualifiedIds: undefined as string[] | undefined,
         };
 
         // Check if all tables in current round are completed
         const currentRoundMatches = updatedMatches.filter(m => m.round === currentRound);
         const allCompleted = currentRoundMatches.every(m => m.isCompleted);
 
-        if (allCompleted && currentRound === 3) {
+        // Tournament completes when the last round finishes
+        if (allCompleted && currentRound === maxRounds) {
             newTournamentData.status = "completed";
+            newTournamentData.qualifiedIds = determineQualifiedPlayers(
+                format, tournament.size, updatedMatches, updatedParticipants
+            );
         }
 
         updateTournament(newTournamentData);
     };
 
-    const isFull = tournament.participants.length >= tournament.size;
+    const playerCount = tournament.participants.length;
     const canGenerateNextRound = () => {
-        if (currentRound >= 3) return false;
-        if (currentRound === 0) return true;
-        // Else, all matches in current round must be completed
+        if (currentRound >= maxRounds) return false;
         const roundMatches = tournament.matches.filter(m => m.round === currentRound);
         return roundMatches.length > 0 && roundMatches.every(m => m.isCompleted);
     };
+
+    const qualifiedIds = new Set(tournament.qualifiedIds || []);
+
+    // Calculate total placement points for each participant (5,3,2,1 system)
+    const calculateTotalPoints = (participantId: string): number => {
+        let total = 0;
+        tournament.matches.forEach(m => {
+            if (m.isCompleted && m.results[participantId]) {
+                total += m.results[participantId];
+            }
+        });
+        return total;
+    };
+
+    // Sort participants by total placement points if Swiss, otherwise by score
+    const sortedParticipants = [...tournament.participants].sort((a, b) => {
+        if (format === "swiss") {
+            return calculateTotalPoints(b.id) - calculateTotalPoints(a.id);
+        }
+        return b.score - a.score;
+    });
 
     return (
         <div className="space-y-8">
@@ -152,13 +130,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         </Button>
                     </Link>
                     {tournament.logoUrl && (
-                        <img 
-                            src={tournament.logoUrl} 
+                        <img
+                            src={tournament.logoUrl}
                             alt={`${tournament.name} logo`}
                             className="w-16 h-16 object-contain rounded-lg bg-muted/50 p-2"
-                            onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                            }}
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
                         />
                     )}
                     <div>
@@ -172,75 +148,53 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </span>
                         </h1>
                         <p className="text-muted-foreground">
-                            {tournament.size} Players • 3-Round Swiss
+                            {playerCount} joueur{playerCount > 1 ? "s" : ""} • {getFormatLabel(playerCount)} • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}
                         </p>
                     </div>
                 </div>
             </div>
 
-            {tournament.status === "draft" && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Users className="w-5 h-5 text-primary" />
-                                Participants ({tournament.participants.length}/{tournament.size})
-                            </div>
-                            {isFull && tournament.status === "draft" && (
-                                <Button onClick={generateNextRound} className="gap-2">
-                                    <Play className="w-4 h-4 fill-white" />
-                                    Generate Pairings
-                                </Button>
-                            )}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleAddParticipant} className="flex gap-3 mb-6">
-                            <input
-                                type="text"
-                                value={newParticipant}
-                                onChange={(e) => setNewParticipant(e.target.value)}
-                                placeholder="Enter player/team name"
-                                disabled={isFull}
-                                className="flex-1 flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            />
-                            <Button type="submit" disabled={isFull} className="gap-2">
-                                <Plus className="w-4 h-4" /> Add Player
-                            </Button>
-                        </form>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {tournament.participants.map(p => (
-                                <div key={p.id} className="p-3 rounded-lg border bg-card/50 text-sm font-medium">
-                                    {p.name}
-                                </div>
-                            ))}
-                            {Array.from({ length: tournament.size - tournament.participants.length }).map((_, i) => (
-                                <div key={i} className="p-3 rounded-lg border border-dashed border-border text-muted-foreground text-sm flex items-center justify-center">
-                                    Empty Slot
-                                </div>
-                            ))}
+            {/* Qualified Players Banner */}
+            {tournament.status === "completed" && tournament.qualifiedIds && tournament.qualifiedIds.length > 0 && (
+                <Card className="border-yellow-500/30 bg-yellow-500/5">
+                    <CardContent className="p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <Award className="w-6 h-6 text-yellow-500" />
+                            <h3 className="text-xl font-bold text-yellow-400">Joueurs Qualifiés</h3>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {tournament.qualifiedIds.map((qId, idx) => {
+                                const p = tournament.participants.find(pp => pp.id === qId);
+                                return (
+                                    <div key={qId} className="flex items-center gap-3 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10">
+                                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                                        <div>
+                                            <p className="font-bold">{p?.name || "Inconnu"}</p>
+                                            <p className="text-xs text-muted-foreground">Qualifié #{idx + 1}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            {tournament.status !== "draft" && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-4">
                         <div className="flex items-center justify-between">
                             <h3 className="text-2xl font-bold flex items-center gap-2">
                                 <ListOrdered className="w-6 h-6 text-primary" />
-                                Rounds & Pairings
+                                Rondes & Tables
                             </h3>
                             {tournament.status === "completed" ? (
                                 <div className="text-green-500 font-bold bg-green-500/10 px-4 py-2 rounded-lg">
-                                    Tournament Completed!
+                                    Tournoi Terminé !
                                 </div>
-                            ) : canGenerateNextRound() && currentRound > 0 ? (
+                            ) : canGenerateNextRound() ? (
                                 <Button onClick={generateNextRound} className="gap-2" variant="secondary">
                                     <Play className="w-4 h-4 fill-foreground" />
-                                    Generate Round {currentRound + 1}
+                                    Générer Ronde {currentRound + 1}
                                 </Button>
                             ) : null}
                         </div>
@@ -251,22 +205,25 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             currentRound={tournament.currentRound || 0}
                             tournamentId={tournament.id}
                             tournamentName={tournament.name}
-                        />               </div>
+                            maxRounds={maxRounds}
+                            qualifiedIds={tournament.qualifiedIds}
+                        />
+                    </div>
 
                     <div>
                         <Card className="sticky top-8 border-primary/20">
                             <CardHeader className="bg-primary/5 border-b border-border">
                                 <CardTitle className="flex items-center gap-2">
                                     <Trophy className="w-5 h-5 text-primary" />
-                                    Leaderboard
+                                    Joueurs
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <div className="divide-y divide-border">
-                                    {[...tournament.participants]
-                                        .sort((a, b) => b.score - a.score)
-                                        .map((p, index) => (
-                                            <div key={p.id} className="p-4 flex items-center justify-between hover:bg-accent/30 transition-colors">
+                                    {sortedParticipants.map((p, index) => {
+                                        const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
+                                        return (
+                                            <div key={p.id} className={`p-4 flex items-center justify-between hover:bg-accent/30 transition-colors ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
                                                 <div className="flex items-center gap-3">
                                                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? "bg-yellow-500" :
                                                         index === 1 ? "bg-slate-300" :
@@ -275,18 +232,23 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         {index + 1}
                                                     </span>
                                                     <span className="font-medium">{p.name}</span>
+                                                    {qualifiedIds.has(p.id) && (
+                                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                                    )}
                                                 </div>
-                                                <div className="font-bold font-mono text-primary">
-                                                    {p.score} <span className="text-muted-foreground text-xs font-sans">pts</span>
-                                                </div>
+                                                {totalPoints !== null && (
+                                                    <span className="text-sm font-mono text-muted-foreground">
+                                                        {totalPoints} pts
+                                                    </span>
+                                                )}
                                             </div>
-                                        ))}
+                                        );
+                                    })}
                                 </div>
                             </CardContent>
                         </Card>
                     </div>
                 </div>
-            )}
         </div>
     );
 }

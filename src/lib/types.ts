@@ -1,9 +1,10 @@
 export type TournamentStatus = "draft" | "in_progress" | "completed";
+export type TournamentFormat = "elimination" | "swiss";
 
 export interface Participant {
     id: string;
     name: string;
-    score: number; // Accrued Swiss format points
+    score: number; // Accrued points
 }
 
 export interface PlayerScore {
@@ -22,11 +23,13 @@ export interface TableMatch {
     tournamentId: string;
     round: number;
     tableNumber: number; // Position in the round
-    participantIds: (string | null)[]; // Up to 4 players per table
+    tableLabel?: string; // e.g. "Finale 1", "Consolation 2", "Table A"
+    participantIds: (string | null)[]; // Up to 5 players per table
     results: Record<string, number>; // Maps participantId -> points earned this round
     scorecards?: Record<string, PlayerScore>; // Maps participantId -> detailed score breakdown
     isPendingReview?: boolean; // Set when players submit scores via QR code
     isCompleted: boolean;
+    isFinalist?: boolean; // True for finalist tables in elimination format
 }
 
 export interface Tournament {
@@ -36,8 +39,12 @@ export interface Tournament {
     eventDate: string;
     createdAt: string;
     status: TournamentStatus;
+    format: TournamentFormat; // "elimination" (16-27) or "swiss" (28+)
     participants: Participant[];
     matches: TableMatch[];
     size: number;
     currentRound: number; // Tracks the current active round
+    maxRounds: number; // 2 for elimination, 3 for swiss
+    qualifiedCount: number; // Number of qualified players
+    qualifiedIds?: string[]; // IDs of qualified players (set when tournament completes)
 }

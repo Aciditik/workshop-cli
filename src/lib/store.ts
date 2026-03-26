@@ -2,6 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { Tournament } from "./types";
+import { getApiUrl } from "./auth";
+
+const API_URL = getApiUrl();
+
+function getToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("token");
+}
+
+function authHeaders(): Record<string, string> {
+    const token = getToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
+}
 
 export function useTournaments() {
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -9,7 +24,9 @@ export function useTournaments() {
 
     const fetchTournaments = async () => {
         try {
-            const res = await fetch('/api/tournaments');
+            const res = await fetch(`${API_URL}/api/tournaments`, {
+                headers: authHeaders(),
+            });
             if (res.ok) {
                 const data = await res.json();
                 setTournaments(data);
@@ -22,7 +39,11 @@ export function useTournaments() {
     };
 
     useEffect(() => {
-        fetchTournaments();
+        if (getToken()) {
+            fetchTournaments();
+        } else {
+            setIsLoaded(true);
+        }
     }, []);
 
     const addTournament = async (tournament: Tournament) => {
@@ -30,9 +51,9 @@ export function useTournaments() {
         setTournaments(prev => [...prev, tournament]);
 
         try {
-            await fetch('/api/tournaments', {
+            await fetch(`${API_URL}/api/tournaments`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders(),
                 body: JSON.stringify(tournament)
             });
         } catch (e) {
@@ -49,9 +70,9 @@ export function useTournaments() {
         ));
 
         try {
-            await fetch(`/api/tournaments/${updatedTournament.id}`, {
+            await fetch(`${API_URL}/api/tournaments/${updatedTournament.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders(),
                 body: JSON.stringify(updatedTournament)
             });
         } catch (e) {
@@ -65,8 +86,9 @@ export function useTournaments() {
         setTournaments(prev => prev.filter(t => t.id !== id));
 
         try {
-            await fetch(`/api/tournaments/${id}`, {
-                method: 'DELETE'
+            await fetch(`${API_URL}/api/tournaments/${id}`, {
+                method: 'DELETE',
+                headers: authHeaders(),
             });
         } catch (e) {
             console.error("Failed to delete tournament", e);
