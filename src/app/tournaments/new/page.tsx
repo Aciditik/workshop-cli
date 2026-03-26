@@ -1,65 +1,84 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTournaments } from "@/lib/store";
-import { Tournament } from "@/lib/types";
+import { Tournament, Participant } from "@/lib/types";
+import { getFormat, getMaxRounds, getQualifiedCount, getFormatLabel, isRecommendedSize, generateRound1 } from "@/lib/qualifier-rules";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Trophy, ChevronLeft, Save, Upload } from "lucide-react";
+import { Trophy, ChevronLeft, Upload, Info, Plus, X, Play, Users } from "lucide-react";
 import Link from "next/link";
 
 export default function NewTournament() {
     const router = useRouter();
     const { addTournament } = useTournaments();
     const [name, setName] = useState("");
-    const [size, setSize] = useState<number>(8);
     const [logoUrl, setLogoUrl] = useState("");
     const [logoFileName, setLogoFileName] = useState("");
     const [eventDate, setEventDate] = useState("");
+    const [players, setPlayers] = useState<string[]>([]);
+    const [playerInput, setPlayerInput] = useState("");
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const size = players.length;
+    const canLaunch = name.trim() && eventDate && size >= 8;
 
     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            alert('Please upload an image file (PNG, JPG, SVG, etc.)');
-            return;
-        }
-
-        // Validate file size (max 800KB)
-        if (file.size > 800 * 1024) {
-            alert('File size must be less than 800KB');
-            return;
-        }
-
+        if (!file.type.startsWith("image/")) { alert("Merci d'uploader une image (PNG, JPG, SVG)"); return; }
+        if (file.size > 800 * 1024) { alert("Fichier trop lourd (max 800 ko)"); return; }
         setLogoFileName(file.name);
-
-        // Convert to base64
         const reader = new FileReader();
-        reader.onloadend = () => {
-            setLogoUrl(reader.result as string);
-        };
+        reader.onloadend = () => setLogoUrl(reader.result as string);
         reader.readAsDataURL(file);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const addPlayer = () => {
+        const trimmed = playerInput.trim();
+        if (!trimmed) return;
+        setPlayers(prev => [...prev, trimmed]);
+        setPlayerInput("");
+        inputRef.current?.focus();
+    };
 
-        if (!name.trim()) return;
+    const removePlayer = (index: number) => {
+        setPlayers(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") { e.preventDefault(); addPlayer(); }
+    };
+
+    const handleLaunch = () => {
+        if (!canLaunch) return;
+
+        const participants: Participant[] = players.map(pName => ({
+            id: crypto.randomUUID(),
+            name: pName,
+            score: 0,
+        }));
+
+        const tournamentId = crypto.randomUUID();
+        const format = getFormat(size);
+        const maxRounds = getMaxRounds(size);
+        const round1Matches = generateRound1(tournamentId, participants, size);
 
         const newTournament: Tournament = {
-            id: crypto.randomUUID(),
+            id: tournamentId,
             name: name.trim(),
-            logoUrl: logoUrl.trim() || undefined,
-            eventDate: eventDate || new Date().toISOString(),
+            logoUrl: logoUrl || undefined,
+            eventDate,
             createdAt: new Date().toISOString(),
-            status: "draft",
-            participants: [],
-            matches: [],
+            status: "in_progress",
+            format,
+            participants,
+            matches: round1Matches,
             size,
-            currentRound: 0,
+            currentRound: 1,
+            maxRounds,
+            qualifiedCount: getQualifiedCount(size),
         };
 
         addTournament(newTournament);
@@ -75,10 +94,8 @@ export default function NewTournament() {
                     </Button>
                 </Link>
                 <div>
-                    <h1 className="text-4xl font-bold tracking-tight mb-2">Create Tournament</h1>
-                    <p className="text-muted-foreground text-lg">
-                        Set up the structure for your new competition.
-                    </p>
+                    <h1 className="text-4xl font-bold tracking-tight mb-2">Nouveau Tournoi</h1>
+                    <p className="text-muted-foreground text-lg">Renseignez les informations et ajoutez les joueurs.</p>
                 </div>
             </div>
 
@@ -86,116 +103,162 @@ export default function NewTournament() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary">
                         <Trophy className="w-5 h-5" />
-                        Tournament Details
+                        Informations
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <label htmlFor="name" className="text-sm font-medium">
-                                Tournament Name
-                            </label>
-                            <input
-                                id="name"
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="e.g. Summer Championship 2026"
-                                className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                required
-                            />
-                        </div>
+                <CardContent className="space-y-6">
+                    {/* Tournament name */}
+                    <div className="space-y-2">
+                        <label htmlFor="name" className="text-sm font-medium">Nom du tournoi</label>
+                        <input
+                            id="name"
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="ex. Summer Championship 2026"
+                            className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        />
+                    </div>
 
-                        <div className="space-y-2">
-                            <label htmlFor="eventDate" className="text-sm font-medium">
-                                Event Date
-                            </label>
-                            <input
-                                id="eventDate"
-                                type="date"
-                                value={eventDate}
-                                onChange={(e) => setEventDate(e.target.value)}
-                                className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                required
-                            />
-                        </div>
+                    {/* Event date */}
+                    <div className="space-y-2">
+                        <label htmlFor="eventDate" className="text-sm font-medium">Date de l&apos;événement</label>
+                        <input
+                            id="eventDate"
+                            type="date"
+                            value={eventDate}
+                            onChange={(e) => setEventDate(e.target.value)}
+                            className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        />
+                    </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium block">
-                                Logo de votre agence
+                    {/* Logo */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium block">Logo de votre boutique / association</label>
+                        <div className="relative">
+                            <input id="logoUpload" type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml" onChange={handleLogoUpload} className="hidden" />
+                            <label htmlFor="logoUpload" className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/20">
+                                <Upload className="w-7 h-7 text-primary mb-1" />
+                                <span className="text-sm font-medium text-foreground">{logoFileName || "Téléchargez le logo"}</span>
+                                <span className="text-xs text-muted-foreground mt-0.5">PNG, SVG • max 800 ko • fond transparent recommandé</span>
                             </label>
-                            <div className="relative">
-                                <input
-                                    id="logoUpload"
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/jpg,image/svg+xml"
-                                    onChange={handleLogoUpload}
-                                    className="hidden"
-                                />
-                                <label
-                                    htmlFor="logoUpload"
-                                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/20"
-                                >
-                                    <Upload className="w-8 h-8 text-primary mb-2" />
-                                    <span className="text-sm font-medium text-foreground">
-                                        {logoFileName || "Téléchargez le logo"}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground mt-1">
-                                        Formats : PNG, SVG
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        Taille max : 800 ko
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        Fond transparent recommandé
-                                    </span>
-                                </label>
-                                {logoUrl && (
-                                    <div className="mt-3 flex items-center justify-center">
-                                        <img 
-                                            src={logoUrl} 
-                                            alt="Logo preview" 
-                                            className="max-h-16 max-w-32 object-contain"
-                                        />
+                            {logoUrl && (
+                                <div className="mt-3 flex items-center justify-center">
+                                    <img src={logoUrl} alt="Logo preview" className="max-h-16 max-w-32 object-contain" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Players section */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary">
+                        <Users className="w-5 h-5" />
+                        Joueurs
+                        {size > 0 && <span className="ml-auto text-sm font-normal text-muted-foreground">{size} joueur{size > 1 ? "s" : ""}</span>}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {/* Add player input */}
+                    <div className="flex gap-2">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={playerInput}
+                            onChange={(e) => setPlayerInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Nom du joueur (Entrée pour valider)"
+                            className="flex-1 flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        />
+                        <Button type="button" onClick={addPlayer} className="gap-1 shrink-0">
+                            <Plus className="w-4 h-4" /> Ajouter
+                        </Button>
+                    </div>
+
+                    {/* Player list */}
+                    {players.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {players.map((player, index) => (
+                                <div key={index} className="flex items-center justify-between px-3 py-2 rounded-md border bg-card/50 text-sm group">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+                                            {index + 1}
+                                        </span>
+                                        <span className="font-medium">{player}</span>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => removePlayer(index)}
+                                        className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 ml-2"
+                                        title="Supprimer"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {players.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                            Aucun joueur ajouté pour l&apos;instant
+                        </p>
+                    )}
+
+                    {/* Format info — shown once there's at least 1 player */}
+                    {size >= 1 && (
+                        <div className={`flex items-start gap-2 p-3 rounded-lg border text-sm ${
+                            size < 8
+                                ? "bg-red-500/5 border-red-500/20 text-red-400"
+                                : isRecommendedSize(size)
+                                    ? "bg-green-500/5 border-green-500/20 text-green-400"
+                                    : "bg-yellow-500/5 border-yellow-500/20 text-yellow-400"
+                        }`}>
+                            <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                            <div className="space-y-0.5">
+                                {size < 8 ? (
+                                    <p className="font-medium">Minimum 8 joueurs requis ({8 - size} manquant{8 - size > 1 ? "s" : ""})</p>
+                                ) : (
+                                    <>
+                                        <p className="font-medium">
+                                            {getFormatLabel(size)}
+                                            {!isRecommendedSize(size) && " (non recommandé)"}
+                                        </p>
+                                        <p className="text-xs opacity-80">
+                                            {getQualifiedCount(size)} joueur{getQualifiedCount(size) > 1 ? "s" : ""} qualifié{getQualifiedCount(size) > 1 ? "s" : ""} · {getMaxRounds(size)} rondes
+                                        </p>
+                                        {size < 28 && (
+                                            <p className="text-xs opacity-80">Ronde 1 : tables aléatoires · Ronde 2 : tables finalistes croisées</p>
+                                        )}
+                                        {size >= 28 && (
+                                            <p className="text-xs opacity-80">Format suisse : classement par points cumulés</p>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium block">
-                                Tournament Size (Participants)
-                            </label>
-                            <input
-                                id="size"
-                                type="number"
-                                min="3"
-                                step="1"
-                                max="1000"
-                                value={size}
-                                onChange={(e) => setSize(parseInt(e.target.value) || 4)}
-                                className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                required
-                            />
-                            <p className="text-xs text-muted-foreground mt-2">
-                                Players will be distributed into tables of 3 or 4 automatically.
-                            </p>
-                        </div>
-
-                        <div className="pt-4 border-t border-border flex justify-end gap-3">
-                            <Link href="/">
-                                <Button variant="ghost" type="button">
-                                    Cancel
-                                </Button>
-                            </Link>
-                            <Button type="submit" size="lg" className="gap-2">
-                                <Save className="w-4 h-4" />
-                                Create & Add Players
-                            </Button>
-                        </div>
-                    </form>
+                    )}
                 </CardContent>
             </Card>
+
+            {/* Footer actions */}
+            <div className="flex justify-between items-center pb-8">
+                <Link href="/">
+                    <Button variant="ghost">Annuler</Button>
+                </Link>
+                <Button
+                    size="lg"
+                    className="gap-2"
+                    disabled={!canLaunch}
+                    onClick={handleLaunch}
+                >
+                    <Play className="w-4 h-4 fill-white" />
+                    Lancer le tournoi ({size} joueur{size !== 1 ? "s" : ""})
+                </Button>
+            </div>
         </div>
     );
 }
