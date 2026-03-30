@@ -95,7 +95,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                 <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
                     <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-3 flex-wrap">
                         <span className={isFinalist ? "text-yellow-400 font-bold" : ""}>{displayLabel}</span>
-                        <span className="text-xs text-muted-foreground/60 font-normal">{playerCount}p · {scale} pts</span>
+                        {/* <span className="text-xs text-muted-foreground/60 font-normal">{playerCount}p · {scale} pts</span> */}
                         {match.isCompleted && <span className="text-green-500">Validé</span>}
                         {match.isPendingReview && !match.isCompleted && <span className="text-yellow-500">En attente</span>}
                     </CardTitle>
@@ -114,7 +114,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                                     <div key={pId} className="rounded-md border border-yellow-500/30 bg-yellow-500/5 overflow-hidden">
                                         <div className="flex items-center justify-between px-3 py-2 bg-yellow-500/10 font-semibold text-sm">
                                             <span>{p.name}</span>
-                                            <span className="text-yellow-400">{total} pts → <span className="text-primary">+{pts} placement</span></span>
+                                            <span className="text-yellow-400">{total} pts {/*→ <span className="text-primary">+{pts} placement</span>*/}</span>
                                         </div>
                                         {sc.corporation && (
                                             <div className="px-3 py-1 text-xs text-muted-foreground border-b border-border/40">
@@ -138,7 +138,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                                         </div>
                                         {sc.megacredits > 0 && (
                                             <div className="px-3 py-1 text-xs text-muted-foreground">
-                                                MC (tiebreaker): <span className="font-medium text-foreground">{sc.megacredits}</span>
+                                                Tiebreaker: <span className="font-medium text-foreground">{sc.megacredits}</span>
                                             </div>
                                         )}
                                     </div>

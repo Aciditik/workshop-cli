@@ -35,7 +35,7 @@ const CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
     { key: "forets", label: "Forêts" },
     { key: "villes", label: "Villes" },
     { key: "cartes", label: "Cartes" },
-    { key: "megacredits", label: "MC (Tiebreaker)" },
+    { key: "megacredits", label: "Tiebreaker" },
 ];
 
 const CORPORATIONS = [
