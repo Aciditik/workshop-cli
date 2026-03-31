@@ -62,7 +62,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                         {otherMatches.length > 0 && (
                             <div className="space-y-2">
                                 {finalistMatches.length > 0 && (
-                                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Autres Tables</p>
+                                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Tables Consolation</p>
                                 )}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {otherMatches.map(match => renderMatchCard(match, round, false))}
@@ -155,31 +155,49 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                         <>
                             {/* Normal players list */}
                             <div className="space-y-2">
-                                {(match.participantIds || []).map((pId, i) => {
-                                    const p = getParticipant(pId);
-                                    // Calculate placement if match is completed
-                                    let placement = "";
-                                    if (match.isCompleted && p) {
-                                        const playerIds = match.participantIds.filter((id): id is string => id !== null);
-                                        const sorted = [...playerIds].sort((a, b) => (match.results[b] || 0) - (match.results[a] || 0));
-                                        const rank = sorted.indexOf(p.id) + 1;
-                                        const suffixes = ["er", "ème", "ème", "ème", "ème"];
-                                        placement = `${rank}${suffixes[rank - 1] || "ème"}`;
-                                    }
-                                    return (
-                                        <div key={i} className="flex items-center justify-between p-2 rounded-md bg-accent/50 text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <span>{p ? p.name : "Place vide"}</span>
-                                                {p && qualifiedSet.has(p.id) && (
-                                                    <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                                                )}
+                                {(() => {
+                                    const playerIds = (match.participantIds || []).filter((id): id is string => id !== null);
+                                    // Sort by ranking (1st to last) when completed
+                                    const sortedIds = match.isCompleted
+                                        ? [...playerIds].sort((a, b) => (match.results[b] || 0) - (match.results[a] || 0))
+                                        : playerIds;
+
+                                    // Calculate NT for each player from scorecards
+                                    const getNT = (pId: string): number => {
+                                        const sc = match.scorecards?.[pId] as PlayerScore | undefined;
+                                        if (!sc) return 0;
+                                        return sc.nt + sc.objectifs + sc.recompenses + sc.forets + sc.villes + sc.cartes;
+                                    };
+
+                                    return sortedIds.map((pId, i) => {
+                                        const p = getParticipant(pId);
+                                        let placement = "";
+                                        if (match.isCompleted && p) {
+                                            const rank = sortedIds.indexOf(p.id) + 1;
+                                            const suffixes = ["er", "ème", "ème", "ème", "ème"];
+                                            placement = `${rank}${suffixes[rank - 1] || "ème"}`;
+                                        }
+                                        const nt = getNT(pId);
+                                        return (
+                                            <div key={i} className="flex items-center justify-between p-2 rounded-md bg-accent/50 text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <span>{p ? p.name : "Place vide"}</span>
+                                                    {p && qualifiedSet.has(p.id) && (
+                                                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    {match.isCompleted && nt > 0 && (
+                                                        <span className="text-xs text-muted-foreground">{nt} NT</span>
+                                                    )}
+                                                    {match.isCompleted && p && (
+                                                        <span className="font-bold text-primary">{placement}</span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            {match.isCompleted && p && (
-                                                <span className="font-bold text-primary">{placement}</span>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    });
+                                })()}
                             </div>
 
                             {!match.isCompleted && round === currentRound && !match.isPendingReview && (

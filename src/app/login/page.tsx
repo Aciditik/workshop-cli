@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [city, setCity] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +23,7 @@ export default function LoginPage() {
 
     try {
       if (isRegister) {
-        await register(email, password, name);
+        await register(email, password, name, city || undefined);
       } else {
         await login(email, password);
       }
@@ -69,20 +70,35 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {isRegister && (
-                <div className="space-y-2">
-                  <label htmlFor="name" className="text-sm font-medium">
-                    Nom
-                  </label>
-                  <input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Votre nom"
-                    className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    required
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <label htmlFor="name" className="text-sm font-medium">
+                      Nom de la boutique / association
+                    </label>
+                    <input
+                      id="name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Votre nom"
+                      className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="city" className="text-sm font-medium">
+                      Ville
+                    </label>
+                    <input
+                      id="city"
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Votre ville"
+                      className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    />
+                  </div>
+                </>
               )}
 
               <div className="space-y-2">

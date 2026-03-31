@@ -9,6 +9,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  city?: string;
   role: "organizer" | "admin";
 }
 
@@ -17,7 +18,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string, city?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -78,11 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/");
   };
 
-  const register = async (email: string, password: string, name: string) => {
+  const register = async (email: string, password: string, name: string, city?: string) => {
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, city }),
     });
 
     if (!res.ok) {
