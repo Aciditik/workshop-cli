@@ -12,7 +12,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
         fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`)
             .then(res => {
                 if (!res.ok) throw new Error("Not found");

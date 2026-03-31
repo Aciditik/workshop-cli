@@ -59,7 +59,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     const [scores, setScores] = useState<Record<string, PlayerScore>>({});
 
     useEffect(() => {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
         fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`)
             .then(res => {
                 if (!res.ok) throw new Error("Not found");
@@ -174,7 +174,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                 pointsToSubmit[pId] = rankings[pId]?.points || 0;
             });
 
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
             await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}/table/${tableId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -290,19 +290,6 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                 </div>
                             ))}
                         </div>
-
-                        {/* DIFF ROW */}
-                        <div className="flex bg-blue-500/20 text-foreground font-bold">
-                            <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/30 text-center">
-                                Diff
-                            </div>
-                            {activePlayers.map(pId => (
-                                <div key={pId} className="flex-1 min-w-[150px] p-4 bg-blue-500/5 text-foreground border-r border-border border-b border-border flex items-center justify-center text-lg font-bold">
-                                    {rankings[pId]?.diff ?? 0}
-                                </div>
-                            ))}
-                        </div>
-
                         {/* CLASSEMENT ROW */}
                         <div className="flex bg-accent/80 text-accent-foreground font-bold">
                             <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border text-center">
