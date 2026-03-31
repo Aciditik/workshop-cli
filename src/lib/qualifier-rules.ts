@@ -94,44 +94,52 @@ function getRound2Config(
     // Winners A+B vs seconds A+B
     if (n >= 8 && n <= 10) {
         const [tA, tB] = r;
+        const finalistIds = [tA.winner, tB.winner, tA.second, tB.second].filter(Boolean);
+        const consolation = [...tA.rest, ...tB.rest].filter(Boolean);
         return {
             finalistTables: [
-                { participantIds: [tA.winner, tB.winner, tA.second, tB.second].filter(Boolean), label: "Finale 1" },
+                { participantIds: finalistIds, label: "Finale 1" },
             ],
-            consolationTables: [],
+            consolationTables: distributeToConsolation(consolation, "Consolation"),
         };
     }
 
     // ─── 11 players (3 tables: 4,4,3): 1 finalist with 3 winners ──
     if (n === 11) {
         const [tA, tB, tC] = r;
+        const finalistIds = new Set([tA.winner, tB.winner, tC.winner]);
+        const consolation = [tA.second, tB.second, tC.second, ...tA.rest, ...tB.rest, ...tC.rest].filter(id => id && !finalistIds.has(id));
         return {
             finalistTables: [
-                { participantIds: [tA.winner, tB.winner, tC.winner], label: "Finale 1" },
+                { participantIds: [...finalistIds], label: "Finale 1" },
             ],
-            consolationTables: [],
+            consolationTables: distributeToConsolation(consolation, "Consolation"),
         };
     }
 
     // ─── 12 players (4 tables of 3): 1 finalist with 4 winners ────
     if (n === 12) {
         const [tA, tB, tC, tD] = r;
+        const finalistIds = new Set([tA.winner, tB.winner, tC.winner, tD.winner]);
+        const consolation = [tA.second, tB.second, tC.second, tD.second, ...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
         return {
             finalistTables: [
-                { participantIds: [tA.winner, tB.winner, tC.winner, tD.winner], label: "Finale 1" },
+                { participantIds: [...finalistIds], label: "Finale 1" },
             ],
-            consolationTables: [],
+            consolationTables: distributeToConsolation(consolation, "Consolation"),
         };
     }
 
     // ─── 13 players (4 tables: 3,3,3,4): 1 finalist with 4 winners
     if (n === 13) {
         const [tA, tB, tC, tD] = r;
+        const finalistIds = new Set([tA.winner, tB.winner, tC.winner, tD.winner]);
+        const consolation = [tA.second, tB.second, tC.second, tD.second, ...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
         return {
             finalistTables: [
-                { participantIds: [tA.winner, tB.winner, tC.winner, tD.winner], label: "Finale 1" },
+                { participantIds: [...finalistIds], label: "Finale 1" },
             ],
-            consolationTables: [],
+            consolationTables: distributeToConsolation(consolation, "Consolation"),
         };
     }
 
@@ -140,36 +148,45 @@ function getRound2Config(
     // Finale 2: winners C+D vs seconds A+B
     if (n === 14) {
         const [tA, tB, tC, tD] = r;
+        const finalistTables = [
+            { participantIds: [tA.winner, tB.winner, tC.second, tD.second].filter(Boolean), label: "Finale 1" },
+            { participantIds: [tC.winner, tD.winner, tA.second, tB.second].filter(Boolean), label: "Finale 2" },
+        ];
+        const finalistIds = new Set(finalistTables.flatMap(t => t.participantIds));
+        const consolation = [...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
         return {
-            finalistTables: [
-                { participantIds: [tA.winner, tB.winner, tC.second, tD.second].filter(Boolean), label: "Finale 1" },
-                { participantIds: [tC.winner, tD.winner, tA.second, tB.second].filter(Boolean), label: "Finale 2" },
-            ],
-            consolationTables: [],
+            finalistTables,
+            consolationTables: distributeToConsolation(consolation, "Consolation"),
         };
     }
 
     // ─── 15 players (4 tables: 4,4,4,3): 2 finalist tables crossed ─
     if (n === 15) {
         const [tA, tB, tC, tD] = r;
+        const finalistTables = [
+            { participantIds: [tA.winner, tB.winner, tC.second, tD.second].filter(Boolean), label: "Finale 1" },
+            { participantIds: [tC.winner, tD.winner, tA.second, tB.second].filter(Boolean), label: "Finale 2" },
+        ];
+        const finalistIds = new Set(finalistTables.flatMap(t => t.participantIds));
+        const consolation = [...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
         return {
-            finalistTables: [
-                { participantIds: [tA.winner, tB.winner, tC.second, tD.second].filter(Boolean), label: "Finale 1" },
-                { participantIds: [tC.winner, tD.winner, tA.second, tB.second].filter(Boolean), label: "Finale 2" },
-            ],
-            consolationTables: [],
+            finalistTables,
+            consolationTables: distributeToConsolation(consolation, "Consolation"),
         };
     }
 
     // ─── 16-19 players (4 tables): 2 finalist tables, crossed ────────
     if (n >= 16 && n <= 19) {
         const [tA, tB, tC, tD] = r;
+        const finalistTables = [
+            { participantIds: [tA.winner, tB.winner, tC.second, tD.second], label: "Finale 1" },
+            { participantIds: [tC.winner, tD.winner, tA.second, tB.second], label: "Finale 2" },
+        ];
+        const finalistIds = new Set(finalistTables.flatMap(t => t.participantIds));
+        const consolation = [...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
         return {
-            finalistTables: [
-                { participantIds: [tA.winner, tB.winner, tC.second, tD.second], label: "Finale 1" },
-                { participantIds: [tC.winner, tD.winner, tA.second, tB.second], label: "Finale 2" },
-            ],
-            consolationTables: [],
+            finalistTables,
+            consolationTables: distributeToConsolation(consolation, "Consolation"),
         };
     }
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTournaments } from "@/lib/store";
+import { useAuth, getApiUrl } from "@/lib/auth";
 import { Tournament, Participant } from "@/lib/types";
 import { getFormat, getMaxRounds, getQualifiedCount, getFormatLabel, isRecommendedSize, generateRound1 } from "@/lib/qualifier-rules";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -13,6 +14,7 @@ import Link from "next/link";
 export default function NewTournament() {
     const router = useRouter();
     const { addTournament } = useTournaments();
+    const { user, token } = useAuth();
     const [name, setName] = useState("");
     const [logoUrl, setLogoUrl] = useState("");
     const [logoFileName, setLogoFileName] = useState("");
@@ -20,6 +22,20 @@ export default function NewTournament() {
     const [players, setPlayers] = useState<string[]>([]);
     const [playerInput, setPlayerInput] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
+    const [organizers, setOrganizers] = useState<{ id: string; name: string; email: string; city?: string }[]>([]);
+    const [selectedOwnerId, setSelectedOwnerId] = useState("");
+
+    const isAdmin = user?.role === "admin";
+
+    useEffect(() => {
+        if (!isAdmin || !token) return;
+        fetch(`${getApiUrl()}/api/auth/users`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(res => res.ok ? res.json() : [])
+            .then(data => setOrganizers(data))
+            .catch(() => {});
+    }, [isAdmin, token]);
 
     const size = players.length;
     const canLaunch = name.trim() && eventDate && size >= 8;
@@ -79,6 +95,7 @@ export default function NewTournament() {
             currentRound: 1,
             maxRounds,
             qualifiedCount: getQualifiedCount(size),
+            ...(isAdmin && selectedOwnerId ? { ownerId: selectedOwnerId } : {}),
         };
 
         addTournament(newTournament);
@@ -131,6 +148,27 @@ export default function NewTournament() {
                             className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         />
                     </div>
+
+                    {/* Organizer selector (admin only) */}
+                    {isAdmin && organizers.length > 0 && (
+                        <div className="space-y-2">
+                            <label htmlFor="owner" className="text-sm font-medium">Organisateur</label>
+                            <select
+                                id="owner"
+                                value={selectedOwnerId}
+                                onChange={(e) => setSelectedOwnerId(e.target.value)}
+                                className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                                <option value="">Moi-même (admin)</option>
+                                {organizers.map(o => (
+                                    <option key={o.id} value={o.id}>
+                                        {o.city ? `${o.name} (${o.city})` : o.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-muted-foreground">L&apos;organisateur sélectionné pourra voir et gérer ce tournoi.</p>
+                        </div>
+                    )}
 
                     {/* Logo */}
                     <div className="space-y-2">

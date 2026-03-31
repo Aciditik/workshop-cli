@@ -137,7 +137,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
 
         const winnerTotal = playersWithSums[0]?.total ?? 0;
 
-        const rankings: Record<string, { rank: number, displayRank: string, points: number, base: number, bonus: number }> = {};
+        const rankings: Record<string, { rank: number, displayRank: string, points: number, base: number, bonus: number, diff: number }> = {};
 
         playersWithSums.forEach((p, index) => {
             let rankStr = `${index + 1}th`;
@@ -153,7 +153,8 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                 displayRank: rankStr,
                 points: base + bonus,
                 base,
-                bonus
+                bonus,
+                diff: winnerTotal - p.total
             };
         });
 
@@ -281,11 +282,23 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                         {/* TOTAL ROW */}
                         <div className="flex bg-primary/40 text-primary-foreground font-bold">
                             <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/30 text-center">
-                                Total
+                                NT
                             </div>
                             {activePlayers.map(pId => (
                                 <div key={pId} className="flex-1 min-w-[150px] p-4 bg-primary/10 text-foreground border-r border-primary/20 border-b border-primary/20 flex items-center justify-center text-xl font-black">
                                     {calculateTotal(pId)}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* DIFF ROW */}
+                        <div className="flex bg-blue-500/20 text-foreground font-bold">
+                            <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/30 text-center">
+                                Diff
+                            </div>
+                            {activePlayers.map(pId => (
+                                <div key={pId} className="flex-1 min-w-[150px] p-4 bg-blue-500/5 text-foreground border-r border-border border-b border-border flex items-center justify-center text-lg font-bold">
+                                    {rankings[pId]?.diff ?? 0}
                                 </div>
                             ))}
                         </div>

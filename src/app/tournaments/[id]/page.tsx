@@ -112,12 +112,70 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         return total;
     };
 
-    // Sort participants by total placement points if Swiss, otherwise by score
+    // Calculate NT score from scorecards for each participant
+    const calculateNTScore = (participantId: string): number => {
+        let ntTotal = 0;
+        tournament.matches.forEach(m => {
+            if (m.isCompleted && m.scorecards && m.scorecards[participantId]) {
+                const scorecard = m.scorecards[participantId] as any;
+                ntTotal += (scorecard.nt || 0) + (scorecard.objectifs || 0) + (scorecard.recompenses || 0) + (scorecard.forets || 0) + (scorecard.villes || 0) + (scorecard.cartes || 0);
+            }
+        });
+        return ntTotal;
+    };
+
+    // Calculate difference from table winner for each participant
+    const calculateTableDifference = (participantId: string): number => {
+        let totalDifference = 0;
+        let matchesCounted = 0;
+
+        tournament.matches.forEach(m => {
+            if (m.isCompleted && m.scorecards && m.scorecards[participantId]) {
+                // Find the NT score of the winner (1st place) at this table
+                const tableScores: { [key: string]: number } = {};
+                Object.entries(m.scorecards).forEach(([pid, scorecard]: [string, any]) => {
+                    if (scorecard) {
+                        const nt = (scorecard.nt || 0) + (scorecard.objectifs || 0) + (scorecard.recompenses || 0) + (scorecard.forets || 0) + (scorecard.villes || 0) + (scorecard.cartes || 0);
+                        tableScores[pid] = nt;
+                    }
+                });
+
+                // Sort by results to find the winner
+                const sortedByResults = Object.entries(m.results || {})
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([pid]) => pid);
+
+                if (sortedByResults.length > 0 && tableScores[sortedByResults[0]]) {
+                    const winnerNT = tableScores[sortedByResults[0]];
+                    const playerNT = tableScores[participantId];
+                    totalDifference += winnerNT - playerNT;
+                    matchesCounted++;
+                }
+            }
+        });
+
+        return matchesCounted > 0 ? totalDifference : 0;
+    };
+
+    // Sort participants: first by placement points, then by NT scores, then by table difference
     const sortedParticipants = [...tournament.participants].sort((a, b) => {
-        if (format === "swiss") {
-            return calculateTotalPoints(b.id) - calculateTotalPoints(a.id);
+        const pointsA = calculateTotalPoints(a.id);
+        const pointsB = calculateTotalPoints(b.id);
+        const ntA = calculateNTScore(a.id);
+        const ntB = calculateNTScore(b.id);
+        const diffA = calculateTableDifference(a.id);
+        const diffB = calculateTableDifference(b.id);
+        
+        // First sort by placement points (descending)
+        if (pointsB !== pointsA) {
+            return pointsB - pointsA;
         }
-        return b.score - a.score;
+        // Then sort by NT scores (descending)
+        if (ntB !== ntA) {
+            return ntB - ntA;
+        }
+        // Finally sort by table difference (ascending - smaller difference is better)
+        return diffA - diffB;
     });
 
     return (
@@ -222,6 +280,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 <div className="divide-y divide-border">
                                     {sortedParticipants.map((p, index) => {
                                         const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
+                                        const ntScore = calculateNTScore(p.id);
+                                        const tableDiff = calculateTableDifference(p.id);
                                         return (
                                             <div key={p.id} className={`p-4 flex items-center justify-between hover:bg-accent/30 transition-colors ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
                                                 <div className="flex items-center gap-3">
@@ -236,11 +296,23 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                                     )}
                                                 </div>
-                                                {totalPoints !== null && (
-                                                    <span className="text-sm font-mono text-muted-foreground">
-                                                        {totalPoints} pts
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-3">
+                                                    {tableDiff > 0 && (
+                                                        <span className="text-sm font-mono text-orange-600">
+                                                            Diff {tableDiff}
+                                                        </span>
+                                                    )}
+                                                    {ntScore > 0 && (
+                                                        <span className="text-sm font-mono text-blue-600">
+                                                            {ntScore} NT
+                                                        </span>
+                                                    )}
+                                                    {totalPoints !== null && (
+                                                        <span className="text-sm font-mono text-muted-foreground">
+                                                            {totalPoints} pts
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })}
