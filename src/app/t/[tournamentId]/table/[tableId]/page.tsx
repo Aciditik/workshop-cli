@@ -259,24 +259,11 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                                 pattern="[0-9]*"
                                                 step="1"
                                                 min="0"
-                                                className="w-full text-center p-2 text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-primary hide-arrows bg-transparent"
-                                                value={scores[pId]?.[cat.key] || 0}
-                                                onChange={(e) => handleScoreChange(pId, cat.key, parseInt(e.target.value) || 0)}
+                                                placeholder="0"
+                                                className="w-full text-center p-2 text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-primary hide-arrows bg-transparent placeholder:text-muted-foreground"
+                                                value={scores[pId]?.[cat.key] || ''}
+                                                onChange={(e) => handleScoreChange(pId, cat.key, e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                                             />
-                                            <div className="flex flex-col bg-muted border-l border-border">
-                                                <button
-                                                    className="px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground h-[18px] flex items-center justify-center transition-colors"
-                                                    onClick={() => handleScoreChange(pId, cat.key, (scores[pId]?.[cat.key] as number || 0) + 1)}
-                                                >
-                                                    <ChevronUp className="w-3 h-3" />
-                                                </button>
-                                                <button
-                                                    className="px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground border-t border-border h-[18px] flex items-center justify-center transition-colors"
-                                                    onClick={() => handleScoreChange(pId, cat.key, Math.max(0, (scores[pId]?.[cat.key] as number || 0) - 1))}
-                                                >
-                                                    <ChevronDown className="w-3 h-3" />
-                                                </button>
-                                            </div>
                                         </div>
                                     </div>
                                 ))}
