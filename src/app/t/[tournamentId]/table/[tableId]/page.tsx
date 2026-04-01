@@ -255,6 +255,10 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                         <div className="flex items-center w-full max-w-[120px] border border-border rounded-md overflow-hidden bg-background">
                                             <input
                                                 type="number"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                step="1"
+                                                min="0"
                                                 className="w-full text-center p-2 text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-primary hide-arrows bg-transparent"
                                                 value={scores[pId]?.[cat.key] || 0}
                                                 onChange={(e) => handleScoreChange(pId, cat.key, parseInt(e.target.value) || 0)}
