@@ -70,7 +70,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
           >
             <PlusCircle className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-medium">New Tournament</span>
+            <span className="font-medium">Nouveau tournoi</span>
           </Link>
         </nav>
 
