@@ -1,22 +1,31 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useRef, KeyboardEvent } from "react";
 import { useTournaments } from "@/lib/store";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SwissRounds } from "@/components/SwissRounds";
+import { Participant } from "@/lib/types";
 import {
     generateEliminationRound2,
     generateSwissRound,
     determineQualifiedPlayers,
     getFormatLabel,
+    generateRound1,
+    getFormat,
+    getMaxRounds,
+    getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw } from "lucide-react";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const { getTournament, updateTournament, isLoaded, refresh } = useTournaments();
+    const [playerName, setPlayerName] = useState("");
+    const [playerEmail, setPlayerEmail] = useState("");
+    const [playerPhone, setPlayerPhone] = useState("");
+    const playerInputRef = useRef<HTMLInputElement>(null);
 
     const tournament = isLoaded ? getTournament(id) : null;
 
@@ -98,6 +107,62 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const roundMatches = tournament.matches.filter(m => m.round === currentRound);
         // Matches must be completed OR pending review to proceed to next round
         return roundMatches.length > 0 && roundMatches.every(m => m.isCompleted || m.isPendingReview);
+    };
+
+    const addPlayer = () => {
+        const trimmed = playerName.trim();
+        if (!trimmed || tournament.status !== "draft") return;
+
+        const newParticipant: Participant = {
+            id: crypto.randomUUID(),
+            name: trimmed,
+            email: trimmed,
+            phone: trimmed,
+            score: 0,
+        };
+
+        updateTournament({
+            ...tournament,
+            participants: [...tournament.participants, newParticipant],
+            size: tournament.participants.length + 1,
+        });
+
+        setPlayerName("");
+        setPlayerEmail("");
+        setPlayerPhone("");
+        playerInputRef.current?.focus();
+    };
+
+    const removePlayer = (participantId: string) => {
+        if (tournament.status !== "draft") return;
+
+        updateTournament({
+            ...tournament,
+            participants: tournament.participants.filter(p => p.id !== participantId),
+            size: tournament.participants.length - 1,
+        });
+    };
+
+    const handlePlayerKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") { e.preventDefault(); addPlayer(); }
+    };
+
+    const startTournament = () => {
+        if (playerCount < 8) return;
+
+        const format = getFormat(playerCount);
+        const maxRounds = getMaxRounds(playerCount);
+        const round1Matches = generateRound1(tournament.id, tournament.participants, playerCount);
+
+        updateTournament({
+            ...tournament,
+            status: "in_progress",
+            format,
+            maxRounds,
+            qualifiedCount: getQualifiedCount(playerCount),
+            currentRound: 1,
+            matches: round1Matches,
+        });
     };
 
     const qualifiedIds = new Set(tournament.qualifiedIds || []);
@@ -243,6 +308,98 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     </div>
                                 );
                             })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* DRAFT Mode: Player Management */}
+            {tournament.status === "draft" && (
+                <Card className="border-orange-500/30 bg-orange-500/5">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-orange-400">
+                            <UserPlus className="w-5 h-5" />
+                            Ajouter des joueurs
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {/* Add player form */}
+                        <div className="space-y-2">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                <input
+                                    ref={playerInputRef}
+                                    type="text"
+                                    value={playerName}
+                                    onChange={(e) => setPlayerName(e.target.value)}
+                                    onKeyDown={handlePlayerKeyDown}
+                                    placeholder="Nom du joueur *"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                                <input
+                                    type="email"
+                                    value={playerEmail}
+                                    onChange={(e) => setPlayerEmail(e.target.value)}
+                                    onKeyDown={handlePlayerKeyDown}
+                                    placeholder="Email *"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                                <input
+                                    type="tel"
+                                    value={playerPhone}
+                                    onChange={(e) => setPlayerPhone(e.target.value)}
+                                    onKeyDown={handlePlayerKeyDown}
+                                    placeholder="Téléphone *"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                            </div>
+                            <Button onClick={addPlayer} className="gap-2 w-full md:w-auto">
+                                <Plus className="w-4 h-4" />
+                                Ajouter le joueur
+                            </Button>
+                        </div>
+
+                        {/* Player list with delete buttons */}
+                        {tournament.participants.length > 0 && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {tournament.participants.map((p, index) => (
+                                    <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-md border bg-card/50 text-sm group">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+                                                {index + 1}
+                                            </span>
+                                            <span className="font-medium">{p.name}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => removePlayer(p.id)}
+                                            className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Supprimer"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {tournament.participants.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                                Aucun joueur ajouté. Ajoutez au moins 8 joueurs pour lancer le tournoi.
+                            </p>
+                        )}
+
+                        {/* Start tournament button */}
+                        <div className="pt-4 border-t">
+                            <Button
+                                onClick={startTournament}
+                                disabled={playerCount < 8}
+                                className="w-full gap-2"
+                                size="lg"
+                            >
+                                <Play className="w-4 h-4 fill-white" />
+                                Lancer le tournoi ({playerCount} joueur{playerCount !== 1 ? "s" : ""})
+                                {playerCount < 8 && ` - ${8 - playerCount} manquant${8 - playerCount > 1 ? "s" : ""}`}
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>

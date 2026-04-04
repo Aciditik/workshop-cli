@@ -14,7 +14,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <Trophy className="w-12 h-12 text-primary opacity-50" />
-          <p className="text-muted-foreground">Loading tournaments...</p>
+          <p className="text-muted-foreground">Chargement des tournois...</p>
         </div>
       </div>
     );
@@ -26,13 +26,13 @@ export default function Dashboard() {
         <div>
           <h1 className="text-4xl font-bold tracking-tight mb-2">Dashboard</h1>
           <p className="text-muted-foreground text-lg">
-            Manage your tournaments or start a new one.
+            Gérez vos tournois ou commencez-en un nouveau.
           </p>
         </div>
         <Link href="/tournaments/new">
           <Button size="lg" className="gap-2">
             <Trophy className="w-5 h-5" />
-            Create Tournament
+            Créer un tournoi
           </Button>
         </Link>
       </div>
@@ -42,12 +42,12 @@ export default function Dashboard() {
           <div className="bg-primary/10 p-4 rounded-full mb-4">
             <Trophy className="w-10 h-10 text-primary" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">No Tournaments Yet</h3>
+          <h3 className="text-xl font-semibold mb-2">Aucun tournoi pour le moment</h3>
           <p className="text-muted-foreground mb-6 max-w-md">
-            You havent created any tournaments. Click the button below to set up your first bracket!
+            Vous n'avez pas créé de tournoi. Cliquez sur le bouton ci-dessous pour créer votre premier tournoi!
           </p>
           <Link href="/tournaments/new">
-            <Button>Create Your First Tournament</Button>
+            <Button>Créer votre premier tournoi</Button>
           </Link>
         </Card>
       ) : (

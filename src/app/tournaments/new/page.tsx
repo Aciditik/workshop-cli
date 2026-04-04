@@ -19,8 +19,10 @@ export default function NewTournament() {
     const [logoUrl, setLogoUrl] = useState("");
     const [logoFileName, setLogoFileName] = useState("");
     const [eventDate, setEventDate] = useState("");
-    const [players, setPlayers] = useState<string[]>([]);
+    const [players, setPlayers] = useState<Array<{name: string; email: string; phone: string}>>([]);
     const [playerInput, setPlayerInput] = useState("");
+    const [emailInput, setEmailInput] = useState("");
+    const [phoneInput, setPhoneInput] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
     const [organizers, setOrganizers] = useState<{ id: string; name: string; email: string; city?: string }[]>([]);
     const [selectedOwnerId, setSelectedOwnerId] = useState("");
@@ -39,6 +41,7 @@ export default function NewTournament() {
 
     const size = players.length;
     const canLaunch = name.trim() && eventDate && size >= 8;
+    const canCreateDraft = name.trim() && eventDate;
 
     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -54,8 +57,10 @@ export default function NewTournament() {
     const addPlayer = () => {
         const trimmed = playerInput.trim();
         if (!trimmed) return;
-        setPlayers(prev => [...prev, trimmed]);
+        setPlayers(prev => [...prev, { name: trimmed, email: trimmed, phone: trimmed }]);
         setPlayerInput("");
+        setEmailInput("");
+        setPhoneInput("");
         inputRef.current?.focus();
     };
 
@@ -67,12 +72,47 @@ export default function NewTournament() {
         if (e.key === "Enter") { e.preventDefault(); addPlayer(); }
     };
 
+    const handleCreateDraft = () => {
+        if (!canCreateDraft) return;
+
+        const tournamentId = crypto.randomUUID();
+        const participants: Participant[] = players.map(p => ({
+            id: crypto.randomUUID(),
+            name: p.name,
+            email: p.email,
+            phone: p.phone,
+            score: 0,
+        }));
+
+        const newTournament: Tournament = {
+            id: tournamentId,
+            name: name.trim(),
+            logoUrl: logoUrl || undefined,
+            eventDate,
+            createdAt: new Date().toISOString(),
+            status: "draft",
+            format: "swiss",
+            participants,
+            matches: [],
+            size: participants.length,
+            currentRound: 0,
+            maxRounds: 3,
+            qualifiedCount: 2,
+            ...(isAdmin && selectedOwnerId ? { ownerId: selectedOwnerId } : {}),
+        };
+
+        addTournament(newTournament);
+        router.push(`/tournaments/${newTournament.id}`);
+    };
+
     const handleLaunch = () => {
         if (!canLaunch) return;
 
-        const participants: Participant[] = players.map(pName => ({
+        const participants: Participant[] = players.map(p => ({
             id: crypto.randomUUID(),
-            name: pName,
+            name: p.name,
+            email: p.email,
+            phone: p.phone,
             score: 0,
         }));
 
@@ -201,18 +241,36 @@ export default function NewTournament() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Add player input */}
-                    <div className="flex gap-2">
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={playerInput}
-                            onChange={(e) => setPlayerInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Nom du joueur (Entrée pour valider)"
-                            className="flex-1 flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        />
-                        <Button type="button" onClick={addPlayer} className="gap-1 shrink-0">
-                            <Plus className="w-4 h-4" /> Ajouter
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={playerInput}
+                                onChange={(e) => setPlayerInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Nom du joueur *"
+                                className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            />
+                            <input
+                                type="email"
+                                value={emailInput}
+                                onChange={(e) => setEmailInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Email *"
+                                className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            />
+                            <input
+                                type="tel"
+                                value={phoneInput}
+                                onChange={(e) => setPhoneInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Téléphone *"
+                                className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            />
+                        </div>
+                        <Button type="button" onClick={addPlayer} className="gap-1 w-full md:w-auto">
+                            <Plus className="w-4 h-4" /> Ajouter le joueur
                         </Button>
                     </div>
 
@@ -225,7 +283,7 @@ export default function NewTournament() {
                                         <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
                                             {index + 1}
                                         </span>
-                                        <span className="font-medium">{player}</span>
+                                        <span className="font-medium">{player.name}</span>
                                     </div>
                                     <button
                                         type="button"
@@ -287,15 +345,27 @@ export default function NewTournament() {
                 <Link href="/">
                     <Button variant="ghost">Annuler</Button>
                 </Link>
-                <Button
-                    size="lg"
-                    className="gap-2"
-                    disabled={!canLaunch}
-                    onClick={handleLaunch}
-                >
-                    <Play className="w-4 h-4 fill-white" />
-                    Lancer le tournoi ({size} joueur{size !== 1 ? "s" : ""})
-                </Button>
+                <div className="flex gap-3">
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        className="gap-2"
+                        disabled={!canCreateDraft}
+                        onClick={handleCreateDraft}
+                    >
+                        <Trophy className="w-4 h-4" />
+                        Créer le tournoi sans joueurs
+                    </Button>
+                    <Button
+                        size="lg"
+                        className="gap-2"
+                        disabled={!canLaunch}
+                        onClick={handleLaunch}
+                    >
+                        <Play className="w-4 h-4 fill-white" />
+                        Lancer le tournoi ({size} joueur{size !== 1 ? "s" : ""})
+                    </Button>
+                </div>
             </div>
         </div>
     );
