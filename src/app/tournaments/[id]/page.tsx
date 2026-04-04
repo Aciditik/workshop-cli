@@ -6,7 +6,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SwissRounds } from "@/components/SwissRounds";
 import { Participant } from "@/lib/types";
-import { Participant } from "@/lib/types";
 import {
     generateEliminationRound2,
     generateSwissRound,
@@ -40,6 +39,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const currentRound = tournament.currentRound || 0;
 
     const generateNextRound = () => {
+        console.log("=== GENERATING NEXT ROUND ===");
+        console.log("Current round:", currentRound);
+        console.log("Format:", format);
+        console.log("Player count:", playerCount);
+        console.log("Participants count:", tournament.participants.length);
+        
         const nextRound = currentRound + 1;
         if (nextRound > maxRounds) return;
 
@@ -48,11 +53,21 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         if (format === "elimination" && nextRound === 2) {
             // Elimination Round 2: crossed finalist tables
             const round1Matches = tournament.matches.filter(m => m.round === 1);
+            console.log("Generating elimination Round 2 with", round1Matches.length, "Round 1 matches");
             newMatches = generateEliminationRound2(tournament.id, playerCount, round1Matches);
         } else {
             // Swiss rounds 2-3: sorted by score
+            console.log("Generating Swiss round", nextRound, "with", tournament.participants.length, "participants");
             newMatches = generateSwissRound(tournament.id, tournament.participants, currentRound);
         }
+
+        console.log("Generated", newMatches.length, "new matches");
+        console.log("Sending update with:", {
+            currentRound: nextRound,
+            totalMatches: tournament.matches.length + newMatches.length,
+            participantsIncluded: !!tournament.participants,
+            participantCount: tournament.participants.length
+        });
 
         updateTournament({
             ...tournament,
@@ -60,6 +75,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             currentRound: nextRound,
             matches: [...tournament.matches, ...newMatches]
         });
+        
+        console.log("=== ROUND GENERATION SENT ===");
     };
 
     const submitMatchResults = (matchId: string, results: Record<string, number>) => {
@@ -108,62 +125,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const roundMatches = tournament.matches.filter(m => m.round === currentRound);
         // Matches must be completed OR pending review to proceed to next round
         return roundMatches.length > 0 && roundMatches.every(m => m.isCompleted || m.isPendingReview);
-    };
-
-    const addPlayer = () => {
-        const trimmed = playerName.trim();
-        if (!trimmed || tournament.status !== "draft") return;
-
-        const newParticipant: Participant = {
-            id: crypto.randomUUID(),
-            name: trimmed,
-            email: trimmed,
-            phone: trimmed,
-            score: 0,
-        };
-
-        updateTournament({
-            ...tournament,
-            participants: [...tournament.participants, newParticipant],
-            size: tournament.participants.length + 1,
-        });
-
-        setPlayerName("");
-        setPlayerEmail("");
-        setPlayerPhone("");
-        playerInputRef.current?.focus();
-    };
-
-    const removePlayer = (participantId: string) => {
-        if (tournament.status !== "draft") return;
-
-        updateTournament({
-            ...tournament,
-            participants: tournament.participants.filter(p => p.id !== participantId),
-            size: tournament.participants.length - 1,
-        });
-    };
-
-    const handlePlayerKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Enter") { e.preventDefault(); addPlayer(); }
-    };
-
-    const startTournament = () => {
-        if (playerCount < 8) return;
-
-        const format = getFormat(playerCount);
-        const maxRounds = getMaxRounds(playerCount);
-        const round1Matches = generateRound1(tournament.id, tournament.participants, playerCount);
-
-        updateTournament({
-            ...tournament,
-            status: "in_progress",
-            format,
-            maxRounds,
-            qualifiedCount: getQualifiedCount(playerCount),
-            currentRound: 1,
-            matches: round1Matches,
-        });
     };
 
     const addPlayer = () => {

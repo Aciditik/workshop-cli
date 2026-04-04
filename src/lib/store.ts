@@ -24,9 +24,16 @@ export function useTournaments() {
 
     const fetchTournaments = async () => {
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout for Render
+            
             const res = await fetch(`${API_URL}/api/tournaments`, {
                 headers: authHeaders(),
+                signal: controller.signal,
             });
+            
+            clearTimeout(timeoutId);
+            
             if (res.ok) {
                 const data = await res.json();
                 setTournaments(data);
@@ -37,6 +44,7 @@ export function useTournaments() {
             }
         } catch (e) {
             console.error("Failed to fetch tournaments", e);
+            // Don't show error to user for network issues (common on Render)
         } finally {
             setIsLoaded(true);
         }
@@ -68,28 +76,50 @@ export function useTournaments() {
     };
 
     const updateTournament = async (updatedTournament: Tournament) => {
+        console.log("=== STORE UPDATE TOURNAMENT ===");
+        console.log("Tournament ID:", updatedTournament.id);
+        console.log("Data being sent:", {
+            name: updatedTournament.name,
+            currentRound: updatedTournament.currentRound,
+            status: updatedTournament.status,
+            participantCount: updatedTournament.participants?.length || 0,
+            matchCount: updatedTournament.matches?.length || 0,
+            hasParticipants: !!updatedTournament.participants,
+            hasMatches: !!updatedTournament.matches
+        });
+        
         // Optimistic update
         setTournaments(prev => prev.map(t =>
             t.id === updatedTournament.id ? updatedTournament : t
         ));
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for Render
+            
             const res = await fetch(`${API_URL}/api/tournaments/${updatedTournament.id}`, {
                 method: 'PUT',
                 headers: authHeaders(),
-                body: JSON.stringify(updatedTournament)
+                body: JSON.stringify(updatedTournament),
+                signal: controller.signal,
             });
+            
+            clearTimeout(timeoutId);
             
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${res.statusText}`);
             }
             
-            // Refresh to ensure server state is in sync
-            await fetchTournaments();
-        } catch (e) {
+            // Only refresh if critical update (not every time to avoid Render issues)
+            if (updatedTournament.status === "completed" || updatedTournament.currentRound !== tournaments.find(t => t.id === updatedTournament.id)?.currentRound) {
+                await fetchTournaments();
+            }
+        } catch (e: any) {
             console.error("Failed to update tournament", e);
-            // Revert by fetching fresh data from server
-            await fetchTournaments();
+            // Only revert on network errors, not timeouts
+            if (e.name !== 'AbortError') {
+                await fetchTournaments();
+            }
         }
     };
 

@@ -1,0 +1,5 @@
+# API Configuration
+NEXT_PUBLIC_API_URL=https://your-workshop-api.onrender.com
+
+# Optional: Add error tracking and monitoring
+# SENTRY_DSN=your_sentry_dsn_here
