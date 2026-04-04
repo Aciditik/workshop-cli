@@ -11,12 +11,12 @@ import {
     determineQualifiedPlayers,
     getFormatLabel,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star } from "lucide-react";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    const { getTournament, updateTournament, isLoaded } = useTournaments();
+    const { getTournament, updateTournament, isLoaded, refresh } = useTournaments();
 
     const tournament = isLoaded ? getTournament(id) : null;
 
@@ -77,9 +77,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             qualifiedIds: undefined as string[] | undefined,
         };
 
-        // Check if all tables in current round are completed
+        // Check if all tables in current round are completed or pending review
         const currentRoundMatches = updatedMatches.filter(m => m.round === currentRound);
-        const allCompleted = currentRoundMatches.every(m => m.isCompleted);
+        const allCompleted = currentRoundMatches.every(m => m.isCompleted || m.isPendingReview);
 
         // Tournament completes when the last round finishes
         if (allCompleted && currentRound === maxRounds) {
@@ -96,7 +96,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const canGenerateNextRound = () => {
         if (currentRound >= maxRounds) return false;
         const roundMatches = tournament.matches.filter(m => m.round === currentRound);
-        return roundMatches.length > 0 && roundMatches.every(m => m.isCompleted);
+        // Matches must be completed OR pending review to proceed to next round
+        return roundMatches.length > 0 && roundMatches.every(m => m.isCompleted || m.isPendingReview);
     };
 
     const qualifiedIds = new Set(tournament.qualifiedIds || []);
@@ -210,6 +211,15 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         </p>
                     </div>
                 </div>
+                <Button
+                    onClick={refresh}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                >
+                    <RotateCcw className="w-4 h-4" />
+                    Refresh
+                </Button>
             </div>
 
             {/* Qualified Players Banner */}

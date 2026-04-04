@@ -59,17 +59,20 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     const [scores, setScores] = useState<Record<string, PlayerScore>>({});
 
     useEffect(() => {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-        fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`)
-            .then(res => {
+        const loadTournament = async () => {
+            try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+                const res = await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`);
                 if (!res.ok) throw new Error("Not found");
-                return res.json();
-            })
-            .then((data: Tournament) => {
+                const data = await res.json();
                 setTournament(data);
+            } catch (error) {
+                console.error("Failed to load tournament:", error);
+            } finally {
                 setLoading(false);
-            })
-            .catch(() => setLoading(false));
+            }
+        };
+        loadTournament();
     }, [tournamentId]);
 
     const match = tournament?.matches.find(m => m.id === tableId);

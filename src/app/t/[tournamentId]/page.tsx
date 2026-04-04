@@ -13,16 +13,19 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-        fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`)
-            .then(res => {
+        const loadTournament = async () => {
+            try {
+                const res = await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`);
                 if (!res.ok) throw new Error("Not found");
-                return res.json();
-            })
-            .then((data: Tournament) => {
+                const data = await res.json();
                 setTournament(data);
+            } catch (error) {
+                console.error("Failed to load tournament:", error);
+            } finally {
                 setLoading(false);
-            })
-            .catch(() => setLoading(false));
+            }
+        };
+        loadTournament();
     }, [tournamentId]);
 
     if (loading) return <div className="p-8 text-center animate-pulse">Loading tournament...</div>;

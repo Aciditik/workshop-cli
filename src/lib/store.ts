@@ -30,6 +30,10 @@ export function useTournaments() {
             if (res.ok) {
                 const data = await res.json();
                 setTournaments(data);
+            } else if (res.status === 401) {
+                // Clear invalid token and reload
+                localStorage.removeItem("token");
+                window.location.reload();
             }
         } catch (e) {
             console.error("Failed to fetch tournaments", e);
@@ -70,13 +74,21 @@ export function useTournaments() {
         ));
 
         try {
-            await fetch(`${API_URL}/api/tournaments/${updatedTournament.id}`, {
+            const res = await fetch(`${API_URL}/api/tournaments/${updatedTournament.id}`, {
                 method: 'PUT',
                 headers: authHeaders(),
                 body: JSON.stringify(updatedTournament)
             });
+            
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            
+            // Refresh to ensure server state is in sync
+            await fetchTournaments();
         } catch (e) {
             console.error("Failed to update tournament", e);
+            // Revert by fetching fresh data from server
             await fetchTournaments();
         }
     };
