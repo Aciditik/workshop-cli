@@ -104,12 +104,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             qualifiedIds: undefined as string[] | undefined,
         };
 
-        // Check if all tables in current round are completed or pending review
-        const currentRoundMatches = updatedMatches.filter(m => m.round === currentRound);
-        const allCompleted = currentRoundMatches.every(m => m.isCompleted || m.isPendingReview);
+        // Check if ALL tables (including finale/consolation) are completed
+        const allTablesCompleted = updatedMatches.every(m => m.isCompleted || m.isPendingReview);
 
-        // Tournament completes when the last round finishes
-        if (allCompleted && currentRound === maxRounds) {
+        // Tournament completes when current round is max AND all tables (including finale/consolation) are done
+        if (allTablesCompleted && currentRound === maxRounds) {
             newTournamentData.status = "completed";
             newTournamentData.qualifiedIds = determineQualifiedPlayers(
                 format, tournament.size, updatedMatches, updatedParticipants
