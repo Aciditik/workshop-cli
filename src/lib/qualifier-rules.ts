@@ -16,7 +16,8 @@ export function getQualifiedCount(size: number): number {
     if (size >= 16 && size <= 23) return 2;
     if (size >= 24 && size <= 27) return 3;
     if (size >= 28 && size <= 31) return 3;
-    return 4; // 32+
+    // 32+: 4 qualified, then +1 for every 8 additional players
+    return 4 + Math.floor((size - 32) / 8);
 }
 
 export function isRecommendedSize(size: number): boolean {

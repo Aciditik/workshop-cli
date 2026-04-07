@@ -16,7 +16,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus } from "lucide-react";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
@@ -34,7 +34,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const format = tournament.format || "swiss";
     const maxRounds = tournament.maxRounds || 3;
-    const qualifiedCount = tournament.qualifiedCount || 2;
+    const qualifiedCount = tournament.status === "draft"
+        ? getQualifiedCount(tournament.participants.length)
+        : (tournament.qualifiedCount || 2);
 
     const currentRound = tournament.currentRound || 0;
 
@@ -105,9 +107,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         };
 
         // Check if ALL tables (including finale/consolation) are completed
-        const allTablesCompleted = updatedMatches.every(m => m.isCompleted || m.isPendingReview);
+        const allTablesCompleted = updatedMatches.every(m => m.isCompleted);
 
-        // Tournament completes when current round is max AND all tables (including finale/consolation) are done
+        // Tournament completes when current round is max AND all tables are truly done
         if (allTablesCompleted && currentRound === maxRounds) {
             newTournamentData.status = "completed";
             newTournamentData.qualifiedIds = determineQualifiedPlayers(
@@ -133,8 +135,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const newParticipant: Participant = {
             id: crypto.randomUUID(),
             name: trimmed,
-            email: trimmed,
-            phone: trimmed,
+            email: playerEmail.trim(),
+            phone: playerPhone.trim(),
             score: 0,
         };
 
@@ -180,6 +182,21 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             currentRound: 1,
             matches: round1Matches,
         });
+    };
+
+    const exportTopPlayers = () => {
+        const exportCount = qualifiedCount * 2 + 1;
+        const topPlayers = sortedParticipants.slice(0, exportCount);
+        const csvHeader = "Nom,Email,Téléphone";
+        const csvRows = topPlayers.map(p => `${p.name},${p.email || ""},${p.phone || ""}`);
+        const csvContent = [csvHeader, ...csvRows].join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${tournament.name}_top${exportCount}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
     };
 
     const qualifiedIds = new Set(tournament.qualifiedIds || []);
@@ -326,96 +343,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 );
                             })}
                         </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* DRAFT Mode: Player Management */}
-            {tournament.status === "draft" && (
-                <Card className="border-orange-500/30 bg-orange-500/5">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-orange-400">
-                            <UserPlus className="w-5 h-5" />
-                            Ajouter des joueurs
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {/* Add player form */}
-                        <div className="space-y-2">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                <input
-                                    ref={playerInputRef}
-                                    type="text"
-                                    value={playerName}
-                                    onChange={(e) => setPlayerName(e.target.value)}
-                                    onKeyDown={handlePlayerKeyDown}
-                                    placeholder="Nom du joueur *"
-                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                />
-                                <input
-                                    type="email"
-                                    value={playerEmail}
-                                    onChange={(e) => setPlayerEmail(e.target.value)}
-                                    onKeyDown={handlePlayerKeyDown}
-                                    placeholder="Email *"
-                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                />
-                                <input
-                                    type="tel"
-                                    value={playerPhone}
-                                    onChange={(e) => setPlayerPhone(e.target.value)}
-                                    onKeyDown={handlePlayerKeyDown}
-                                    placeholder="Téléphone *"
-                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                />
-                            </div>
-                            <Button onClick={addPlayer} className="gap-2 w-full md:w-auto">
-                                <Plus className="w-4 h-4" />
-                                Ajouter le joueur
-                            </Button>
-                        </div>
-
-                        {/* Player list with delete buttons */}
-                        {tournament.participants.length > 0 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {tournament.participants.map((p, index) => (
-                                    <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-md border bg-card/50 text-sm group">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
-                                                {index + 1}
-                                            </span>
-                                            <span className="font-medium">{p.name}</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removePlayer(p.id)}
-                                            className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-                                            title="Supprimer"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {tournament.participants.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
-                                Aucun joueur ajouté. Ajoutez au moins 8 joueurs pour lancer le tournoi.
-                            </p>
-                        )}
-
-                        {/* Start tournament button */}
-                        <div className="pt-4 border-t">
-                            <Button
-                                onClick={startTournament}
-                                disabled={playerCount < 8}
-                                className="w-full gap-2"
-                                size="lg"
-                            >
-                                <Play className="w-4 h-4 fill-white" />
-                                Lancer le tournoi ({playerCount} joueur{playerCount !== 1 ? "s" : ""})
-                                {playerCount < 8 && ` - ${8 - playerCount} manquant${8 - playerCount > 1 ? "s" : ""}`}
+                        <div className="mt-4 pt-4 border-t border-yellow-500/20">
+                            <Button onClick={exportTopPlayers} className="gap-2" variant="outline">
+                                <Download className="w-4 h-4" />
+                                Exporter le top {qualifiedCount * 2 + 1} (CSV)
                             </Button>
                         </div>
                     </CardContent>
@@ -572,6 +503,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                                     )}
                                                 </div>
+                                                {tournament.status !== "draft" && (
                                                 <div className="flex items-center gap-3">
                                                     {tableDiff > 0 && (
                                                         <span className="text-sm font-mono text-orange-600">
@@ -589,6 +521,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         </span>
                                                     )}
                                                 </div>
+                                                )}
                                             </div>
                                         );
                                     })}
