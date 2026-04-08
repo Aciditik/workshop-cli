@@ -3,9 +3,10 @@ export type TournamentFormat = "elimination" | "swiss";
 
 export interface Participant {
     id: string;
+    firstname: string;
     name: string;
-    email?: string;
-    phone?: string;
+    email: string;
+    phone: string;
     score: number; // Accrued points
 }
 

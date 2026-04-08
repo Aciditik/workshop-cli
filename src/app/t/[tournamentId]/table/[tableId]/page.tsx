@@ -223,7 +223,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                             </div>
                             {activePlayers.map(pId => (
                                 <div key={pId} className="flex-1 min-w-[150px] p-4 bg-card text-card-foreground border-r border-border border-b border-border flex items-center justify-center font-medium">
-                                    {getParticipant(pId)?.name || "Unknown"}
+                                    {(() => { const p = getParticipant(pId); return p ? `${p.firstname} ${p.name}` : "Unknown"; })()}
                                 </div>
                             ))}
                         </div>

@@ -1,8 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import { TableMatch, Participant, PlayerScore } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QRCodeModal } from "@/components/QRCodeModal";
-import { Star } from "lucide-react";
+import { Star, ChevronDown, ChevronRight } from "lucide-react";
 
 interface SwissRoundsProps {
     matches: TableMatch[];
@@ -18,16 +21,31 @@ interface SwissRoundsProps {
 export function SwissRounds({ matches, participants, onSubmitResults, currentRound, tournamentId, tournamentName, maxRounds = 3, qualifiedIds }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
+    // By default, only the current round is expanded
+    const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set([currentRound]));
+
+    const toggleRound = (round: number) => {
+        setExpandedRounds(prev => {
+            const next = new Set(prev);
+            if (next.has(round)) next.delete(round);
+            else next.add(round);
+            return next;
+        });
+    };
 
     const getParticipant = (id: string | null) =>
         id ? participants.find(p => p.id === id) : null;
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-4">
             {rounds.map(round => {
                 const roundMatches = matches.filter(m => m.round === round).sort((a, b) => a.tableNumber - b.tableNumber);
 
                 if (roundMatches.length === 0) return null;
+
+                const isExpanded = expandedRounds.has(round);
+                const completedCount = roundMatches.filter(m => m.isCompleted).length;
+                const totalCount = roundMatches.length;
 
                 // Separate finalist and non-finalist tables for display
                 const finalistMatches = roundMatches.filter(m => m.isFinalist);
@@ -35,45 +53,62 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
 
                 return (
                     <div key={round} className="space-y-4">
-                        <div className="flex items-center justify-between">
+                        {/* Clickable round header */}
+                        <button
+                            type="button"
+                            onClick={() => toggleRound(round)}
+                            className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                        >
                             <h3 className="text-xl font-bold flex items-center gap-2">
+                                {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                                 Ronde {round}
                                 {round === currentRound && <span className="bg-primary/20 text-primary text-xs px-2 py-1 rounded-full uppercase tracking-wider">Active</span>}
+                                <span className="text-sm font-normal text-muted-foreground ml-2">
+                                    {completedCount}/{totalCount} tables
+                                </span>
                             </h3>
-                            {round === currentRound && (
-                                <QRCodeModal
-                                    tournamentId={tournamentId}
-                                    tournamentName={tournamentName}
-                                />
-                            )}
-                        </div>
-
-                        {/* Finalist tables section */}
-                        {finalistMatches.length > 0 && (
-                            <div className="space-y-2">
-                                <p className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">Tables Finalistes</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {finalistMatches.map(match => renderMatchCard(match, round, true))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Other tables (consolation or regular swiss) */}
-                        {otherMatches.length > 0 && (
-                            <div className="space-y-2">
-                                {finalistMatches.length > 0 && (
-                                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Tables Consolation</p>
+                            <div className="flex items-center gap-2">
+                                {round === currentRound && (
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <QRCodeModal
+                                            tournamentId={tournamentId}
+                                            tournamentName={tournamentName}
+                                        />
+                                    </div>
                                 )}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {otherMatches.map(match => renderMatchCard(match, round, false))}
-                                </div>
                             </div>
-                        )}
+                        </button>
 
-                        {/* Regular display when no finalist distinction */}
-                        {finalistMatches.length === 0 && otherMatches.length === 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {roundMatches.map(match => renderMatchCard(match, round, false))}
+                        {isExpanded && (
+                            <div className="space-y-4 pl-2">
+                                {/* Finalist tables section */}
+                                {finalistMatches.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">Tables Finalistes</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {finalistMatches.map(match => renderMatchCard(match, round, true))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Other tables (consolation or regular swiss) */}
+                                {otherMatches.length > 0 && (
+                                    <div className="space-y-2">
+                                        {finalistMatches.length > 0 && (
+                                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Tables Consolation</p>
+                                        )}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {otherMatches.map(match => renderMatchCard(match, round, false))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Regular display when no finalist distinction */}
+                                {finalistMatches.length === 0 && otherMatches.length === 0 && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {roundMatches.map(match => renderMatchCard(match, round, false))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -113,7 +148,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                                 return (
                                     <div key={pId} className="rounded-md border border-yellow-500/30 bg-yellow-500/5 overflow-hidden">
                                         <div className="flex items-center justify-between px-3 py-2 bg-yellow-500/10 font-semibold text-sm">
-                                            <span>{p.name}</span>
+                                            <span>{p.firstname} {p.name}</span>
                                             <span className="text-yellow-400">{total} pts {/*→ <span className="text-primary">+{pts} placement</span>*/}</span>
                                         </div>
                                         {sc.corporation && (
@@ -181,7 +216,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                                         return (
                                             <div key={i} className="flex items-center justify-between p-2 rounded-md bg-accent/50 text-sm">
                                                 <div className="flex items-center gap-2">
-                                                    <span>{p ? p.name : "Place vide"}</span>
+                                                    <span>{p ? `${p.firstname} ${p.name}` : "Place vide"}</span>
                                                     {p && qualifiedSet.has(p.id) && (
                                                         <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                                                     )}

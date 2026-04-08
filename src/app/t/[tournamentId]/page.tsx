@@ -33,14 +33,19 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
     if (!tournament) return <div className="p-8 text-center text-red-500">Tournament not found.</div>;
 
     const currentRound = tournament.currentRound || 0;
-    const activeMatches = tournament.matches
-        .filter(m => m.round === currentRound && !m.isCompleted)
+    const currentRoundMatches = tournament.matches
+        .filter(m => m.round === currentRound)
         .sort((a, b) => a.tableNumber - b.tableNumber);
+    const activeMatches = currentRoundMatches.filter(m => !m.isCompleted && !m.isPendingReview);
+    const submittedMatches = currentRoundMatches.filter(m => m.isCompleted || m.isPendingReview);
 
     const getParticipantNames = (ids: (string | null)[]) =>
         ids
             .filter((id): id is string => id !== null)
-            .map(id => tournament.participants.find(p => p.id === id)?.name || "Unknown")
+            .map(id => {
+                const p = tournament.participants.find(p => p.id === id);
+                return p ? `${p.firstname} ${p.name}` : "Unknown";
+            })
             .join(", ");
 
     return (
@@ -70,9 +75,9 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
 
                 {tournament.status === "in_progress" && currentRound > 0 && (
                     <>
-                        {activeMatches.length === 0 ? (
+                        {currentRoundMatches.length === 0 ? (
                             <Card className="p-6 text-center">
-                                <p className="text-muted-foreground">All tables for this round are completed.</p>
+                                <p className="text-muted-foreground">No tables for this round yet.</p>
                             </Card>
                         ) : (
                             <div className="space-y-3">
@@ -101,6 +106,41 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                                         </Card>
                                     </Link>
                                 ))}
+
+                                {submittedMatches.length > 0 && (
+                                    <>
+                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-4">
+                                            Scores déjà soumis ({submittedMatches.length}/{currentRoundMatches.length})
+                                        </p>
+                                        {submittedMatches.map(match => (
+                                            <Card key={match.id} className="p-4 border-green-500/30 bg-green-500/5 opacity-70">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="bg-green-500/20 text-green-500 font-bold rounded-lg w-10 h-10 flex items-center justify-center text-lg">
+                                                            {match.tableNumber}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-semibold text-sm">Table {match.tableNumber}</p>
+                                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                <Users className="w-3 h-3" />
+                                                                {getParticipantNames(match.participantIds)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-green-500 text-sm font-medium flex items-center gap-1">
+                                                        ✓ {match.isCompleted ? "Validé" : "En attente"}
+                                                    </span>
+                                                </div>
+                                            </Card>
+                                        ))}
+                                    </>
+                                )}
+
+                                {activeMatches.length === 0 && submittedMatches.length > 0 && (
+                                    <Card className="p-6 text-center border-green-500/30 bg-green-500/5">
+                                        <p className="text-green-500 font-medium">Tous les scores de cette ronde ont été soumis !</p>
+                                    </Card>
+                                )}
                             </div>
                         )}
                     </>

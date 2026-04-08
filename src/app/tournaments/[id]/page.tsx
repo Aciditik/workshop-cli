@@ -22,6 +22,7 @@ import Link from "next/link";
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const { getTournament, updateTournament, isLoaded, refresh } = useTournaments();
+    const [playerFirstname, setPlayerFirstname] = useState("");
     const [playerName, setPlayerName] = useState("");
     const [playerEmail, setPlayerEmail] = useState("");
     const [playerPhone, setPlayerPhone] = useState("");
@@ -129,14 +130,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     };
 
     const addPlayer = () => {
-        const trimmed = playerName.trim();
-        if (!trimmed || tournament.status !== "draft") return;
+        const firstname = playerFirstname.trim();
+        const name = playerName.trim();
+        const email = playerEmail.trim();
+        const phone = playerPhone.trim();
+        if (!firstname || !name || !email || !phone || tournament.status !== "draft") return;
 
         const newParticipant: Participant = {
             id: crypto.randomUUID(),
-            name: trimmed,
-            email: playerEmail.trim(),
-            phone: playerPhone.trim(),
+            firstname,
+            name,
+            email,
+            phone,
             score: 0,
         };
 
@@ -146,6 +151,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             size: tournament.participants.length + 1,
         });
 
+        setPlayerFirstname("");
         setPlayerName("");
         setPlayerEmail("");
         setPlayerPhone("");
@@ -187,8 +193,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const exportTopPlayers = () => {
         const exportCount = qualifiedCount * 2 + 1;
         const topPlayers = sortedParticipants.slice(0, exportCount);
-        const csvHeader = "Nom,Email,Téléphone";
-        const csvRows = topPlayers.map(p => `${p.name},${p.email || ""},${p.phone || ""}`);
+        const csvHeader = "Pr\u00e9nom,Nom,Email,T\u00e9l\u00e9phone";
+        const csvRows = topPlayers.map(p => `${p.firstname || ""},${p.name},${p.email || ""},${p.phone || ""}`);
         const csvContent = [csvHeader, ...csvRows].join("\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
@@ -336,7 +342,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     <div key={qId} className="flex items-center gap-3 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10">
                                         <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                                         <div>
-                                            <p className="font-bold">{p?.name || "Inconnu"}</p>
+                                            <p className="font-bold">{p?.firstname} {p?.name || "Inconnu"}</p>
                                             <p className="text-xs text-muted-foreground">Qualifié #{idx + 1}</p>
                                         </div>
                                     </div>
@@ -365,14 +371,24 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     <CardContent className="space-y-4">
                         {/* Add player form */}
                         <div className="space-y-2">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 <input
                                     ref={playerInputRef}
+                                    type="text"
+                                    value={playerFirstname}
+                                    onChange={(e) => setPlayerFirstname(e.target.value)}
+                                    onKeyDown={handlePlayerKeyDown}
+                                    placeholder="Pr\u00e9nom *"
+                                    required
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                                <input
                                     type="text"
                                     value={playerName}
                                     onChange={(e) => setPlayerName(e.target.value)}
                                     onKeyDown={handlePlayerKeyDown}
-                                    placeholder="Nom du joueur *"
+                                    placeholder="Nom *"
+                                    required
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                                 <input
@@ -381,6 +397,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     onChange={(e) => setPlayerEmail(e.target.value)}
                                     onKeyDown={handlePlayerKeyDown}
                                     placeholder="Email *"
+                                    required
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                                 <input
@@ -388,7 +405,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     value={playerPhone}
                                     onChange={(e) => setPlayerPhone(e.target.value)}
                                     onKeyDown={handlePlayerKeyDown}
-                                    placeholder="Téléphone *"
+                                    placeholder="T\u00e9l\u00e9phone *"
+                                    required
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                             </div>
@@ -407,7 +425,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
                                                 {index + 1}
                                             </span>
-                                            <span className="font-medium">{p.name}</span>
+                                            <span className="font-medium">{p.firstname} {p.name}</span>
                                         </div>
                                         <button
                                             type="button"
@@ -498,7 +516,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         }`}>
                                                         {index + 1}
                                                     </span>
-                                                    <span className="font-medium">{p.name}</span>
+                                                    <span className="font-medium">{p.firstname} {p.name}</span>
                                                     {qualifiedIds.has(p.id) && (
                                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                                     )}

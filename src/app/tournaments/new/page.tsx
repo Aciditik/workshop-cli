@@ -19,7 +19,8 @@ export default function NewTournament() {
     const [logoUrl, setLogoUrl] = useState("");
     const [logoFileName, setLogoFileName] = useState("");
     const [eventDate, setEventDate] = useState("");
-    const [players, setPlayers] = useState<Array<{name: string; email: string; phone: string}>>([]);
+    const [players, setPlayers] = useState<Array<{firstname: string; name: string; email: string; phone: string}>>([]);
+    const [firstnameInput, setFirstnameInput] = useState("");
     const [playerInput, setPlayerInput] = useState("");
     const [emailInput, setEmailInput] = useState("");
     const [phoneInput, setPhoneInput] = useState("");
@@ -55,9 +56,13 @@ export default function NewTournament() {
     };
 
     const addPlayer = () => {
-        const trimmed = playerInput.trim();
-        if (!trimmed) return;
-        setPlayers(prev => [...prev, { name: trimmed, email: trimmed, phone: trimmed }]);
+        const firstname = firstnameInput.trim();
+        const name = playerInput.trim();
+        const email = emailInput.trim();
+        const phone = phoneInput.trim();
+        if (!firstname || !name || !email || !phone) return;
+        setPlayers(prev => [...prev, { firstname, name, email, phone }]);
+        setFirstnameInput("");
         setPlayerInput("");
         setEmailInput("");
         setPhoneInput("");
@@ -78,6 +83,7 @@ export default function NewTournament() {
         const tournamentId = crypto.randomUUID();
         const participants: Participant[] = players.map(p => ({
             id: crypto.randomUUID(),
+            firstname: p.firstname,
             name: p.name,
             email: p.email,
             phone: p.phone,
@@ -110,6 +116,7 @@ export default function NewTournament() {
 
         const participants: Participant[] = players.map(p => ({
             id: crypto.randomUUID(),
+            firstname: p.firstname,
             name: p.name,
             email: p.email,
             phone: p.phone,
@@ -242,14 +249,24 @@ export default function NewTournament() {
                 <CardContent className="space-y-4">
                     {/* Add player input */}
                     <div className="space-y-2">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             <input
                                 ref={inputRef}
+                                type="text"
+                                value={firstnameInput}
+                                onChange={(e) => setFirstnameInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Prénom *"
+                                required
+                                className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            />
+                            <input
                                 type="text"
                                 value={playerInput}
                                 onChange={(e) => setPlayerInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Nom du joueur *"
+                                placeholder="Nom *"
+                                required
                                 className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             />
                             <input
@@ -258,6 +275,7 @@ export default function NewTournament() {
                                 onChange={(e) => setEmailInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Email *"
+                                required
                                 className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             />
                             <input
@@ -266,6 +284,7 @@ export default function NewTournament() {
                                 onChange={(e) => setPhoneInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Téléphone *"
+                                required
                                 className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             />
                         </div>
@@ -283,7 +302,7 @@ export default function NewTournament() {
                                         <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
                                             {index + 1}
                                         </span>
-                                        <span className="font-medium">{player.name}</span>
+                                        <span className="font-medium">{player.firstname} {player.name}</span>
                                     </div>
                                     <button
                                         type="button"
