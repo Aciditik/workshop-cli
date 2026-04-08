@@ -54,8 +54,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                 return (
                     <div key={round} className="space-y-4">
                         {/* Clickable round header */}
-                        <button
-                            type="button"
+                        <div
                             onClick={() => toggleRound(round)}
                             className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
                         >
@@ -77,7 +76,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                                     </div>
                                 )}
                             </div>
-                        </button>
+                        </div>
 
                         {isExpanded && (
                             <div className="space-y-4 pl-2">
