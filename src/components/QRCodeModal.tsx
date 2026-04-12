@@ -18,7 +18,7 @@ export function QRCodeModal({ tournamentId, tournamentName }: QRCodeModalProps) 
             <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
                     <QrCode className="w-3.5 h-3.5" />
-                    Show QR
+                    Voir le QR code
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
@@ -37,7 +37,7 @@ export function QRCodeModal({ tournamentId, tournamentName }: QRCodeModalProps) 
                         {url}
                     </p>
                     <p className="text-sm text-center text-muted-foreground">
-                        Have players scan this code to select their table and enter scores.
+                        Les joueurs peuvent scanner ce code pour sélectionner leur table et saisir leurs scores.
                     </p>
                 </div>
             </DialogContent>

@@ -39,12 +39,12 @@ const CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
 ];
 
 const CORPORATIONS = [
-    "Select Corporation",
-    "Arcadian Communities", "Cheung Shing Mars", "Credicor", "Desertron", "Ecoline", "Ecotec", "Green Power",
+    "Choisissez votre corporation",
+    "Arcadian Communities","AstroDrill", "Cheung Shing Mars", "Credicor", "Desertron", "Ecoline", "Ecotec", "Green Power",
     "Guilde des Voleurs", "Guilde Ouvrière", "Helion", "Interplanetary Cinematics", "Inventrix", "Kuiper Cooperative", 
     "Ludophiles d'Asnières et d'ailleurs","Mining Guild", "Nirgal Enterprise", "Palladin Shipping", "Phobolog", "Point Luna", "Recyclon", 
     "Robinson Industries", "Sagitta", "Saturn Systems", "Soleil Vert", "Spire", "Teractor", "Tharsis Republic", "Thorgate", 
-    "Tycho Magnetics", "United Nations Mars Initiative", "Valley Trust", "Vitor"
+    "Tycho Magnetics", "Union Pharmaceutique","United Nations Mars Initiative", "Valley Trust", "Vitor", "World Series Mars"
 ];
 
 export default function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, tableId: string }> }) {
@@ -91,17 +91,17 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [match?.participantIds, scores]);
 
-    if (loading) return <div className="p-8 text-center animate-pulse">Loading table data...</div>;
-    if (!tournament) return <div className="p-8 text-center text-red-500">Tournament not found.</div>;
-    if (!match) return <div className="p-8 text-center text-red-500">Table not found.</div>;
+    if (loading) return <div className="p-8 text-center animate-pulse">Chargement des données de la table...</div>;
+    if (!tournament) return <div className="p-8 text-center text-red-500">Tournoi non trouvé.</div>;
+    if (!match) return <div className="p-8 text-center text-red-500">Table non trouvée.</div>;
 
     if (match.isCompleted || submitted) {
         return (
             <div className="min-h-screen bg-background p-4 flex flex-col items-center justify-center">
                 <Card className="w-full max-w-sm border-green-500/50 bg-green-500/5 text-center p-8">
                     <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold mb-2">Scores Submitted!</h2>
-                    <p className="text-muted-foreground">Thank you. The admin will verify these results shortly.</p>
+                    <h2 className="text-2xl font-bold mb-2">Scores envoyés!</h2>
+                    <p className="text-muted-foreground">Merci. L'admin vérifiera ces résultats sous peu.</p>
                 </Card>
             </div>
         );
@@ -144,10 +144,10 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
         const rankings: Record<string, { rank: number, displayRank: string, points: number, base: number, bonus: number, diff: number }> = {};
 
         playersWithSums.forEach((p, index) => {
-            let rankStr = `${index + 1}th`;
-            if (index === 0) rankStr = `1st`;
-            if (index === 1) rankStr = `2nd`;
-            if (index === 2) rankStr = `3rd`;
+            let rankStr = `${index + 1}e`;
+            if (index === 0) rankStr = `1er`;
+            if (index === 1) rankStr = `2e`;
+            if (index === 2) rankStr = `3e`;
 
             const base = placementPoints[index] || 0;
             const bonus = index > 0 && (winnerTotal - p.total) <= 5 ? 1 : 0;
@@ -200,7 +200,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                     <div className="bg-primary/20 p-3 rounded-full inline-block text-primary shadow-lg ring-1 ring-primary/30">
                         <Trophy className="w-8 h-8" />
                     </div>
-                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Table {match.tableNumber} Scorecard</h1>
+                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Table {match.tableNumber} - Tableau des scores</h1>
                     <p className="text-muted-foreground font-medium">{tournament.name} - Round {match.round}</p>
                 </div>
 
@@ -320,7 +320,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                         onClick={handleSubmit}
                         disabled={submitting || Object.keys(scores).length === 0}
                     >
-                        {submitting ? "Submitting..." : "Submit to Admin"}
+                        {submitting ? "Envoi..." : "Envoi à l'admin"}
                     </Button>
                 </div>
             </div>

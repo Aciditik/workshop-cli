@@ -11,6 +11,7 @@ interface SwissRoundsProps {
     matches: TableMatch[];
     participants: Participant[];
     onSubmitResults: (matchId: string, results: Record<string, number>) => void;
+    onDeclineResults: (matchId: string) => void;
     currentRound: number;
     tournamentId: string;
     tournamentName: string;
@@ -18,7 +19,7 @@ interface SwissRoundsProps {
     qualifiedIds?: string[];
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, currentRound, tournamentId, tournamentName, maxRounds = 3, qualifiedIds }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, currentRound, tournamentId, tournamentName, maxRounds = 3, qualifiedIds }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -80,34 +81,9 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
 
                         {isExpanded && (
                             <div className="space-y-4 pl-2">
-                                {/* Finalist tables section */}
-                                {finalistMatches.length > 0 && (
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">Tables Finalistes</p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                            {finalistMatches.map(match => renderMatchCard(match, round, true))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Other tables (consolation or regular swiss) */}
-                                {otherMatches.length > 0 && (
-                                    <div className="space-y-2">
-                                        {finalistMatches.length > 0 && (
-                                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Tables Consolation</p>
-                                        )}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                            {otherMatches.map(match => renderMatchCard(match, round, false))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Regular display when no finalist distinction */}
-                                {finalistMatches.length === 0 && otherMatches.length === 0 && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {roundMatches.map(match => renderMatchCard(match, round, false))}
-                                    </div>
-                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {roundMatches.map(match => renderMatchCard(match, round, match.isFinalist))}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -178,12 +154,20 @@ export function SwissRounds({ matches, participants, onSubmitResults, currentRou
                                     </div>
                                 );
                             })}
-                            <Button
-                                className="w-full text-xs h-8 bg-yellow-500 hover:bg-yellow-600 text-white"
-                                onClick={() => onSubmitResults(match.id, match.results)}
-                            >
-                                Valider les scores
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button
+                                    className="flex-1 text-xs h-8 bg-red-500 hover:bg-red-600 text-white"
+                                    onClick={() => onDeclineResults(match.id)}
+                                >
+                                    Refuser
+                                </Button>
+                                <Button
+                                    className="flex-1 text-xs h-8 bg-yellow-500 hover:bg-yellow-600 text-white"
+                                    onClick={() => onSubmitResults(match.id, match.results)}
+                                >
+                                    Valider
+                                </Button>
+                            </div>
                         </div>
                     ) : (
                         <>

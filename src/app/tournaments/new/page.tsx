@@ -346,7 +346,7 @@ export default function NewTournament() {
                                             {getQualifiedCount(size)} joueur{getQualifiedCount(size) > 1 ? "s" : ""} qualifié{getQualifiedCount(size) > 1 ? "s" : ""} · {getMaxRounds(size)} rondes
                                         </p>
                                         {size < 28 && (
-                                            <p className="text-xs opacity-80">Ronde 1 : tables aléatoires · Ronde 2 : tables finalistes croisées</p>
+                                            <p className="text-xs opacity-80">Ronde 1 : tables aléatoires · Ronde 2 : tables croisées selon résultats</p>
                                         )}
                                         {size >= 28 && (
                                             <p className="text-xs opacity-80">Format suisse : classement par points cumulés</p>

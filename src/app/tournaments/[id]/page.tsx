@@ -121,6 +121,19 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         updateTournament(newTournamentData);
     };
 
+    const declineMatchResults = (matchId: string) => {
+        if (tournament.status !== "in_progress") return;
+
+        const updatedMatches = tournament.matches.map(m =>
+            m.id === matchId ? { ...m, isPendingReview: false, results: {}, scorecards: undefined } : m
+        );
+
+        updateTournament({
+            ...tournament,
+            matches: updatedMatches,
+        });
+    };
+
     const playerCount = tournament.participants.length;
     const canGenerateNextRound = () => {
         if (currentRound >= maxRounds) return false;
@@ -485,6 +498,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             matches={tournament.matches}
                             participants={tournament.participants}
                             onSubmitResults={submitMatchResults}
+                            onDeclineResults={declineMatchResults}
                             currentRound={tournament.currentRound || 0}
                             tournamentId={tournament.id}
                             tournamentName={tournament.name}

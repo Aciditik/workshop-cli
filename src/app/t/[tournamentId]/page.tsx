@@ -57,7 +57,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                     </div>
                     <h1 className="text-3xl font-extrabold tracking-tight">{tournament.name}</h1>
                     {currentRound > 0 && (
-                        <p className="text-muted-foreground font-medium">Round {currentRound} — Select your table</p>
+                        <p className="text-muted-foreground font-medium">Round {currentRound} — Choisissez votre table</p>
                     )}
                 </div>
 
@@ -101,7 +101,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <span className="text-primary text-sm font-medium">→ Enter scores</span>
+                                                <span className="text-primary text-sm font-medium">→ Entrer vos scores</span>
                                             </div>
                                         </Card>
                                     </Link>
