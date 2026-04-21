@@ -1,11 +1,13 @@
 "use client";
 
 import { use, useState, useRef, KeyboardEvent } from "react";
+import { useRouter } from "next/navigation";
 import { useTournaments } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SwissRounds } from "@/components/SwissRounds";
-import { Participant } from "@/lib/types";
+import { Participant, Tournament } from "@/lib/types";
 import {
     generateEliminationRound2,
     generateSwissRound,
@@ -16,17 +18,28 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download } from "lucide-react";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    const { getTournament, updateTournament, isLoaded, refresh } = useTournaments();
+    const { getTournament, updateTournament, addTournament, isLoaded, refresh } = useTournaments();
+    const { user } = useAuth();
+    const router = useRouter();
+    const isAdmin = user?.role === "admin";
     const [playerFirstname, setPlayerFirstname] = useState("");
     const [playerName, setPlayerName] = useState("");
     const [playerEmail, setPlayerEmail] = useState("");
     const [playerPhone, setPlayerPhone] = useState("");
     const playerInputRef = useRef<HTMLInputElement>(null);
+
+    // Admin mid-tournament player removal confirmation
+    const [removeConfirm, setRemoveConfirm] = useState<Participant | null>(null);
+
+    // Finale CDF planning modal (shown when tournament completed)
+    const [showFinaleModal, setShowFinaleModal] = useState(false);
+    const [availability, setAvailability] = useState<Record<string, boolean>>({});
+    const [creatingFinale, setCreatingFinale] = useState(false);
 
     const tournament = isLoaded ? getTournament(id) : null;
 
@@ -138,8 +151,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const canGenerateNextRound = () => {
         if (currentRound >= maxRounds) return false;
         const roundMatches = tournament.matches.filter(m => m.round === currentRound);
-        // Matches must be completed OR pending review to proceed to next round
-        return roundMatches.length > 0 && roundMatches.every(m => m.isCompleted || m.isPendingReview);
+        // All matches must be validated (isCompleted) — pending review is not enough
+        return roundMatches.length > 0 && roundMatches.every(m => m.isCompleted);
     };
 
     const addPlayer = () => {
@@ -172,13 +185,131 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     };
 
     const removePlayer = (participantId: string) => {
-        if (tournament.status !== "draft") return;
+        // Draft: always allowed. In-progress: admin only. Completed: never (results are frozen).
+        if (tournament.status === "completed") return;
+        if (tournament.status === "in_progress" && !isAdmin) return;
+
+        const newParticipants = tournament.participants.filter(p => p.id !== participantId);
+        const newSize = newParticipants.length;
+
+        // Draft: simple removal.
+        if (tournament.status === "draft") {
+            updateTournament({
+                ...tournament,
+                participants: newParticipants,
+                size: newSize,
+            });
+            return;
+        }
+
+        // Mid-tournament (admin): block if it would go below the minimum playable size.
+        if (newSize < 8) {
+            alert("Impossible: un tournoi doit conserver au minimum 8 joueurs.");
+            return;
+        }
+
+        // Recompute format metadata based on the new size.
+        // maxRounds is never lowered below the current round to avoid invalidating
+        // rounds already generated / in progress.
+        const newFormat = getFormat(newSize);
+        const newMaxRounds = Math.max(getMaxRounds(newSize), currentRound);
+        const newQualifiedCount = getQualifiedCount(newSize);
+
+        // For uncompleted matches, nullify the removed player's slot so they
+        // no longer appear at the table. Completed matches are preserved as
+        // historical records (their past points stay in `results`).
+        const updatedMatches = tournament.matches.map(m => {
+            if (m.isCompleted) return m;
+            if (!m.participantIds.includes(participantId)) return m;
+            return {
+                ...m,
+                participantIds: m.participantIds.map(pid => pid === participantId ? null : pid),
+                // If they submitted a scorecard/result that isn't yet validated, drop it
+                results: Object.fromEntries(
+                    Object.entries(m.results || {}).filter(([pid]) => pid !== participantId)
+                ),
+                scorecards: m.scorecards
+                    ? Object.fromEntries(
+                        Object.entries(m.scorecards).filter(([pid]) => pid !== participantId)
+                    )
+                    : m.scorecards,
+            };
+        });
 
         updateTournament({
             ...tournament,
-            participants: tournament.participants.filter(p => p.id !== participantId),
-            size: tournament.participants.length - 1,
+            participants: newParticipants,
+            size: newSize,
+            format: newFormat,
+            maxRounds: newMaxRounds,
+            qualifiedCount: newQualifiedCount,
+            matches: updatedMatches,
         });
+    };
+
+    // ── Finale CDF ────────────────────────────────────────────────────────────
+    // When a tournament is completed, admin can pick available qualified players
+    // and spin up a brand-new "Finale" tournament pre-populated with them.
+    const openFinaleModal = () => {
+        if (!tournament.qualifiedIds || tournament.qualifiedIds.length === 0) return;
+        // Default everyone to available.
+        const initial: Record<string, boolean> = {};
+        tournament.qualifiedIds.forEach(qid => { initial[qid] = true; });
+        setAvailability(initial);
+        setShowFinaleModal(true);
+    };
+
+    const createFinaleTournament = async () => {
+        if (!tournament.qualifiedIds) return;
+        const availableIds = tournament.qualifiedIds.filter(qid => availability[qid]);
+        if (availableIds.length < 8) {
+            alert(`Il faut au moins 8 joueurs disponibles pour créer une Finale (actuellement ${availableIds.length}).`);
+            return;
+        }
+
+        setCreatingFinale(true);
+        try {
+            // Build fresh participant records (new ids) so the finale tournament
+            // owns its own player list independently from the qualifier.
+            const finaleParticipants: Participant[] = availableIds.map(qid => {
+                const src = tournament.participants.find(p => p.id === qid);
+                return {
+                    id: crypto.randomUUID(),
+                    firstname: src?.firstname || "",
+                    name: src?.name || "Inconnu",
+                    email: src?.email || "",
+                    phone: src?.phone || "",
+                    score: 0,
+                };
+            });
+
+            const size = finaleParticipants.length;
+            const finale: Tournament = {
+                id: crypto.randomUUID(),
+                name: `Finale CDF — ${tournament.name}`,
+                logoUrl: tournament.logoUrl,
+                eventDate: new Date().toISOString().split("T")[0],
+                createdAt: new Date().toISOString(),
+                status: "draft",
+                format: getFormat(size),
+                participants: finaleParticipants,
+                matches: [],
+                size,
+                currentRound: 0,
+                maxRounds: getMaxRounds(size),
+                qualifiedCount: getQualifiedCount(size),
+                ...(tournament.ownerId ? { ownerId: tournament.ownerId } : {}),
+            };
+
+            await addTournament(finale);
+            setShowFinaleModal(false);
+            router.push(`/tournaments/${finale.id}`);
+        } catch (e) {
+            console.error("Failed to create finale tournament", e);
+            alert("La création du tournoi Finale a échoué. Réessayez.");
+        } finally {
+            setCreatingFinale(false);
+        }
     };
 
     const handlePlayerKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -362,11 +493,17 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 );
                             })}
                         </div>
-                        <div className="mt-4 pt-4 border-t border-yellow-500/20">
+                        <div className="mt-4 pt-4 border-t border-yellow-500/20 flex flex-col sm:flex-row gap-3">
                             <Button onClick={exportTopPlayers} className="gap-2 font-prototype" variant="outline">
                                 <Download className="w-4 h-4" />
                                 Exporter le top {qualifiedCount * 2 + 1} (CSV)
                             </Button>
+                            {isAdmin && (
+                                <Button onClick={openFinaleModal} className="gap-2 font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black">
+                                    <CalendarPlus className="w-4 h-4" />
+                                    Planifier la Finale CDF
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -522,38 +659,50 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         const ntScore = calculateNTScore(p.id);
                                         const tableDiff = calculateTableDifference(p.id);
                                         return (
-                                            <div key={p.id} className={`p-4 flex items-center justify-between hover:bg-accent/30 transition-colors ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? "bg-yellow-500" :
+                                            <div key={p.id} className={`p-4 flex items-center justify-between gap-3 hover:bg-accent/30 transition-colors group ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${index === 0 ? "bg-yellow-500" :
                                                         index === 1 ? "bg-slate-300" :
                                                             index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
                                                         }`}>
                                                         {index + 1}
                                                     </span>
-                                                    <span className="font-prototype">{p.firstname} {p.name}</span>
+                                                    <span className="font-prototype truncate">{p.firstname} {p.name}</span>
                                                     {qualifiedIds.has(p.id) && (
-                                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
                                                     )}
                                                 </div>
-                                                {tournament.status !== "draft" && (
-                                                <div className="flex items-center gap-3">
-                                                    {tableDiff > 0 && (
-                                                        <span className="text-sm font-prototype text-orange-600">
-                                                            Diff {tableDiff}
-                                                        </span>
+                                                <div className="flex items-center gap-3 shrink-0">
+                                                    {tournament.status !== "draft" && (
+                                                        <>
+                                                            {tableDiff > 0 && (
+                                                                <span className="text-sm font-prototype text-orange-600">
+                                                                    Diff {tableDiff}
+                                                                </span>
+                                                            )}
+                                                            {ntScore > 0 && (
+                                                                <span className="text-sm font-prototype text-blue-600">
+                                                                    {ntScore} NT
+                                                                </span>
+                                                            )}
+                                                            {totalPoints !== null && (
+                                                                <span className="text-sm font-prototype text-muted-foreground">
+                                                                    {totalPoints} pts
+                                                                </span>
+                                                            )}
+                                                        </>
                                                     )}
-                                                    {ntScore > 0 && (
-                                                        <span className="text-sm font-prototype text-blue-600">
-                                                            {ntScore} NT
-                                                        </span>
-                                                    )}
-                                                    {totalPoints !== null && (
-                                                        <span className="text-sm font-prototype text-muted-foreground">
-                                                            {totalPoints} pts
-                                                        </span>
+                                                    {isAdmin && tournament.status === "in_progress" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setRemoveConfirm(p)}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Retirer ce joueur du tournoi (admin)"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
                                                     )}
                                                 </div>
-                                                )}
                                             </div>
                                         );
                                     })}
@@ -562,6 +711,154 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         </Card>
                     </div>
                 </div>
+
+            {/* Admin: Confirm player removal mid-tournament */}
+            {removeConfirm && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                    onClick={() => setRemoveConfirm(null)}
+                >
+                    <div
+                        className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-border flex items-start gap-3">
+                            <div className="bg-red-500/20 p-2 rounded-full shrink-0">
+                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-prototype">Retirer un joueur du tournoi</h3>
+                                <p className="text-sm text-muted-foreground font-prototype">Cette action est réservée à l&apos;administration.</p>
+                            </div>
+                        </div>
+                        <div className="p-5 space-y-3 text-sm font-prototype">
+                            <p>
+                                Vous êtes sur le point de retirer{" "}
+                                <strong>{removeConfirm.firstname} {removeConfirm.name}</strong> du tournoi.
+                            </p>
+                            {(() => {
+                                const newSize = tournament.participants.length - 1;
+                                const newMax = Math.max(getMaxRounds(newSize), currentRound);
+                                const newQual = getQualifiedCount(newSize);
+                                return (
+                                    <div className="rounded-lg border border-border bg-background/50 p-3 space-y-1 text-xs text-muted-foreground">
+                                        <p>• Le tournoi passera à <strong className="text-foreground">{newSize} joueurs</strong>.</p>
+                                        <p>• Format recalculé: <strong className="text-foreground">{getFormatLabel(newSize)}</strong>.</p>
+                                        <p>• Rondes: <strong className="text-foreground">{newMax}</strong> · Qualifiés: <strong className="text-foreground">{newQual}</strong>.</p>
+                                        <p>• Les rondes déjà terminées restent intactes. Les tables non terminées libéreront la place du joueur.</p>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                        <div className="p-5 border-t border-border flex flex-col-reverse sm:flex-row gap-3">
+                            <Button variant="outline" className="w-full font-prototype" onClick={() => setRemoveConfirm(null)}>
+                                Annuler
+                            </Button>
+                            <Button
+                                className="w-full font-prototype bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                                onClick={() => {
+                                    removePlayer(removeConfirm.id);
+                                    setRemoveConfirm(null);
+                                }}
+                            >
+                                Retirer le joueur
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Finale CDF: pick available qualified players and create the finale tournament */}
+            {showFinaleModal && tournament.qualifiedIds && (
+                <div
+                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
+                    onClick={() => !creatingFinale && setShowFinaleModal(false)}
+                >
+                    <div
+                        className="w-full sm:max-w-lg bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-border flex items-start gap-3">
+                            <div className="bg-yellow-500/20 p-2 rounded-full shrink-0">
+                                <CalendarPlus className="w-5 h-5 text-yellow-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-prototype">Planifier la Finale CDF</h3>
+                                <p className="text-sm text-muted-foreground font-prototype">
+                                    Cochez les joueurs disponibles pour la Finale. Un nouveau tournoi sera créé avec eux.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-5 space-y-2 overflow-y-auto flex-1">
+                            {tournament.qualifiedIds.map((qid, idx) => {
+                                const p = tournament.participants.find(pp => pp.id === qid);
+                                const available = !!availability[qid];
+                                return (
+                                    <button
+                                        key={qid}
+                                        type="button"
+                                        onClick={() => setAvailability(prev => ({ ...prev, [qid]: !prev[qid] }))}
+                                        className={`w-full flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors text-left ${available ? "border-green-500/40 bg-green-500/10" : "border-border bg-background/50 hover:bg-accent/40"}`}
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <span className="w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center text-xs font-prototype shrink-0">
+                                                {idx + 1}
+                                            </span>
+                                            <div className="min-w-0">
+                                                <div className="font-prototype truncate">{p?.firstname} {p?.name || "Inconnu"}</div>
+                                                {p?.email && <div className="text-xs text-muted-foreground font-prototype truncate">{p.email}</div>}
+                                            </div>
+                                        </div>
+                                        <div className={`shrink-0 flex items-center gap-2 text-sm font-prototype ${available ? "text-green-500" : "text-muted-foreground"}`}>
+                                            {available ? (
+                                                <>
+                                                    <Check className="w-4 h-4" />
+                                                    Disponible
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <X className="w-4 h-4" />
+                                                    Indisponible
+                                                </>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="p-5 border-t border-border space-y-3">
+                            {(() => {
+                                const availableCount = Object.values(availability).filter(Boolean).length;
+                                return (
+                                    <p className="text-sm font-prototype text-muted-foreground text-center">
+                                        {availableCount} joueur{availableCount > 1 ? "s" : ""} disponible{availableCount > 1 ? "s" : ""}
+                                        {availableCount < 8 && " — minimum 8 requis"}
+                                    </p>
+                                );
+                            })()}
+                            <div className="flex flex-col-reverse sm:flex-row gap-3">
+                                <Button
+                                    variant="outline"
+                                    className="w-full font-prototype"
+                                    onClick={() => setShowFinaleModal(false)}
+                                    disabled={creatingFinale}
+                                >
+                                    Annuler
+                                </Button>
+                                <Button
+                                    className="w-full font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black"
+                                    onClick={createFinaleTournament}
+                                    disabled={creatingFinale || Object.values(availability).filter(Boolean).length < 8}
+                                >
+                                    {creatingFinale ? "Création..." : "Créer le tournoi Finale"}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

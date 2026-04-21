@@ -4,8 +4,9 @@ import { use, useState, useEffect } from "react";
 import { Tournament } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Trophy, CheckCircle2, ChevronUp, ChevronDown } from "lucide-react";
+import { Trophy, CheckCircle2, ChevronUp, ChevronDown, ArrowLeft, AlertTriangle } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 type PlayerScore = {
     corporation: string;
@@ -55,6 +56,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [showRecap, setShowRecap] = useState(false);
 
     // Form state: mapping participantId -> score obj
     const [scores, setScores] = useState<Record<string, PlayerScore>>({});
@@ -102,7 +104,13 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                 <Card className="w-full max-w-sm border-green-500/50 bg-green-500/5 text-center p-8">
                     <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-prototype mb-2">Scores envoyés!</h2>
-                    <p className="font-prototype text-muted-foreground">Merci. L'admin vérifiera ces résultats sous peu.</p>
+                    <p className="font-prototype text-muted-foreground mb-6">Merci. L&apos;admin vérifiera ces résultats sous peu.</p>
+                    <Link href={`/t/${tournamentId}`} className="inline-block w-full">
+                        <Button className="w-full gap-2 font-prototype" variant="outline">
+                            <ArrowLeft className="w-4 h-4" />
+                            Retour aux tables
+                        </Button>
+                    </Link>
                 </Card>
             </div>
         );
@@ -126,7 +134,14 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
         return pScores.nt + pScores.objectifs + pScores.recompenses + pScores.forets + pScores.villes + pScores.cartes;
     };
 
+    // True as soon as any player has a non-zero category score — avoids showing
+    // a default "winner" medal before anyone has actually entered scores.
+    const hasAnyScore = activePlayers.some(pId => calculateTotal(pId) > 0);
+
     const getRankings = () => {
+        const rankings: Record<string, { rank: number, displayRank: string, points: number, base: number, bonus: number, diff: number }> = {};
+        if (!hasAnyScore) return rankings;
+
         const playersWithSums = activePlayers.map(pId => ({
             id: pId,
             total: calculateTotal(pId),
@@ -141,8 +156,6 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
         const placementPoints = activePlayers.length === 3 ? [5, 3, 2] : [5, 3, 2, 1];
 
         const winnerTotal = playersWithSums[0]?.total ?? 0;
-
-        const rankings: Record<string, { rank: number, displayRank: string, points: number, base: number, bonus: number, diff: number }> = {};
 
         playersWithSums.forEach((p, index) => {
             let rankStr = `${index + 1}e`;
@@ -387,12 +400,96 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                 <div className="pt-4 pb-12 w-full max-w-sm mx-auto">
                     <Button
                         className="w-full h-14 text-xl font-prototype shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all transform hover:scale-[1.02] ring-1 ring-primary/50"
-                        onClick={handleSubmit}
-                        disabled={submitting || Object.keys(scores).length === 0}
+                        onClick={() => setShowRecap(true)}
+                        disabled={submitting || Object.keys(scores).length === 0 || !hasAnyScore}
                     >
                         {submitting ? "Envoi..." : "Envoi à l'admin"}
                     </Button>
+                    {!hasAnyScore && (
+                        <p className="text-xs text-muted-foreground text-center mt-2 font-prototype">
+                            Saisissez au moins un score avant d&apos;envoyer.
+                        </p>
+                    )}
                 </div>
+
+                {/* Recap modal */}
+                {showRecap && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
+                        onClick={() => !submitting && setShowRecap(false)}
+                    >
+                        <div
+                            className="w-full sm:max-w-lg bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="p-5 border-b border-border flex items-start gap-3">
+                                <div className="bg-yellow-500/20 p-2 rounded-full shrink-0">
+                                    <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-prototype">Vérification avant envoi</h3>
+                                    <p className="text-sm text-muted-foreground font-prototype">
+                                        Relisez le classement. Une fois envoyé, l&apos;admin validera ces scores.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="p-5 space-y-3">
+                                {[...activePlayers]
+                                    .sort((a, b) => (rankings[a]?.rank || 99) - (rankings[b]?.rank || 99))
+                                    .map(pId => {
+                                        const p = getParticipant(pId);
+                                        const r = rankings[pId];
+                                        return (
+                                            <div key={pId} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-background/50">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="flex items-center gap-1 shrink-0 w-14">
+                                                        {r?.rank === 1 && <span className="text-yellow-500 text-xl">🥇</span>}
+                                                        {r?.rank === 2 && <span className="text-gray-300 text-xl">🥈</span>}
+                                                        {r?.rank === 3 && <span className="text-orange-500 text-xl">🥉</span>}
+                                                        <span className="font-prototype text-sm">{r?.displayRank || "-"}</span>
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="font-prototype truncate">{p ? `${p.firstname} ${p.name}` : "Unknown"}</div>
+                                                        <div className="text-xs text-muted-foreground font-prototype truncate">
+                                                            {scores[pId]?.corporation || "— Corporation non choisie —"}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <div className="text-xs text-muted-foreground font-prototype">NT</div>
+                                                    <div className="text-xl font-prototype text-primary">{calculateTotal(pId)}</div>
+                                                    {r && (
+                                                        <div className="text-xs text-muted-foreground font-prototype">
+                                                            {r.points} pt{r.points > 1 ? "s" : ""}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+
+                            <div className="p-5 border-t border-border flex flex-col-reverse sm:flex-row gap-3 sticky bottom-0 bg-card">
+                                <Button
+                                    variant="outline"
+                                    className="w-full font-prototype"
+                                    onClick={() => setShowRecap(false)}
+                                    disabled={submitting}
+                                >
+                                    Retour / Modifier
+                                </Button>
+                                <Button
+                                    className="w-full font-prototype bg-primary hover:bg-primary/90"
+                                    onClick={handleSubmit}
+                                    disabled={submitting}
+                                >
+                                    {submitting ? "Envoi..." : "Confirmer et envoyer"}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
