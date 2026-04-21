@@ -319,8 +319,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const createFinaleTournament = async () => {
         if (!tournament.qualifiedIds) return;
         const availableIds = tournament.qualifiedIds.filter(qid => availability[qid]);
-        if (availableIds.length < 8) {
-            alert(`Il faut au moins 8 joueurs disponibles pour créer une Finale (actuellement ${availableIds.length}).`);
+        if (availableIds.length === 0) {
+            alert("Sélectionnez au moins un joueur disponible pour créer la Finale.");
             return;
         }
 
@@ -892,7 +892,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 return (
                                     <p className="text-sm font-prototype text-muted-foreground text-center">
                                         {availableCount} joueur{availableCount > 1 ? "s" : ""} disponible{availableCount > 1 ? "s" : ""}
-                                        {availableCount < 8 && " — minimum 8 requis"}
+                                        {availableCount > 0 && availableCount < 8 && " — la Finale sera créée en brouillon, vous pourrez ajouter d'autres joueurs ensuite"}
                                     </p>
                                 );
                             })()}
@@ -908,7 +908,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 <Button
                                     className="w-full font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black"
                                     onClick={createFinaleTournament}
-                                    disabled={creatingFinale || Object.values(availability).filter(Boolean).length < 8}
+                                    disabled={creatingFinale || Object.values(availability).filter(Boolean).length === 0}
                                 >
                                     {creatingFinale ? "Création..." : "Créer le tournoi Finale"}
                                 </Button>
