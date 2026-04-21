@@ -1,10 +1,10 @@
 "use client";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield } from "lucide-react";
+import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -43,11 +43,31 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-20 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 border-r border-border glass flex flex-col z-10 shrink-0">
+      <aside
+        className={`fixed md:static inset-y-0 left-0 w-64 border-r border-border glass flex flex-col z-30 shrink-0 transition-transform duration-300 md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="p-6 flex items-center gap-3">
           <div className="bg-primary p-2 rounded-lg shadow-lg shadow-primary/30">
             <Trophy className="w-6 h-6 text-white" />
@@ -55,6 +75,13 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
           <h1 className="text-xl font-bold bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
             CDF Terraforming Mars
           </h1>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="ml-auto md:hidden p-1 rounded-md hover:bg-accent text-muted-foreground"
+            aria-label="Fermer le menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -76,7 +103,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 
         <div className="p-4 border-t border-border/50 space-y-3">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-bold">
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-bold shrink-0">
               {user?.name?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
@@ -100,9 +127,28 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative z-0">
+      <main className="flex-1 overflow-y-auto relative z-0 w-full">
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay"></div>
-        <div className="max-w-6xl mx-auto p-8 relative">{children}</div>
+
+        {/* Mobile top bar */}
+        <div className="md:hidden sticky top-0 z-10 flex items-center justify-between p-3 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-md hover:bg-accent text-foreground"
+            aria-label="Ouvrir le menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="bg-primary p-1.5 rounded-md shadow-md shadow-primary/30">
+              <Trophy className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-sm font-semibold">CDF Terraforming Mars</span>
+          </div>
+          <div className="w-9" aria-hidden="true" />
+        </div>
+
+        <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8 relative">{children}</div>
       </main>
     </div>
   );

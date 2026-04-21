@@ -194,17 +194,80 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     };
 
     return (
-        <div className="min-h-screen bg-transparent flex flex-col items-center py-8 px-2 sm:px-4">
+        <div className="min-h-screen bg-transparent flex flex-col items-center py-6 sm:py-8 px-3 sm:px-4">
             <div className="w-full max-w-5xl space-y-6">
-                <div className="text-center space-y-2 mb-8">
+                <div className="text-center space-y-2 mb-6 sm:mb-8">
                     <div className="bg-primary/20 p-3 rounded-full inline-block text-primary shadow-lg ring-1 ring-primary/30">
-                        <Trophy className="w-8 h-8" />
+                        <Trophy className="w-7 h-7 sm:w-8 sm:h-8" />
                     </div>
-                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Table {match.tableNumber} - Tableau des scores</h1>
-                    <p className="text-muted-foreground font-medium">{tournament.name} - Round {match.round}</p>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">Table {match.tableNumber} - Tableau des scores</h1>
+                    <p className="text-muted-foreground font-medium text-sm sm:text-base">{tournament.name} - Round {match.round}</p>
                 </div>
 
-                <div className="glass rounded-xl overflow-x-auto">
+                {/* MOBILE LAYOUT: one card per player */}
+                <div className="md:hidden space-y-4">
+                    {activePlayers.map((pId, i) => {
+                        const p = getParticipant(pId);
+                        const rank = rankings[pId];
+                        return (
+                            <div key={pId} className="glass rounded-xl overflow-hidden">
+                                <div className="bg-primary/20 px-4 py-3 flex items-center justify-between">
+                                    <div>
+                                        <div className="text-xs text-muted-foreground font-medium">Joueur #{i + 1}</div>
+                                        <div className="font-bold">{p ? `${p.firstname} ${p.name}` : "Unknown"}</div>
+                                    </div>
+                                    {rank && (
+                                        <div className="flex items-center gap-1 font-bold text-lg">
+                                            {rank.rank === 1 && <span className="text-yellow-500 text-xl drop-shadow-md">🥇</span>}
+                                            {rank.rank === 2 && <span className="text-gray-300 text-xl drop-shadow-md">🥈</span>}
+                                            {rank.rank === 3 && <span className="text-orange-500 text-xl drop-shadow-md">🥉</span>}
+                                            <span>{rank.displayRank}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <label className="text-xs text-muted-foreground font-semibold block mb-1">Corporation</label>
+                                        <select
+                                            className="w-full p-2 border border-border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                            value={scores[pId]?.corporation || ""}
+                                            onChange={(e) => handleScoreChange(pId, "corporation", e.target.value)}
+                                        >
+                                            {CORPORATIONS.map(c => (
+                                                <option key={c} value={c === "Select Corporation" ? "" : c}>{c}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {CATEGORIES.map(cat => (
+                                            <div key={cat.key}>
+                                                <label className="text-xs text-muted-foreground font-semibold block mb-1">{cat.label}</label>
+                                                <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    step="1"
+                                                    min="0"
+                                                    placeholder="0"
+                                                    className="w-full text-center p-2 border border-border rounded-md bg-background text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-primary hide-arrows"
+                                                    value={scores[pId]?.[cat.key] || ''}
+                                                    onChange={(e) => handleScoreChange(pId, cat.key, e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                                        <span className="text-sm font-semibold text-muted-foreground">Total NT</span>
+                                        <span className="text-2xl font-black text-primary">{calculateTotal(pId)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* DESKTOP LAYOUT: original table */}
+                <div className="hidden md:block glass rounded-xl overflow-x-auto">
                     <div className="min-w-[800px] w-full">
                         {/* HEADER */}
                         <div className="flex bg-primary/20 text-primary-foreground font-bold text-sm tracking-wide">

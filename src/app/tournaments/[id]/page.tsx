@@ -299,10 +299,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                     <Link href="/">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="shrink-0">
                             <ChevronLeft className="w-5 h-5" />
                         </Button>
                     </Link>
@@ -310,21 +310,21 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         <img
                             src={tournament.logoUrl}
                             alt={`${tournament.name} logo`}
-                            className="w-16 h-16 object-contain rounded-lg bg-muted/50 p-2"
+                            className="w-12 h-12 sm:w-16 sm:h-16 object-contain rounded-lg bg-muted/50 p-2 shrink-0"
                             onError={(e) => { e.currentTarget.style.display = "none"; }}
                         />
                     )}
-                    <div>
-                        <h1 className="text-4xl font-bold tracking-tight mb-2 flex items-center gap-3">
-                            {tournament.name}
-                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${tournament.status === "completed" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
+                    <div className="min-w-0">
+                        <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-1 sm:mb-2 flex flex-wrap items-center gap-2 sm:gap-3">
+                            <span className="truncate">{tournament.name}</span>
+                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${tournament.status === "completed" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
                                 tournament.status === "in_progress" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
                                     "bg-orange-500/10 text-orange-500 border border-orange-500/20"
                                 }`}>
                                 {tournament.status.replace("_", " ").toUpperCase()}
                             </span>
                         </h1>
-                        <p className="text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                             {playerCount} joueur{playerCount > 1 ? "s" : ""} • {getFormatLabel(playerCount)} • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}
                         </p>
                     </div>
@@ -333,7 +333,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     onClick={refresh}
                     variant="outline"
                     size="sm"
-                    className="gap-2"
+                    className="gap-2 w-full sm:w-auto shrink-0"
                 >
                     <RotateCcw className="w-4 h-4" />
                     Refresh

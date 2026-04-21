@@ -150,16 +150,16 @@ export default function NewTournament() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto space-y-8">
-            <div className="flex items-center gap-4">
+        <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
+            <div className="flex items-center gap-3 sm:gap-4">
                 <Link href="/">
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" className="shrink-0">
                         <ChevronLeft className="w-5 h-5" />
                     </Button>
                 </Link>
-                <div>
-                    <h1 className="text-4xl font-bold tracking-tight mb-2">Nouveau Tournoi</h1>
-                    <p className="text-muted-foreground text-lg">Renseignez les informations et ajoutez les joueurs.</p>
+                <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-1 sm:mb-2">Nouveau Tournoi</h1>
+                    <p className="text-muted-foreground text-sm sm:text-lg">Renseignez les informations et ajoutez les joueurs.</p>
                 </div>
             </div>
 
@@ -360,15 +360,15 @@ export default function NewTournament() {
             </Card>
 
             {/* Footer actions */}
-            <div className="flex justify-between items-center pb-8">
-                <Link href="/">
-                    <Button variant="ghost">Annuler</Button>
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-8">
+                <Link href="/" className="order-2 sm:order-1">
+                    <Button variant="ghost" className="w-full sm:w-auto">Annuler</Button>
                 </Link>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3 order-1 sm:order-2">
                     <Button
                         size="lg"
                         variant="outline"
-                        className="gap-2"
+                        className="gap-2 w-full sm:w-auto"
                         disabled={!canCreateDraft}
                         onClick={handleCreateDraft}
                     >
@@ -377,7 +377,7 @@ export default function NewTournament() {
                     </Button>
                     <Button
                         size="lg"
-                        className="gap-2"
+                        className="gap-2 w-full sm:w-auto"
                         disabled={!canLaunch}
                         onClick={handleLaunch}
                     >

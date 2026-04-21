@@ -22,15 +22,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Dashboard</h1>
-          <p className="text-muted-foreground text-lg">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">Dashboard</h1>
+          <p className="text-muted-foreground text-base sm:text-lg">
             Gérez vos tournois ou commencez-en un nouveau.
           </p>
         </div>
-        <Link href="/tournaments/new">
-          <Button size="lg" className="gap-2">
+        <Link href="/tournaments/new" className="shrink-0">
+          <Button size="lg" className="gap-2 w-full sm:w-auto">
             <Trophy className="w-5 h-5" />
             Créer un tournoi
           </Button>

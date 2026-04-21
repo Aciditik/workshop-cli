@@ -57,17 +57,17 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                         {/* Clickable round header */}
                         <div
                             onClick={() => toggleRound(round)}
-                            className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                            className="w-full flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
                         >
-                            <h3 className="text-xl font-bold flex items-center gap-2">
-                                {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                                Ronde {round}
-                                {round === currentRound && <span className="bg-primary/20 text-primary text-xs px-2 py-1 rounded-full uppercase tracking-wider">Active</span>}
-                                <span className="text-sm font-normal text-muted-foreground ml-2">
-                                    {completedCount}/{totalCount} tables
+                            <h3 className="text-base sm:text-xl font-bold flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                                {isExpanded ? <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" /> : <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
+                                <span>Ronde {round}</span>
+                                {round === currentRound && <span className="bg-primary/20 text-primary text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider">Active</span>}
+                                <span className="text-xs sm:text-sm font-normal text-muted-foreground">
+                                    {completedCount}/{totalCount}
                                 </span>
                             </h3>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 shrink-0">
                                 {round === currentRound && (
                                     <div onClick={(e) => e.stopPropagation()}>
                                         <QRCodeModal
