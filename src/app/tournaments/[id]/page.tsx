@@ -30,8 +30,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const tournament = isLoaded ? getTournament(id) : null;
 
-    if (!isLoaded) return <div className="p-8 animate-pulse text-muted-foreground">Loading...</div>;
-    if (!tournament) return <div className="p-8 text-destructive">Tournament not found.</div>;
+    if (!isLoaded) return <div className="p-8 animate-pulse font-prototype text-muted-foreground">Loading...</div>;
+    if (!tournament) return <div className="p-8 font-prototype text-destructive">Tournament not found.</div>;
 
     const format = tournament.format || "swiss";
     const maxRounds = tournament.maxRounds || 3;
@@ -315,16 +315,16 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         />
                     )}
                     <div className="min-w-0">
-                        <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-1 sm:mb-2 flex flex-wrap items-center gap-2 sm:gap-3">
+                        <h1 className="text-2xl sm:text-4xl font-prototype tracking-tight mb-1 sm:mb-2 flex flex-wrap items-center gap-2 sm:gap-3">
                             <span className="truncate">{tournament.name}</span>
-                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${tournament.status === "completed" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
+                            <span className={`text-xs px-2.5 py-1 rounded-full font-prototype whitespace-nowrap ${tournament.status === "completed" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
                                 tournament.status === "in_progress" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
                                     "bg-orange-500/10 text-orange-500 border border-orange-500/20"
                                 }`}>
                                 {tournament.status.replace("_", " ").toUpperCase()}
                             </span>
                         </h1>
-                        <p className="text-xs sm:text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm font-prototype text-muted-foreground">
                             {playerCount} joueur{playerCount > 1 ? "s" : ""} • {getFormatLabel(playerCount)} • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}
                         </p>
                     </div>
@@ -333,7 +333,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     onClick={refresh}
                     variant="outline"
                     size="sm"
-                    className="gap-2 w-full sm:w-auto shrink-0"
+                    className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
                 >
                     <RotateCcw className="w-4 h-4" />
                     Refresh
@@ -346,7 +346,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     <CardContent className="p-6">
                         <div className="flex items-center gap-3 mb-4">
                             <Award className="w-6 h-6 text-yellow-500" />
-                            <h3 className="text-xl font-bold text-yellow-400">Joueurs Qualifiés</h3>
+                            <h3 className="text-xl font-prototype text-yellow-400">Joueurs Qualifiés</h3>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                             {tournament.qualifiedIds.map((qId, idx) => {
@@ -355,15 +355,15 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     <div key={qId} className="flex items-center gap-3 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10">
                                         <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                                         <div>
-                                            <p className="font-bold">{p?.firstname} {p?.name || "Inconnu"}</p>
-                                            <p className="text-xs text-muted-foreground">Qualifié #{idx + 1}</p>
+                                            <p className="font-prototype">{p?.firstname} {p?.name || "Inconnu"}</p>
+                                            <p className="text-xs font-prototype text-muted-foreground">Qualifié #{idx + 1}</p>
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
                         <div className="mt-4 pt-4 border-t border-yellow-500/20">
-                            <Button onClick={exportTopPlayers} className="gap-2" variant="outline">
+                            <Button onClick={exportTopPlayers} className="gap-2 font-prototype" variant="outline">
                                 <Download className="w-4 h-4" />
                                 Exporter le top {qualifiedCount * 2 + 1} (CSV)
                             </Button>
@@ -376,7 +376,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             {tournament.status === "draft" && (
                 <Card className="border-orange-500/30 bg-orange-500/5">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-orange-400">
+                        <CardTitle className="flex items-center gap-2 text-orange-400 font-prototype">
                             <UserPlus className="w-5 h-5" />
                             Ajouter des joueurs
                         </CardTitle>
@@ -393,7 +393,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     onKeyDown={handlePlayerKeyDown}
                                     placeholder="Pr\u00e9nom *"
                                     required
-                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                                 <input
                                     type="text"
@@ -402,7 +402,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     onKeyDown={handlePlayerKeyDown}
                                     placeholder="Nom *"
                                     required
-                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                                 <input
                                     type="email"
@@ -411,7 +411,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     onKeyDown={handlePlayerKeyDown}
                                     placeholder="Email *"
                                     required
-                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                                 <input
                                     type="tel"
@@ -420,10 +420,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     onKeyDown={handlePlayerKeyDown}
                                     placeholder="T\u00e9l\u00e9phone *"
                                     required
-                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                             </div>
-                            <Button onClick={addPlayer} className="gap-2 w-full md:w-auto">
+                            <Button onClick={addPlayer} className="gap-2 w-full md:w-auto font-prototype">
                                 <Plus className="w-4 h-4" />
                                 Ajouter le joueur
                             </Button>
@@ -435,10 +435,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 {tournament.participants.map((p, index) => (
                                     <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-md border bg-card/50 text-sm group">
                                         <div className="flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+                                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-prototype text-muted-foreground shrink-0">
                                                 {index + 1}
                                             </span>
-                                            <span className="font-medium">{p.firstname} {p.name}</span>
+                                            <span className="font-prototype">{p.firstname} {p.name}</span>
                                         </div>
                                         <button
                                             type="button"
@@ -454,7 +454,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         )}
 
                         {tournament.participants.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                            <p className="text-sm font-prototype text-muted-foreground text-center py-4 border border-dashed rounded-lg">
                                 Aucun joueur ajouté. Ajoutez au moins 8 joueurs pour lancer le tournoi.
                             </p>
                         )}
@@ -464,7 +464,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             <Button
                                 onClick={startTournament}
                                 disabled={playerCount < 8}
-                                className="w-full gap-2"
+                                className="w-full gap-2 font-prototype"
                                 size="lg"
                             >
                                 <Play className="w-4 h-4 fill-white" />
@@ -479,16 +479,16 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-4">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-2xl font-bold flex items-center gap-2">
+                            <h3 className="text-2xl font-prototype flex items-center gap-2">
                                 <ListOrdered className="w-6 h-6 text-primary" />
                                 Rondes & Tables
                             </h3>
                             {tournament.status === "completed" ? (
-                                <div className="text-green-500 font-bold bg-green-500/10 px-4 py-2 rounded-lg">
+                                <div className="text-green-500 font-prototype bg-green-500/10 px-4 py-2 rounded-lg">
                                     Tournoi Terminé !
                                 </div>
                             ) : canGenerateNextRound() ? (
-                                <Button onClick={generateNextRound} className="gap-2" variant="secondary">
+                                <Button onClick={generateNextRound} className="gap-2 font-prototype" variant="secondary">
                                     <Play className="w-4 h-4 fill-foreground" />
                                     Générer Ronde {currentRound + 1}
                                 </Button>
@@ -510,7 +510,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     <div>
                         <Card className="sticky top-8 border-primary/20">
                             <CardHeader className="bg-primary/5 border-b border-border">
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 font-prototype">
                                     <Trophy className="w-5 h-5 text-primary" />
                                     Joueurs
                                 </CardTitle>
@@ -530,7 +530,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         }`}>
                                                         {index + 1}
                                                     </span>
-                                                    <span className="font-medium">{p.firstname} {p.name}</span>
+                                                    <span className="font-prototype">{p.firstname} {p.name}</span>
                                                     {qualifiedIds.has(p.id) && (
                                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                                     )}
@@ -538,17 +538,17 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 {tournament.status !== "draft" && (
                                                 <div className="flex items-center gap-3">
                                                     {tableDiff > 0 && (
-                                                        <span className="text-sm font-mono text-orange-600">
+                                                        <span className="text-sm font-prototype text-orange-600">
                                                             Diff {tableDiff}
                                                         </span>
                                                     )}
                                                     {ntScore > 0 && (
-                                                        <span className="text-sm font-mono text-blue-600">
+                                                        <span className="text-sm font-prototype text-blue-600">
                                                             {ntScore} NT
                                                         </span>
                                                     )}
                                                     {totalPoints !== null && (
-                                                        <span className="text-sm font-mono text-muted-foreground">
+                                                        <span className="text-sm font-prototype text-muted-foreground">
                                                             {totalPoints} pts
                                                         </span>
                                                     )}

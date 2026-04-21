@@ -16,7 +16,7 @@ export function QRCodeModal({ tournamentId, tournamentName }: QRCodeModalProps) 
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 h-8 text-xs">
+                <Button variant="outline" size="sm" className="gap-2 h-8 text-xs font-prototype">
                     <QrCode className="w-3.5 h-3.5" />
                     Voir le QR code
                 </Button>

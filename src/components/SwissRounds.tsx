@@ -59,11 +59,11 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                             onClick={() => toggleRound(round)}
                             className="w-full flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
                         >
-                            <h3 className="text-base sm:text-xl font-bold flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                            <h3 className="text-base sm:text-xl font-prototype flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
                                 {isExpanded ? <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" /> : <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
-                                <span>Ronde {round}</span>
-                                {round === currentRound && <span className="bg-primary/20 text-primary text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider">Active</span>}
-                                <span className="text-xs sm:text-sm font-normal text-muted-foreground">
+                                <span className="font-prototype">Ronde {round}</span>
+                                {round === currentRound && <span className="bg-primary/20 text-primary text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider font-prototype">Active</span>}
+                                <span className="text-xs sm:text-sm font-prototype text-muted-foreground">
                                     {completedCount}/{totalCount}
                                 </span>
                             </h3>
@@ -103,11 +103,11 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                 className={`${match.isCompleted ? "opacity-75 bg-muted/20" : isFinalist ? "border-yellow-500/50 bg-yellow-500/5" : "border-primary/50"}`}
             >
                 <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-3 flex-wrap">
-                        <span className={isFinalist ? "text-yellow-400 font-bold" : ""}>{displayLabel}</span>
+                    <CardTitle className="text-sm font-prototype text-muted-foreground flex items-center gap-3 flex-wrap">
+                        <span className={isFinalist ? "text-yellow-400 font-prototype" : "font-prototype"}>{displayLabel}</span>
                         {/* <span className="text-xs text-muted-foreground/60 font-normal">{playerCount}p · {scale} pts</span> */}
-                        {match.isCompleted && <span className="text-green-500">Validé</span>}
-                        {match.isPendingReview && !match.isCompleted && <span className="text-yellow-500">En attente</span>}
+                        {match.isCompleted && <span className="text-green-500 font-prototype">Validé</span>}
+                        {match.isPendingReview && !match.isCompleted && <span className="text-yellow-500 font-prototype">En attente</span>}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -122,13 +122,13 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 const pts = match.results[pId] || 0;
                                 return (
                                     <div key={pId} className="rounded-md border border-yellow-500/30 bg-yellow-500/5 overflow-hidden">
-                                        <div className="flex items-center justify-between px-3 py-2 bg-yellow-500/10 font-semibold text-sm">
-                                            <span>{p.firstname} {p.name}</span>
-                                            <span className="text-yellow-400">{total} pts {/*→ <span className="text-primary">+{pts} placement</span>*/}</span>
+                                        <div className="flex items-center justify-between px-3 py-2 bg-yellow-500/10 font-prototype text-sm">
+                                            <span className="font-prototype">{p.firstname} {p.name}</span>
+                                            <span className="text-yellow-400 font-prototype">{total} pts {/*→ <span className="text-primary">+{pts} placement</span>*/}</span>
                                         </div>
                                         {sc.corporation && (
-                                            <div className="px-3 py-1 text-xs text-muted-foreground border-b border-border/40">
-                                                Corp: <span className="text-foreground font-medium">{sc.corporation}</span>
+                                            <div className="px-3 py-1 text-xs font-prototype text-muted-foreground border-b border-border/40">
+                                                Corp: <span className="text-foreground font-prototype">{sc.corporation}</span>
                                             </div>
                                         )}
                                         <div className="grid grid-cols-3 gap-0 text-xs">
@@ -141,14 +141,14 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                                 ["Cartes", sc.cartes],
                                             ] as [string, number][]).map(([label, val]) => (
                                                 <div key={label} className="flex flex-col items-center p-1.5 border-r border-b border-border/30 last:border-r-0">
-                                                    <span className="text-muted-foreground">{label}</span>
-                                                    <span className="font-bold text-foreground">{val}</span>
+                                                    <span className="text-muted-foreground font-prototype">{label}</span>
+                                                    <span className="font-prototype text-foreground">{val}</span>
                                                 </div>
                                             ))}
                                         </div>
                                         {sc.megacredits > 0 && (
-                                            <div className="px-3 py-1 text-xs text-muted-foreground">
-                                                Tiebreaker: <span className="font-medium text-foreground">{sc.megacredits}</span>
+                                            <div className="px-3 py-1 text-xs font-prototype text-muted-foreground">
+                                                Tiebreaker: <span className="font-prototype text-foreground">{sc.megacredits}</span>
                                             </div>
                                         )}
                                     </div>
@@ -156,13 +156,13 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                             })}
                             <div className="flex gap-2">
                                 <Button
-                                    className="flex-1 text-xs h-8 bg-red-500 hover:bg-red-600 text-white"
+                                    className="flex-1 text-xs h-8 bg-red-500 hover:bg-red-600 text-white font-prototype"
                                     onClick={() => onDeclineResults(match.id)}
                                 >
                                     Refuser
                                 </Button>
                                 <Button
-                                    className="flex-1 text-xs h-8 bg-yellow-500 hover:bg-yellow-600 text-white"
+                                    className="flex-1 text-xs h-8 bg-yellow-500 hover:bg-yellow-600 text-white font-prototype"
                                     onClick={() => onSubmitResults(match.id, match.results)}
                                 >
                                     Valider
@@ -199,17 +199,17 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                         return (
                                             <div key={i} className="flex items-center justify-between p-2 rounded-md bg-accent/50 text-sm">
                                                 <div className="flex items-center gap-2">
-                                                    <span>{p ? `${p.firstname} ${p.name}` : "Place vide"}</span>
+                                                    <span className="font-prototype">{p ? `${p.firstname} ${p.name}` : "Place vide"}</span>
                                                     {p && qualifiedSet.has(p.id) && (
                                                         <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     {match.isCompleted && nt > 0 && (
-                                                        <span className="text-xs text-muted-foreground">{nt} NT</span>
+                                                        <span className="text-xs font-prototype text-muted-foreground">{nt} NT</span>
                                                     )}
                                                     {match.isCompleted && p && (
-                                                        <span className="font-bold text-primary">{placement}</span>
+                                                        <span className="font-prototype text-primary">{placement}</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -219,14 +219,14 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                             </div>
 
                             {!match.isCompleted && round === currentRound && !match.isPendingReview && (
-                                <div className="text-center text-xs text-muted-foreground p-2 border border-dashed rounded-md">
+                                <div className="text-center font-prototype text-xs text-muted-foreground p-2 border border-dashed rounded-md">
                                     En attente des scores des joueurs...
                                 </div>
                             )}
 
                             {match.isPendingReview && !match.isCompleted && round === currentRound && (
                                 <Button
-                                    className="w-full text-xs h-8 bg-yellow-500 hover:bg-yellow-600 text-white"
+                                    className="w-full text-xs h-8 bg-yellow-500 hover:bg-yellow-600 text-white font-prototype"
                                     onClick={() => onSubmitResults(match.id, match.results)}
                                 >
                                     Valider les scores

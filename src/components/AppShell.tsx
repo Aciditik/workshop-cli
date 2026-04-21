@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -28,7 +29,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <Trophy className="w-12 h-12 text-primary opacity-50" />
-          <p className="text-muted-foreground">Chargement...</p>
+          <p className="text-muted-foreground font-prototype">Chargement...</p>
         </div>
       </div>
     );
@@ -69,10 +70,16 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div className="p-6 flex items-center gap-3">
-          <div className="bg-primary p-2 rounded-lg shadow-lg shadow-primary/30">
-            <Trophy className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 relative shrink-0">
+            <Image 
+              src="/cdf-logo.png" 
+              alt="CDF Logo"
+              width={40}
+              height={40}
+              className="object-contain"
+            />
           </div>
-          <h1 className="text-xl font-bold bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
+          <h1 className="text-xl font-prototype bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
             CDF Terraforming Mars
           </h1>
           <button
@@ -90,29 +97,29 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
           >
             <LayoutDashboard className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-medium">Dashboard</span>
+            <span className="font-prototype">Dashboard</span>
           </Link>
           <Link
             href="/tournaments/new"
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
           >
             <PlusCircle className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-medium">Nouveau tournoi</span>
+            <span className="font-prototype">Nouveau tournoi</span>
           </Link>
         </nav>
 
         <div className="p-4 border-t border-border/50 space-y-3">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-prototype shrink-0">
               {user?.name?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.name}</p>
+              <p className="text-sm font-prototype truncate">{user?.name}</p>
               <div className="flex items-center gap-1">
                 {user?.role === "admin" && (
                   <Shield className="w-3 h-3 text-yellow-500" />
                 )}
-                <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+                <p className="text-xs font-prototype text-muted-foreground capitalize">{user?.role}</p>
               </div>
             </div>
             <button
@@ -140,10 +147,16 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="bg-primary p-1.5 rounded-md shadow-md shadow-primary/30">
-              <Trophy className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 relative shrink-0">
+              <Image 
+                src="/cdf-logo.png" 
+                alt="CDF Logo"
+                width={32}
+                height={32}
+                className="object-contain"
+              />
             </div>
-            <span className="text-sm font-semibold">CDF Terraforming Mars</span>
+            <span className="text-sm font-prototype">CDF Terraforming Mars</span>
           </div>
           <div className="w-9" aria-hidden="true" />
         </div>

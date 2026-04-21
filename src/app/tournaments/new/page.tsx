@@ -157,15 +157,15 @@ export default function NewTournament() {
                         <ChevronLeft className="w-5 h-5" />
                     </Button>
                 </Link>
-                <div className="min-w-0">
-                    <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-1 sm:mb-2">Nouveau Tournoi</h1>
-                    <p className="text-muted-foreground text-sm sm:text-lg">Renseignez les informations et ajoutez les joueurs.</p>
+                <div className="text-center space-y-4 mb-8">
+                    <h1 className="text-4xl font-extrabold tracking-tight font-prototype">Nouveau Tournoi</h1>
+                    <p className="text-muted-foreground font-prototype text-sm sm:text-lg">Renseignez les informations et ajoutez les joueurs.</p>
                 </div>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-primary">
+                    <CardTitle className="flex items-center gap-2 text-primary font-prototype">
                         <Trophy className="w-5 h-5" />
                         Informations
                     </CardTitle>
@@ -173,33 +173,33 @@ export default function NewTournament() {
                 <CardContent className="space-y-6">
                     {/* Tournament name */}
                     <div className="space-y-2">
-                        <label htmlFor="name" className="text-sm font-medium">Nom du tournoi</label>
+                        <label htmlFor="name" className="text-sm font-prototype">Nom du tournoi</label>
                         <input
                             id="name"
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="ex. Summer Championship 2026"
-                            className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         />
                     </div>
 
                     {/* Event date */}
                     <div className="space-y-2">
-                        <label htmlFor="eventDate" className="text-sm font-medium">Date de l&apos;événement</label>
+                        <label htmlFor="eventDate" className="text-sm font-prototype">Date de l&apos;événement</label>
                         <input
                             id="eventDate"
                             type="date"
                             value={eventDate}
                             onChange={(e) => setEventDate(e.target.value)}
-                            className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         />
                     </div>
 
                     {/* Organizer selector (admin only) */}
                     {isAdmin && organizers.length > 0 && (
                         <div className="space-y-2">
-                            <label htmlFor="owner" className="text-sm font-medium">Organisateur</label>
+                            <label htmlFor="owner" className="text-sm font-prototype">Organisateur</label>
                             <select
                                 id="owner"
                                 value={selectedOwnerId}
@@ -213,19 +213,19 @@ export default function NewTournament() {
                                     </option>
                                 ))}
                             </select>
-                            <p className="text-xs text-muted-foreground">L&apos;organisateur sélectionné pourra voir et gérer ce tournoi.</p>
+                            <p className="text-xs font-prototype text-muted-foreground">L&apos;organisateur sélectionné pourra voir et gérer ce tournoi.</p>
                         </div>
                     )}
 
                     {/* Logo */}
                     <div className="space-y-2">
-                        <label className="text-sm font-medium block">Logo de votre boutique / association</label>
+                        <label className="text-sm font-prototype block">Logo de votre boutique / association</label>
                         <div className="relative">
                             <input id="logoUpload" type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml" onChange={handleLogoUpload} className="hidden" />
                             <label htmlFor="logoUpload" className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/20">
                                 <Upload className="w-7 h-7 text-primary mb-1" />
-                                <span className="text-sm font-medium text-foreground">{logoFileName || "Téléchargez le logo"}</span>
-                                <span className="text-xs text-muted-foreground mt-0.5">PNG, SVG • max 800 ko • fond transparent recommandé</span>
+                                <span className="text-sm font-prototype text-foreground">{logoFileName || "Téléchargez le logo"}</span>
+                                <span className="text-xs font-prototype text-muted-foreground mt-0.5">PNG, SVG • max 800 ko • fond transparent recommandé</span>
                             </label>
                             {logoUrl && (
                                 <div className="mt-3 flex items-center justify-center">
@@ -240,10 +240,10 @@ export default function NewTournament() {
             {/* Players section */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-primary">
+                    <CardTitle className="flex items-center gap-2 text-primary font-prototype">
                         <Users className="w-5 h-5" />
                         Joueurs
-                        {size > 0 && <span className="ml-auto text-sm font-normal text-muted-foreground">{size} joueur{size > 1 ? "s" : ""}</span>}
+                        {size > 0 && <span className="ml-auto text-sm font-prototype text-muted-foreground">{size} joueur{size > 1 ? "s" : ""}</span>}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -288,7 +288,7 @@ export default function NewTournament() {
                                 className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             />
                         </div>
-                        <Button type="button" onClick={addPlayer} className="gap-1 w-full md:w-auto">
+                        <Button type="button" onClick={addPlayer} className="gap-1 w-full md:w-auto font-prototype">
                             <Plus className="w-4 h-4" /> Ajouter le joueur
                         </Button>
                     </div>
@@ -299,10 +299,10 @@ export default function NewTournament() {
                             {players.map((player, index) => (
                                 <div key={index} className="flex items-center justify-between px-3 py-2 rounded-md border bg-card/50 text-sm group">
                                     <div className="flex items-center gap-2">
-                                        <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+                                        <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-prototype text-muted-foreground shrink-0">
                                             {index + 1}
                                         </span>
-                                        <span className="font-medium">{player.firstname} {player.name}</span>
+                                        <span className="font-prototype">{player.firstname} {player.name}</span>
                                     </div>
                                     <button
                                         type="button"
@@ -318,7 +318,7 @@ export default function NewTournament() {
                     )}
 
                     {players.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                        <p className="text-sm font-prototype text-muted-foreground text-center py-4 border border-dashed rounded-lg">
                             Aucun joueur ajouté pour l&apos;instant
                         </p>
                     )}
@@ -335,21 +335,21 @@ export default function NewTournament() {
                             <Info className="w-4 h-4 mt-0.5 shrink-0" />
                             <div className="space-y-0.5">
                                 {size < 8 ? (
-                                    <p className="font-medium">Minimum 8 joueurs requis ({8 - size} manquant{8 - size > 1 ? "s" : ""})</p>
+                                    <p className="font-prototype">Minimum 8 joueurs requis ({8 - size} manquant{8 - size > 1 ? "s" : ""})</p>
                                 ) : (
                                     <>
-                                        <p className="font-medium">
+                                        <p className="font-prototype">
                                             {getFormatLabel(size)}
                                             {!isRecommendedSize(size) && " (non recommandé)"}
                                         </p>
-                                        <p className="text-xs opacity-80">
+                                        <p className="text-xs font-prototype opacity-80">
                                             {getQualifiedCount(size)} joueur{getQualifiedCount(size) > 1 ? "s" : ""} qualifié{getQualifiedCount(size) > 1 ? "s" : ""} · {getMaxRounds(size)} rondes
                                         </p>
                                         {size < 28 && (
-                                            <p className="text-xs opacity-80">Ronde 1 : tables aléatoires · Ronde 2 : tables croisées selon résultats</p>
+                                            <p className="text-xs font-prototype opacity-80">Ronde 1 : tables aléatoires · Ronde 2 : tables croisées selon résultats</p>
                                         )}
                                         {size >= 28 && (
-                                            <p className="text-xs opacity-80">Format suisse : classement par points cumulés</p>
+                                            <p className="text-xs font-prototype opacity-80">Format suisse : classement par points cumulés</p>
                                         )}
                                     </>
                                 )}
@@ -362,13 +362,13 @@ export default function NewTournament() {
             {/* Footer actions */}
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-8">
                 <Link href="/" className="order-2 sm:order-1">
-                    <Button variant="ghost" className="w-full sm:w-auto">Annuler</Button>
+                    <Button variant="ghost" className="w-full sm:w-auto font-prototype">Annuler</Button>
                 </Link>
                 <div className="flex flex-col sm:flex-row gap-3 order-1 sm:order-2">
                     <Button
                         size="lg"
                         variant="outline"
-                        className="gap-2 w-full sm:w-auto"
+                        className="gap-2 w-full sm:w-auto font-prototype"
                         disabled={!canCreateDraft}
                         onClick={handleCreateDraft}
                     >
@@ -377,7 +377,7 @@ export default function NewTournament() {
                     </Button>
                     <Button
                         size="lg"
-                        className="gap-2 w-full sm:w-auto"
+                        className="gap-2 w-full sm:w-auto font-prototype"
                         disabled={!canLaunch}
                         onClick={handleLaunch}
                     >

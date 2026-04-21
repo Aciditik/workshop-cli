@@ -14,7 +14,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <Trophy className="w-12 h-12 text-primary opacity-50" />
-          <p className="text-muted-foreground">Chargement des tournois...</p>
+          <p className="text-muted-foreground font-prototype">Chargement des tournois...</p>
         </div>
       </div>
     );
@@ -24,13 +24,13 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">Dashboard</h1>
-          <p className="text-muted-foreground text-base sm:text-lg">
+          <h1 className="text-3xl sm:text-4xl font-prototype tracking-tight mb-2">Dashboard</h1>
+          <p className="text-muted-foreground font-prototype text-base sm:text-lg">
             Gérez vos tournois ou commencez-en un nouveau.
           </p>
         </div>
         <Link href="/tournaments/new" className="shrink-0">
-          <Button size="lg" className="gap-2 w-full sm:w-auto">
+          <Button size="lg" className="gap-2 w-full sm:w-auto font-prototype">
             <Trophy className="w-5 h-5" />
             Créer un tournoi
           </Button>
@@ -42,12 +42,12 @@ export default function Dashboard() {
           <div className="bg-primary/10 p-4 rounded-full mb-4">
             <Trophy className="w-10 h-10 text-primary" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">Aucun tournoi pour le moment</h3>
-          <p className="text-muted-foreground mb-6 max-w-md">
+          <h3 className="text-xl font-prototype mb-2">Aucun tournoi pour le moment</h3>
+          <p className="text-muted-foreground font-prototype mb-6 max-w-md">
             Vous n'avez pas créé de tournoi. Cliquez sur le bouton ci-dessous pour créer votre premier tournoi!
           </p>
           <Link href="/tournaments/new">
-            <Button>Créer votre premier tournoi</Button>
+            <Button className="font-prototype">Créer votre premier tournoi</Button>
           </Link>
         </Card>
       ) : (
@@ -70,7 +70,7 @@ export default function Dashboard() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
                 <span
-                  className={`absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-medium ${tournament.status === "completed"
+                  className={`absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-prototype ${tournament.status === "completed"
                     ? "bg-green-500/10 text-green-500 border border-green-500/20"
                     : tournament.status === "in_progress"
                       ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
@@ -95,17 +95,17 @@ export default function Dashboard() {
                         <Trophy className="w-16 h-16 text-muted-foreground/50" />
                       </div>
                     )}
-                    <h3 className="text-lg font-bold text-center mb-2">{tournament.name}</h3>
+                    <h3 className="text-lg font-prototype text-center mb-2">{tournament.name}</h3>
                   </div>
                   <div className="w-full pt-4 border-t border-border">
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between text-sm font-prototype text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
-                        <span>{new Date(tournament.eventDate).toLocaleDateString()}</span>
+                        <span className="font-prototype">{new Date(tournament.eventDate).toLocaleDateString()}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4" />
-                        <span>{tournament.participants.length} / {tournament.size}</span>
+                        <span className="font-prototype">{tournament.participants.length} / {tournament.size}</span>
                       </div>
                     </div>
                   </div>

@@ -41,7 +41,7 @@ export default function LoginPage() {
           <div className="bg-primary p-3 rounded-xl shadow-lg shadow-primary/30">
             <Trophy className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-prototype bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
             CDF Terraforming Mars
           </h1>
           <p className="text-muted-foreground text-center">

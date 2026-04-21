@@ -5,6 +5,7 @@ import { Tournament } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Trophy, CheckCircle2, ChevronUp, ChevronDown } from "lucide-react";
+import Image from "next/image";
 
 type PlayerScore = {
     corporation: string;
@@ -91,17 +92,17 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [match?.participantIds, scores]);
 
-    if (loading) return <div className="p-8 text-center animate-pulse">Chargement des données de la table...</div>;
-    if (!tournament) return <div className="p-8 text-center text-red-500">Tournoi non trouvé.</div>;
-    if (!match) return <div className="p-8 text-center text-red-500">Table non trouvée.</div>;
+    if (loading) return <div className="p-8 text-center animate-pulse font-prototype">Chargement des données de la table...</div>;
+    if (!tournament) return <div className="p-8 text-center font-prototype text-red-500">Tournoi non trouvé.</div>;
+    if (!match) return <div className="p-8 text-center font-prototype text-red-500">Table non trouvée.</div>;
 
     if (match.isCompleted || submitted) {
         return (
             <div className="min-h-screen bg-background p-4 flex flex-col items-center justify-center">
                 <Card className="w-full max-w-sm border-green-500/50 bg-green-500/5 text-center p-8">
                     <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold mb-2">Scores envoyés!</h2>
-                    <p className="text-muted-foreground">Merci. L'admin vérifiera ces résultats sous peu.</p>
+                    <h2 className="text-2xl font-prototype mb-2">Scores envoyés!</h2>
+                    <p className="font-prototype text-muted-foreground">Merci. L'admin vérifiera ces résultats sous peu.</p>
                 </Card>
             </div>
         );
@@ -197,11 +198,17 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
         <div className="min-h-screen bg-transparent flex flex-col items-center py-6 sm:py-8 px-3 sm:px-4">
             <div className="w-full max-w-5xl space-y-6">
                 <div className="text-center space-y-2 mb-6 sm:mb-8">
-                    <div className="bg-primary/20 p-3 rounded-full inline-block text-primary shadow-lg ring-1 ring-primary/30">
-                        <Trophy className="w-7 h-7 sm:w-8 sm:h-8" />
+                    <div className="w-16 h-16 relative mx-auto">
+                        <Image 
+                            src="/cdf-logo.png" 
+                            alt="CDF Logo"
+                            width={64}
+                            height={64}
+                            className="object-contain"
+                        />
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">Table {match.tableNumber} - Tableau des scores</h1>
-                    <p className="text-muted-foreground font-medium text-sm sm:text-base">{tournament.name} - Round {match.round}</p>
+                    <h1 className="text-2xl sm:text-3xl font-prototype text-foreground tracking-tight">Table {match.tableNumber} - Tableau des scores</h1>
+                    <p className="text-muted-foreground font-prototype text-sm sm:text-base">{tournament.name} - Round {match.round}</p>
                 </div>
 
                 {/* MOBILE LAYOUT: one card per player */}
@@ -213,11 +220,11 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                             <div key={pId} className="glass rounded-xl overflow-hidden">
                                 <div className="bg-primary/20 px-4 py-3 flex items-center justify-between">
                                     <div>
-                                        <div className="text-xs text-muted-foreground font-medium">Joueur #{i + 1}</div>
-                                        <div className="font-bold">{p ? `${p.firstname} ${p.name}` : "Unknown"}</div>
+                                        <div className="text-xs text-muted-foreground font-prototype">Joueur #{i + 1}</div>
+                                        <div className="font-prototype">{p ? `${p.firstname} ${p.name}` : "Unknown"}</div>
                                     </div>
                                     {rank && (
-                                        <div className="flex items-center gap-1 font-bold text-lg">
+                                        <div className="flex items-center gap-1 font-prototype text-lg">
                                             {rank.rank === 1 && <span className="text-yellow-500 text-xl drop-shadow-md">🥇</span>}
                                             {rank.rank === 2 && <span className="text-gray-300 text-xl drop-shadow-md">🥈</span>}
                                             {rank.rank === 3 && <span className="text-orange-500 text-xl drop-shadow-md">🥉</span>}
@@ -227,21 +234,21 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                 </div>
                                 <div className="p-4 space-y-3">
                                     <div>
-                                        <label className="text-xs text-muted-foreground font-semibold block mb-1">Corporation</label>
+                                        <label className="text-xs text-muted-foreground font-prototype block mb-1">Corporation</label>
                                         <select
                                             className="w-full p-2 border border-border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                             value={scores[pId]?.corporation || ""}
                                             onChange={(e) => handleScoreChange(pId, "corporation", e.target.value)}
                                         >
                                             {CORPORATIONS.map(c => (
-                                                <option key={c} value={c === "Select Corporation" ? "" : c}>{c}</option>
+                                                <option key={c} value={c === "Select Corporation" ? "" : c} className="font-prototype">{c}</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         {CATEGORIES.map(cat => (
                                             <div key={cat.key}>
-                                                <label className="text-xs text-muted-foreground font-semibold block mb-1">{cat.label}</label>
+                                                <label className="text-xs text-muted-foreground font-prototype block mb-1">{cat.label}</label>
                                                 <input
                                                     type="number"
                                                     inputMode="numeric"
@@ -249,7 +256,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                                     step="1"
                                                     min="0"
                                                     placeholder="0"
-                                                    className="w-full text-center p-2 border border-border rounded-md bg-background text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-primary hide-arrows"
+                                                    className="w-full text-center p-2 border border-border rounded-md bg-background text-foreground font-prototype focus:outline-none focus:ring-2 focus:ring-primary hide-arrows"
                                                     value={scores[pId]?.[cat.key] || ''}
                                                     onChange={(e) => handleScoreChange(pId, cat.key, e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                                                 />
@@ -257,8 +264,8 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                         ))}
                                     </div>
                                     <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                                        <span className="text-sm font-semibold text-muted-foreground">Total NT</span>
-                                        <span className="text-2xl font-black text-primary">{calculateTotal(pId)}</span>
+                                        <span className="text-sm font-prototype text-muted-foreground">Total NT</span>
+                                        <span className="text-2xl font-prototype text-primary">{calculateTotal(pId)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -270,10 +277,10 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                 <div className="hidden md:block glass rounded-xl overflow-x-auto">
                     <div className="min-w-[800px] w-full">
                         {/* HEADER */}
-                        <div className="flex bg-primary/20 text-primary-foreground font-bold text-sm tracking-wide">
-                            <div className="w-48 flex-shrink-0 p-4 border-r border-border">Table {match.tableNumber}</div>
+                        <div className="flex bg-primary/20 text-primary-foreground font-prototype text-sm tracking-wide">
+                            <div className="w-48 flex-shrink-0 p-4 border-r border-border font-prototype">Table {match.tableNumber}</div>
                             {activePlayers.map((pId, i) => (
-                                <div key={pId} className="flex-1 min-w-[150px] p-4 text-center border-r border-border last:border-0">
+                                <div key={pId} className="flex-1 min-w-[150px] p-4 text-center border-r border-border last:border-0 font-prototype">
                                     Joueur #{i + 1}
                                 </div>
                             ))}
@@ -281,11 +288,11 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
 
                         {/* PLAYER NAMES */}
                         <div className="flex bg-secondary text-secondary-foreground font-bold">
-                            <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/50 text-center">
+                            <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/50 text-center font-prototype">
                                 Nom du joueur
                             </div>
                             {activePlayers.map(pId => (
-                                <div key={pId} className="flex-1 min-w-[150px] p-4 bg-card text-card-foreground border-r border-border border-b border-border flex items-center justify-center font-medium">
+                                <div key={pId} className="flex-1 min-w-[150px] p-4 bg-card text-card-foreground border-r border-border border-b border-border flex items-center justify-center font-prototype">
                                     {(() => { const p = getParticipant(pId); return p ? `${p.firstname} ${p.name}` : "Unknown"; })()}
                                 </div>
                             ))}
@@ -293,7 +300,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
 
                         {/* CORPORATION */}
                         <div className="flex bg-secondary text-secondary-foreground font-bold">
-                            <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/50 text-center">
+                            <div className="w-48 font-prototype flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/50 text-center">
                                 Corporation
                             </div>
                             {activePlayers.map(pId => (
@@ -313,7 +320,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
 
                         {/* CATEGORY ROWS */}
                         {CATEGORIES.map(cat => (
-                            <div key={cat.key} className="flex bg-secondary/80 text-secondary-foreground font-bold">
+                            <div key={cat.key} className="flex bg-secondary/80 text-secondary-foreground font-prototype">
                                 <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/30 text-center">
                                     {cat.label}
                                 </div>
@@ -327,7 +334,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                                 step="1"
                                                 min="0"
                                                 placeholder="0"
-                                                className="w-full text-center p-2 text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-primary hide-arrows bg-transparent placeholder:text-muted-foreground"
+                                                className="w-full text-center p-2 text-foreground font-prototype focus:outline-none focus:ring-1 focus:ring-inset focus:ring-primary hide-arrows bg-transparent placeholder:text-muted-foreground"
                                                 value={scores[pId]?.[cat.key] || ''}
                                                 onChange={(e) => handleScoreChange(pId, cat.key, e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                                             />
@@ -338,23 +345,23 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                         ))}
 
                         {/* TOTAL ROW */}
-                        <div className="flex bg-primary/40 text-primary-foreground font-bold">
+                        <div className="flex bg-primary/40 text-primary-foreground font-prototype">
                             <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/30 text-center">
                                 NT
                             </div>
                             {activePlayers.map(pId => (
-                                <div key={pId} className="flex-1 min-w-[150px] p-4 bg-primary/10 text-foreground border-r border-primary/20 border-b border-primary/20 flex items-center justify-center text-xl font-black">
+                                <div key={pId} className="flex-1 min-w-[150px] p-4 bg-primary/10 text-foreground border-r border-primary/20 border-b border-primary/20 flex items-center justify-center text-xl font-prototype">
                                     {calculateTotal(pId)}
                                 </div>
                             ))}
                         </div>
                         {/* CLASSEMENT ROW */}
-                        <div className="flex bg-accent/80 text-accent-foreground font-bold">
+                        <div className="flex bg-accent/80 text-accent-foreground font-prototype">
                             <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border text-center">
                                 Classement
                             </div>
                             {activePlayers.map(pId => (
-                                <div key={pId} className="flex-1 min-w-[150px] p-4 bg-accent/20 text-foreground border-r border-border flex items-center justify-center font-bold text-lg gap-2">
+                                <div key={pId} className="flex-1 min-w-[150px] p-4 bg-accent/20 text-foreground border-r border-border flex items-center justify-center font-prototype text-lg gap-2">
                                     {rankings[pId] && rankings[pId].rank === 1 && <span className="text-yellow-500 text-xl drop-shadow-md">🥇</span>}
                                     {rankings[pId] && rankings[pId].rank === 2 && <span className="text-gray-300 text-xl drop-shadow-md">🥈</span>}
                                     {rankings[pId] && rankings[pId].rank === 3 && <span className="text-orange-500 text-xl drop-shadow-md">🥉</span>}
@@ -379,7 +386,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
 
                 <div className="pt-4 pb-12 w-full max-w-sm mx-auto">
                     <Button
-                        className="w-full h-14 text-xl font-extrabold shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all transform hover:scale-[1.02] ring-1 ring-primary/50"
+                        className="w-full h-14 text-xl font-prototype shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all transform hover:scale-[1.02] ring-1 ring-primary/50"
                         onClick={handleSubmit}
                         disabled={submitting || Object.keys(scores).length === 0}
                     >
