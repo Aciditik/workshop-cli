@@ -23,7 +23,7 @@ import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    const { getTournament, updateTournament, addTournament, isLoaded, refresh } = useTournaments();
+    const { tournaments, getTournament, updateTournament, addTournament, isLoaded, refresh } = useTournaments();
     const { user } = useAuth();
     const router = useRouter();
     const isAdmin = user?.role === "admin";
@@ -328,7 +328,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         try {
             // Build fresh participant records (new ids) so the finale tournament
             // owns its own player list independently from the qualifier.
-            const finaleParticipants: Participant[] = availableIds.map(qid => {
+            const newParticipants: Participant[] = availableIds.map(qid => {
                 const src = tournament.participants.find(p => p.id === qid);
                 return {
                     id: crypto.randomUUID(),
@@ -340,16 +340,49 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 };
             });
 
-            const size = finaleParticipants.length;
+            // If a draft "CDF Finale 2026" already exists (e.g. created from
+            // another qualifier), merge new players into it instead of
+            // creating a duplicate. Dedup by email (case-insensitive).
+            const existingFinale = tournaments.find(
+                t => t.name === "CDF Finale 2026" && t.status === "draft"
+            );
+
+            if (existingFinale) {
+                const existingEmails = new Set(
+                    existingFinale.participants
+                        .map(p => (p.email || "").trim().toLowerCase())
+                        .filter(Boolean)
+                );
+                const toAdd = newParticipants.filter(p => {
+                    const e = (p.email || "").trim().toLowerCase();
+                    return e ? !existingEmails.has(e) : true;
+                });
+                const mergedParticipants = [...existingFinale.participants, ...toAdd];
+                const size = mergedParticipants.length;
+
+                await updateTournament({
+                    ...existingFinale,
+                    participants: mergedParticipants,
+                    size,
+                    format: getFormat(size),
+                    maxRounds: getMaxRounds(size),
+                    qualifiedCount: getQualifiedCount(size),
+                });
+                setShowFinaleModal(false);
+                router.push(`/tournaments/${existingFinale.id}`);
+                return;
+            }
+
+            const size = newParticipants.length;
             const finale: Tournament = {
                 id: crypto.randomUUID(),
-                name: `Finale CDF — ${tournament.name}`,
-                logoUrl: tournament.logoUrl,
-                eventDate: new Date().toISOString().split("T")[0],
+                name: "CDF Finale 2026",
+                logoUrl: "/cdf-logo.png",
+                eventDate: "2026-11-14",
                 createdAt: new Date().toISOString(),
                 status: "draft",
                 format: getFormat(size),
-                participants: finaleParticipants,
+                participants: newParticipants,
                 matches: [],
                 size,
                 currentRound: 0,
