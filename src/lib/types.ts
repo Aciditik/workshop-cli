@@ -1,4 +1,4 @@
-export type TournamentStatus = "draft" | "in_progress" | "completed";
+export type TournamentStatus = "brouillon" | "en_cours" | "fini";
 export type TournamentFormat = "elimination" | "swiss";
 
 export interface Participant {

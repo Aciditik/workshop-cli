@@ -111,7 +111,7 @@ export function useTournaments() {
             }
             
             // Only refresh if critical update (not every time to avoid Render issues)
-            if (updatedTournament.status === "completed" || updatedTournament.currentRound !== tournaments.find(t => t.id === updatedTournament.id)?.currentRound) {
+            if (updatedTournament.status === "fini" || updatedTournament.currentRound !== tournaments.find(t => t.id === updatedTournament.id)?.currentRound) {
                 await fetchTournaments();
             }
         } catch (e: any) {

@@ -211,14 +211,28 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
         <div className="min-h-screen bg-transparent flex flex-col items-center py-6 sm:py-8 px-3 sm:px-4">
             <div className="w-full max-w-5xl space-y-6">
                 <div className="text-center space-y-2 mb-6 sm:mb-8">
-                    <div className="w-16 h-16 relative mx-auto">
-                        <Image 
-                            src="/cdf-logo.png" 
-                            alt="CDF Logo"
-                            width={64}
-                            height={64}
-                            className="object-contain"
-                        />
+                    <div className="flex items-center justify-center gap-4">
+                        <div className="w-16 h-16 relative">
+                            <Image 
+                                src="/cdf-logo.png" 
+                                alt="CdF Logo"
+                                width={64}
+                                height={64}
+                                className="object-contain"
+                            />
+                        </div>
+                        {tournament.logoUrl && (
+                            <div className="w-16 h-16 relative">
+                                <Image 
+                                    src={tournament.logoUrl} 
+                                    alt={`${tournament.name} logo`}
+                                    width={64}
+                                    height={64}
+                                    className="object-contain"
+                                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                />
+                            </div>
+                        )}
                     </div>
                     <h1 className="text-2xl sm:text-3xl font-prototype text-foreground tracking-tight">Table {match.tableNumber} - Tableau des scores</h1>
                     <p className="text-muted-foreground font-prototype text-sm sm:text-base">{tournament.name} - Round {match.round}</p>

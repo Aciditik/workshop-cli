@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import Image from "next/image";
 import { Trophy, LogIn, UserPlus } from "lucide-react";
 
 export default function LoginPage() {
@@ -38,11 +39,17 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center gap-3">
-          <div className="bg-primary p-3 rounded-xl shadow-lg shadow-primary/30">
-            <Trophy className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 relative mx-auto">
+            <Image 
+                src="/cdf-logo.png" 
+                alt="CdF Logo"
+                width={64}
+                height={64}
+                className="object-contain"
+            />
           </div>
           <h1 className="text-3xl font-prototype bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
-            CDF Terraforming Mars
+            CdF Terraforming Mars
           </h1>
           <p className="text-muted-foreground text-center">
             {isRegister

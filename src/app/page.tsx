@@ -24,7 +24,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-prototype tracking-tight mb-2">Dashboard</h1>
+          <h1 className="text-3xl sm:text-4xl font-prototype tracking-tight mb-2">Tableau de bord</h1>
           <p className="text-muted-foreground font-prototype text-base sm:text-lg">
             Gérez vos tournois ou commencez-en un nouveau.
           </p>
@@ -62,7 +62,7 @@ export default function Dashboard() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (confirm("Are you sure you want to delete this tournament?")) {
+                    if (confirm("Voulez-vous vraiment supprimer ce tournoi ?")) {
                       deleteTournament(tournament.id);
                     }
                   }}
@@ -70,14 +70,14 @@ export default function Dashboard() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
                 <span
-                  className={`absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-prototype ${tournament.status === "completed"
+                  className={`absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-prototype ${tournament.status === "fini"
                     ? "bg-green-500/10 text-green-500 border border-green-500/20"
-                    : tournament.status === "in_progress"
+                    : tournament.status === "en_cours"
                       ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
                       : "bg-orange-500/10 text-orange-500 border border-orange-500/20"
                     }`}
                 >
-                  {tournament.status.replace("_", " ").toUpperCase()}
+                  {tournament.status === "fini" ? "FINI" : tournament.status === "en_cours" ? "EN COURS" : "BROUILLON"}
                 </span>
                 <CardContent className="flex-1 flex flex-col items-center justify-between p-6 pt-12">
                   <div className="flex flex-col items-center justify-center flex-1 w-full">

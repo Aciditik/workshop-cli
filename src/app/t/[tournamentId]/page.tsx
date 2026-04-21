@@ -95,14 +95,28 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
         <div className="min-h-screen bg-background flex flex-col items-center py-10 px-4">
             <div className="w-full max-w-lg space-y-8">
                 <div className="text-center space-y-2">
-                    <div className="w-16 h-16 relative mx-auto">
-                        <Image 
-                            src="/cdf-logo.png" 
-                            alt="CDF Logo"
-                            width={64}
-                            height={64}
-                            className="object-contain"
-                        />
+                    <div className="flex items-center justify-center gap-4">
+                        <div className="w-16 h-16 relative">
+                            <Image 
+                                src="/cdf-logo.png" 
+                                alt="CdF Logo"
+                                width={64}
+                                height={64}
+                                className="object-contain"
+                            />
+                        </div>
+                        {tournament.logoUrl && (
+                            <div className="w-16 h-16 relative">
+                                <Image 
+                                    src={tournament.logoUrl} 
+                                    alt={`${tournament.name} logo`}
+                                    width={64}
+                                    height={64}
+                                    className="object-contain"
+                                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                />
+                            </div>
+                        )}
                     </div>
                     <h1 className="text-3xl font-prototype tracking-tight">{tournament.name}</h1>
                     {currentRound > 0 && (
@@ -110,19 +124,19 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                     )}
                 </div>
 
-                {tournament.status === "completed" && (
+                {tournament.status === "fini" && (
                     <Card className="p-6 text-center border-green-500/50 bg-green-500/5">
-                        <p className="text-green-500 font-prototype text-lg">Tournament Completed!</p>
+                        <p className="text-green-500 font-prototype text-lg">Tournoi Terminé !</p>
                     </Card>
                 )}
 
-                {tournament.status === "draft" && (
+                {tournament.status === "brouillon" && (
                     <Card className="p-6 text-center">
                         <p className="text-muted-foreground font-prototype">The tournament has not started yet.</p>
                     </Card>
                 )}
 
-                {tournament.status === "in_progress" && currentRound > 0 && (
+                {tournament.status === "en_cours" && currentRound > 0 && (
                     <>
                         {currentRoundMatches.length === 0 ? (
                             <Card className="p-6 text-center">

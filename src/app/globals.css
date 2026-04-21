@@ -44,7 +44,7 @@
   html {
     background-image:
       linear-gradient(rgba(9, 9, 11, 0.7), rgba(9, 9, 11, 0.85)),
-      url('/background.webp');
+      url('/background.png');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;

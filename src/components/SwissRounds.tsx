@@ -12,18 +12,89 @@ interface SwissRoundsProps {
     participants: Participant[];
     onSubmitResults: (matchId: string, results: Record<string, number>) => void;
     onDeclineResults: (matchId: string) => void;
+    onEditScorecards?: (matchId: string, results: Record<string, number>, scorecards: Record<string, PlayerScore>) => void;
     currentRound: number;
     tournamentId: string;
     tournamentName: string;
+    tournamentLogoUrl?: string;
+    eventDate?: string;
     maxRounds?: number;
     qualifiedIds?: string[];
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, currentRound, tournamentId, tournamentName, maxRounds = 3, qualifiedIds }: SwissRoundsProps) {
+// Category keys used to compute a player's raw NT total.
+const SCORE_CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
+    { key: "nt", label: "NT" },
+    { key: "objectifs", label: "Objectifs" },
+    { key: "recompenses", label: "Récomp." },
+    { key: "forets", label: "Forêts" },
+    { key: "villes", label: "Villes" },
+    { key: "cartes", label: "Cartes" },
+];
+
+// Recompute placement points from raw scorecards using the same rule as the
+// mobile scorecard page: sort by total (tiebreaker: megacredits), assign
+// [5,3,2,1] (or [5,3,2] for 3p), plus +1 bonus for non-winners within 5 pts.
+function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record<string, number> {
+    const ids = Object.keys(scorecards);
+    const totals = ids.map(id => {
+        const s = scorecards[id];
+        const total = s.nt + s.objectifs + s.recompenses + s.forets + s.villes + s.cartes;
+        return { id, total, megacredits: s.megacredits || 0 };
+    });
+    totals.sort((a, b) => b.total !== a.total ? b.total - a.total : b.megacredits - a.megacredits);
+    const placement = ids.length === 3 ? [5, 3, 2] : [5, 3, 2, 1];
+    const winnerTotal = totals[0]?.total ?? 0;
+    const out: Record<string, number> = {};
+    totals.forEach((p, i) => {
+        const base = placement[i] ?? 0;
+        const bonus = i > 0 && (winnerTotal - p.total) <= 5 ? 1 : 0;
+        out[p.id] = base + bonus;
+    });
+    return out;
+}
+
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
     const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set([currentRound]));
+    // Inline edit mode for pending-review scorecards.
+    const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+    const [editDraft, setEditDraft] = useState<Record<string, PlayerScore>>({});
+
+    const startEditing = (match: TableMatch) => {
+        const draft: Record<string, PlayerScore> = {};
+        (match.participantIds || []).forEach(pid => {
+            if (!pid) return;
+            const sc = match.scorecards?.[pid] as PlayerScore | undefined;
+            draft[pid] = sc
+                ? { ...sc }
+                : { corporation: "", nt: 0, objectifs: 0, recompenses: 0, forets: 0, villes: 0, cartes: 0, megacredits: 0 };
+        });
+        setEditDraft(draft);
+        setEditingMatchId(match.id);
+    };
+
+    const cancelEditing = () => {
+        setEditingMatchId(null);
+        setEditDraft({});
+    };
+
+    const updateDraftField = (pid: string, key: keyof PlayerScore, value: number) => {
+        setEditDraft(prev => ({
+            ...prev,
+            [pid]: { ...prev[pid], [key]: Math.max(0, value) },
+        }));
+    };
+
+    const saveEditing = (matchId: string) => {
+        if (!onEditScorecards) return;
+        const results = computePlacementPoints(editDraft);
+        onEditScorecards(matchId, results, editDraft);
+        setEditingMatchId(null);
+        setEditDraft({});
+    };
 
     const toggleRound = (round: number) => {
         setExpandedRounds(prev => {
@@ -73,6 +144,8 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                         <QRCodeModal
                                             tournamentId={tournamentId}
                                             tournamentName={tournamentName}
+                                            tournamentLogoUrl={tournamentLogoUrl}
+                                            eventDate={eventDate}
                                         />
                                     </div>
                                 )}
@@ -111,8 +184,68 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {/* Pending review: show full scorecard for verification */}
+                    {/* Pending review: show full scorecard for verification, or inline editor if admin clicked "Modifier". */}
                     {match.isPendingReview && !match.isCompleted && match.scorecards ? (
+                        editingMatchId === match.id ? (
+                            <div className="space-y-3">
+                                {(match.participantIds || []).filter((id): id is string => id !== null).map(pId => {
+                                    const p = getParticipant(pId);
+                                    const sc = editDraft[pId];
+                                    if (!p || !sc) return null;
+                                    const total = sc.nt + sc.objectifs + sc.recompenses + sc.forets + sc.villes + sc.cartes;
+                                    return (
+                                        <div key={pId} className="rounded-md border border-orange-500/30 bg-orange-500/5 overflow-hidden">
+                                            <div className="flex items-center justify-between px-3 py-2 bg-orange-500/10 font-prototype text-sm">
+                                                <span className="font-prototype">{p.firstname} {p.name}</span>
+                                                <span className="text-orange-400 font-prototype">{total} pts</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 p-2 text-xs">
+                                                {SCORE_CATEGORIES.map(({ key, label }) => (
+                                                    <div key={key} className="flex flex-col">
+                                                        <label className="text-muted-foreground font-prototype mb-1">{label}</label>
+                                                        <input
+                                                            type="number"
+                                                            inputMode="numeric"
+                                                            min={0}
+                                                            step={1}
+                                                            value={sc[key] as number}
+                                                            onChange={e => updateDraftField(pId, key, e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                                                            className="w-full text-center p-1.5 border border-border rounded bg-background text-foreground font-prototype focus:outline-none focus:ring-1 focus:ring-primary hide-arrows"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="px-2 pb-2">
+                                                <label className="text-xs text-muted-foreground font-prototype mb-1 block">Tiebreaker (MC)</label>
+                                                <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min={0}
+                                                    step={1}
+                                                    value={sc.megacredits}
+                                                    onChange={e => updateDraftField(pId, "megacredits", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                                                    className="w-full text-center p-1.5 border border-border rounded bg-background text-foreground text-xs font-prototype focus:outline-none focus:ring-1 focus:ring-primary hide-arrows"
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                <div className="flex gap-2">
+                                    <Button
+                                        className="flex-1 text-xs h-8 bg-muted hover:bg-muted/80 text-foreground font-prototype"
+                                        onClick={cancelEditing}
+                                    >
+                                        Annuler
+                                    </Button>
+                                    <Button
+                                        className="flex-1 text-xs h-8 bg-green-500 hover:bg-green-600 text-white font-prototype"
+                                        onClick={() => saveEditing(match.id)}
+                                    >
+                                        Valider les modifications
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
                         <div className="space-y-3">
                             {(match.participantIds || []).filter((id): id is string => id !== null).map(pId => {
                                 const p = getParticipant(pId);
@@ -156,19 +289,20 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                             })}
                             <div className="flex gap-2">
                                 <Button
-                                    className="flex-1 text-xs h-8 bg-red-500 hover:bg-red-600 text-white font-prototype"
-                                    onClick={() => onDeclineResults(match.id)}
+                                    className="flex-1 text-xs h-8 bg-orange-500 hover:bg-orange-600 text-white font-prototype"
+                                    onClick={() => startEditing(match)}
                                 >
-                                    Refuser
+                                    Modifier
                                 </Button>
                                 <Button
-                                    className="flex-1 text-xs h-8 bg-yellow-500 hover:bg-yellow-600 text-white font-prototype"
+                                    className="flex-1 text-xs h-8 bg-green-500 hover:bg-green-600 text-white font-prototype"
                                     onClick={() => onSubmitResults(match.id, match.results)}
                                 >
                                     Valider
                                 </Button>
                             </div>
                         </div>
+                        )
                     ) : (
                         <>
                             {/* Normal players list */}

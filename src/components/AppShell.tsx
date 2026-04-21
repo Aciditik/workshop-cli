@@ -73,14 +73,14 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
           <div className="w-10 h-10 relative shrink-0">
             <Image 
               src="/cdf-logo.png" 
-              alt="CDF Logo"
+              alt="CdF Logo"
               width={40}
               height={40}
               className="object-contain"
             />
           </div>
           <h1 className="text-xl font-prototype bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
-            CDF Terraforming Mars
+            CdF Terraforming Mars
           </h1>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -97,7 +97,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
           >
             <LayoutDashboard className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-prototype">Dashboard</span>
+            <span className="font-prototype">Tableau de bord</span>
           </Link>
           <Link
             href="/tournaments/new"
@@ -150,13 +150,13 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 relative shrink-0">
               <Image 
                 src="/cdf-logo.png" 
-                alt="CDF Logo"
+                alt="CdF Logo"
                 width={32}
                 height={32}
                 className="object-contain"
               />
             </div>
-            <span className="text-sm font-prototype">CDF Terraforming Mars</span>
+            <span className="text-sm font-prototype">CdF Terraforming Mars</span>
           </div>
           <div className="w-9" aria-hidden="true" />
         </div>

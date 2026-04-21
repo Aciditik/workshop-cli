@@ -36,7 +36,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // Admin mid-tournament player removal confirmation
     const [removeConfirm, setRemoveConfirm] = useState<Participant | null>(null);
 
-    // Finale CDF planning modal (shown when tournament completed)
+    // Finale CdF planning modal (shown when tournament completed)
     const [showFinaleModal, setShowFinaleModal] = useState(false);
     const [availability, setAvailability] = useState<Record<string, boolean>>({});
     const [creatingFinale, setCreatingFinale] = useState(false);
@@ -48,7 +48,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const format = tournament.format || "swiss";
     const maxRounds = tournament.maxRounds || 3;
-    const qualifiedCount = tournament.status === "draft"
+    const qualifiedCount = tournament.status === "brouillon"
         ? getQualifiedCount(tournament.participants.length)
         : (tournament.qualifiedCount || 2);
 
@@ -87,7 +87,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
         updateTournament({
             ...tournament,
-            status: "in_progress",
+            status: "en_cours",
             currentRound: nextRound,
             matches: [...tournament.matches, ...newMatches]
         });
@@ -96,7 +96,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     };
 
     const submitMatchResults = (matchId: string, results: Record<string, number>) => {
-        if (tournament.status !== "in_progress") return;
+        if (tournament.status !== "en_cours") return;
 
         const updatedMatches = tournament.matches.map(m =>
             m.id === matchId ? { ...m, results, isCompleted: true, isPendingReview: false } : m
@@ -125,7 +125,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
         // Tournament completes when current round is max AND all tables are truly done
         if (allTablesCompleted && currentRound === maxRounds) {
-            newTournamentData.status = "completed";
+            newTournamentData.status = "fini";
             newTournamentData.qualifiedIds = determineQualifiedPlayers(
                 format, tournament.size, updatedMatches, updatedParticipants
             );
@@ -135,7 +135,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     };
 
     const declineMatchResults = (matchId: string) => {
-        if (tournament.status !== "in_progress") return;
+        if (tournament.status !== "en_cours") return;
 
         const updatedMatches = tournament.matches.map(m =>
             m.id === matchId ? { ...m, isPendingReview: false, results: {}, scorecards: undefined } : m
@@ -145,6 +145,48 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             ...tournament,
             matches: updatedMatches,
         });
+    };
+
+    // Admin / organizer inline-edit of a pending-review scorecard from the
+    // dashboard. Overwrites both raw scorecards and placement results, then
+    // validates the match (same end state as submitMatchResults).
+    const editMatchScorecards = (
+        matchId: string,
+        results: Record<string, number>,
+        scorecards: Record<string, import("@/lib/types").PlayerScore>,
+    ) => {
+        if (tournament.status !== "en_cours") return;
+
+        const updatedMatches = tournament.matches.map(m =>
+            m.id === matchId
+                ? { ...m, scorecards, results, isCompleted: true, isPendingReview: false }
+                : m
+        );
+
+        const updatedParticipants = tournament.participants.map(p => {
+            let newTotal = 0;
+            updatedMatches.forEach(m => {
+                if (m.isCompleted && m.results[p.id]) newTotal += m.results[p.id];
+            });
+            return { ...p, score: newTotal };
+        });
+
+        const newTournamentData = {
+            ...tournament,
+            matches: updatedMatches,
+            participants: updatedParticipants,
+            qualifiedIds: undefined as string[] | undefined,
+        };
+
+        const allTablesCompleted = updatedMatches.every(m => m.isCompleted);
+        if (allTablesCompleted && currentRound === maxRounds) {
+            newTournamentData.status = "fini";
+            newTournamentData.qualifiedIds = determineQualifiedPlayers(
+                format, tournament.size, updatedMatches, updatedParticipants
+            );
+        }
+
+        updateTournament(newTournamentData);
     };
 
     const playerCount = tournament.participants.length;
@@ -160,7 +202,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const name = playerName.trim();
         const email = playerEmail.trim();
         const phone = playerPhone.trim();
-        if (!firstname || !name || !email || !phone || tournament.status !== "draft") return;
+        if (!firstname || !name || !email || !phone || tournament.status !== "brouillon") return;
 
         const newParticipant: Participant = {
             id: crypto.randomUUID(),
@@ -186,14 +228,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const removePlayer = (participantId: string) => {
         // Draft: always allowed. In-progress: admin only. Completed: never (results are frozen).
-        if (tournament.status === "completed") return;
-        if (tournament.status === "in_progress" && !isAdmin) return;
+        if (tournament.status === "fini") return;
+        if (tournament.status === "en_cours" && !isAdmin) return;
 
         const newParticipants = tournament.participants.filter(p => p.id !== participantId);
         const newSize = newParticipants.length;
 
         // Draft: simple removal.
-        if (tournament.status === "draft") {
+        if (tournament.status === "brouillon") {
             updateTournament({
                 ...tournament,
                 participants: newParticipants,
@@ -210,7 +252,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
         // Recompute format metadata based on the new size.
         // maxRounds is never lowered below the current round to avoid invalidating
-        // rounds already generated / in progress.
+        // rounds already generated / en cours.
         const newFormat = getFormat(newSize);
         const newMaxRounds = Math.max(getMaxRounds(newSize), currentRound);
         const newQualifiedCount = getQualifiedCount(newSize);
@@ -274,7 +316,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 const scoredParticipants = newParticipants.map(p => {
                     let total = 0;
                     updatedMatches.forEach(m => {
-                        if (m.isCompleted && m.results[p.id]) total += m.results[p.id];
+                        if (m.isCompleted && m.results[p.id]) {
+                            total += m.results[p.id];
+                        }
                     });
                     return { ...p, score: total };
                 });
@@ -288,7 +332,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const rescored = newParticipants.map(p => {
             let total = 0;
             updatedMatches.forEach(m => {
-                if (m.isCompleted && m.results[p.id]) total += m.results[p.id];
+                if (m.isCompleted && m.results[p.id]) {
+                    total += m.results[p.id];
+                }
             });
             return { ...p, score: total };
         });
@@ -304,7 +350,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         });
     };
 
-    // ── Finale CDF ────────────────────────────────────────────────────────────
+    // ── Finale CdF ────────────────────────────────────────────────────────────
     // When a tournament is completed, admin can pick available qualified players
     // and spin up a brand-new "Finale" tournament pre-populated with them.
     const openFinaleModal = () => {
@@ -340,11 +386,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 };
             });
 
-            // If a draft "CDF Finale 2026" already exists (e.g. created from
+            // If a brouillon "CdF Finale 2026" already exists (e.g. created from
             // another qualifier), merge new players into it instead of
             // creating a duplicate. Dedup by email (case-insensitive).
             const existingFinale = tournaments.find(
-                t => t.name === "CDF Finale 2026" && t.status === "draft"
+                t => t.name === "CdF Finale 2026" && t.status === "brouillon"
             );
 
             if (existingFinale) {
@@ -376,11 +422,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             const size = newParticipants.length;
             const finale: Tournament = {
                 id: crypto.randomUUID(),
-                name: "CDF Finale 2026",
+                name: "CdF Finale 2026",
                 logoUrl: "/cdf-logo.png",
                 eventDate: "2026-11-14",
                 createdAt: new Date().toISOString(),
-                status: "draft",
+                status: "brouillon",
                 format: getFormat(size),
                 participants: newParticipants,
                 matches: [],
@@ -415,7 +461,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
         updateTournament({
             ...tournament,
-            status: "in_progress",
+            status: "en_cours",
             format,
             maxRounds,
             qualifiedCount: getQualifiedCount(playerCount),
@@ -538,11 +584,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     <div className="min-w-0">
                         <h1 className="text-2xl sm:text-4xl font-prototype tracking-tight mb-1 sm:mb-2 flex flex-wrap items-center gap-2 sm:gap-3">
                             <span className="truncate">{tournament.name}</span>
-                            <span className={`text-xs px-2.5 py-1 rounded-full font-prototype whitespace-nowrap ${tournament.status === "completed" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
-                                tournament.status === "in_progress" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
+                            <span className={`text-xs px-2.5 py-1 rounded-full font-prototype whitespace-nowrap ${tournament.status === "fini" ? "bg-green-500/10 text-green-500 border border-green-500/20" :
+                                tournament.status === "en_cours" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
                                     "bg-orange-500/10 text-orange-500 border border-orange-500/20"
                                 }`}>
-                                {tournament.status.replace("_", " ").toUpperCase()}
+                                {tournament.status === "fini" ? "FINI" : tournament.status === "en_cours" ? "EN COURS" : "BROUILLON"}
                             </span>
                         </h1>
                         <p className="text-xs sm:text-sm font-prototype text-muted-foreground">
@@ -562,7 +608,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Qualified Players Banner */}
-            {tournament.status === "completed" && tournament.qualifiedIds && tournament.qualifiedIds.length > 0 && (
+            {tournament.status === "fini" && tournament.qualifiedIds && tournament.qualifiedIds.length > 0 && (
                 <Card className="border-yellow-500/30 bg-yellow-500/5">
                     <CardContent className="p-6">
                         <div className="flex items-center gap-3 mb-4">
@@ -591,7 +637,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             {isAdmin && (
                                 <Button onClick={openFinaleModal} className="gap-2 font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black">
                                     <CalendarPlus className="w-4 h-4" />
-                                    Planifier la Finale CDF
+                                    Planifier la Finale CdF
                                 </Button>
                             )}
                         </div>
@@ -599,8 +645,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 </Card>
             )}
 
-            {/* DRAFT Mode: Player Management */}
-            {tournament.status === "draft" && (
+            {/* brouillon Mode: Player Management */}
+            {tournament.status === "brouillon" && (
                 <Card className="border-orange-500/30 bg-orange-500/5">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-orange-400 font-prototype">
@@ -710,7 +756,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 <ListOrdered className="w-6 h-6 text-primary" />
                                 Rondes & Tables
                             </h3>
-                            {tournament.status === "completed" ? (
+                            {tournament.status === "fini" ? (
                                 <div className="text-green-500 font-prototype bg-green-500/10 px-4 py-2 rounded-lg">
                                     Tournoi Terminé !
                                 </div>
@@ -726,9 +772,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             participants={tournament.participants}
                             onSubmitResults={submitMatchResults}
                             onDeclineResults={declineMatchResults}
+                            onEditScorecards={editMatchScorecards}
                             currentRound={tournament.currentRound || 0}
                             tournamentId={tournament.id}
                             tournamentName={tournament.name}
+                            tournamentLogoUrl={tournament.logoUrl}
+                            eventDate={tournament.eventDate}
                             maxRounds={maxRounds}
                             qualifiedIds={tournament.qualifiedIds}
                         />
@@ -763,7 +812,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-3 shrink-0">
-                                                    {tournament.status !== "draft" && (
+                                                    {tournament.status !== "brouillon" && (
                                                         <>
                                                             {tableDiff > 0 && (
                                                                 <span className="text-sm font-prototype text-orange-600">
@@ -782,7 +831,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                             )}
                                                         </>
                                                     )}
-                                                    {isAdmin && tournament.status === "in_progress" && (
+                                                    {isAdmin && tournament.status === "en_cours" && (
                                                         <button
                                                             type="button"
                                                             onClick={() => setRemoveConfirm(p)}
@@ -859,7 +908,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 </div>
             )}
 
-            {/* Finale CDF: pick available qualified players and create the finale tournament */}
+            {/* Finale CdF: pick available qualified players and create the finale tournament */}
             {showFinaleModal && tournament.qualifiedIds && (
                 <div
                     className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
@@ -874,7 +923,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 <CalendarPlus className="w-5 h-5 text-yellow-500" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-prototype">Planifier la Finale CDF</h3>
+                                <h3 className="text-lg font-prototype">Planifier la Finale CdF</h3>
                                 <p className="text-sm text-muted-foreground font-prototype">
                                     Cochez les joueurs disponibles pour la Finale. Un nouveau tournoi sera créé avec eux.
                                 </p>
