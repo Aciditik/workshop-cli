@@ -215,16 +215,17 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const newMaxRounds = Math.max(getMaxRounds(newSize), currentRound);
         const newQualifiedCount = getQualifiedCount(newSize);
 
-        // For uncompleted matches, nullify the removed player's slot so they
-        // no longer appear at the table. Completed matches are preserved as
-        // historical records (their past points stay in `results`).
-        const updatedMatches = tournament.matches.map(m => {
-            if (m.isCompleted) return m;
+        // Step 1 — clean the removed player out of every match.
+        // Completed matches: keep them (historical record), but strip the removed
+        // player from participantIds/results/scorecards so the UI no longer shows
+        // them and their points don't influence future ranking computations.
+        // Uncompleted matches: same treatment — they'll either be regenerated
+        // below (for future rounds) or simply show a freed slot.
+        let updatedMatches = tournament.matches.map(m => {
             if (!m.participantIds.includes(participantId)) return m;
             return {
                 ...m,
                 participantIds: m.participantIds.map(pid => pid === participantId ? null : pid),
-                // If they submitted a scorecard/result that isn't yet validated, drop it
                 results: Object.fromEntries(
                     Object.entries(m.results || {}).filter(([pid]) => pid !== participantId)
                 ),
@@ -236,9 +237,65 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             };
         });
 
+        // Step 2 — regenerate any *uncompleted* future round that contained the
+        // removed player, so that slots cascade correctly instead of leaving
+        // "Place vide" and an oversized consolation table (matches the canonical
+        // tournament config for the new player count).
+        const impactedRounds = Array.from(new Set(
+            tournament.matches
+                .filter(m => m.round > 1 && m.participantIds.includes(participantId))
+                .map(m => m.round)
+        )).sort((a, b) => a - b);
+
+        for (const round of impactedRounds) {
+            const roundMatches = updatedMatches.filter(m => m.round === round);
+            // Only regenerate if the whole round is still uncompleted. If any
+            // table is already validated we keep history and leave a null slot.
+            if (roundMatches.some(m => m.isCompleted)) continue;
+
+            // Drop this round's matches, then regenerate.
+            updatedMatches = updatedMatches.filter(m => m.round !== round);
+
+            if (newFormat === "elimination" && round === 2) {
+                // Regenerate finalist + consolation tables from the Round 1
+                // completed matches, pretending the removed player was never there.
+                const round1ForRanking = updatedMatches
+                    .filter(m => m.round === 1)
+                    .map(m => ({
+                        ...m,
+                        // participantIds already had the removed player nulled out in step 1
+                        // results already stripped of their entry in step 1
+                    }));
+                const regenerated = generateEliminationRound2(tournament.id, newSize, round1ForRanking);
+                updatedMatches = [...updatedMatches, ...regenerated];
+            } else {
+                // Swiss: regenerate the next round from participants' accumulated
+                // scores (computed from all *remaining* completed matches).
+                const scoredParticipants = newParticipants.map(p => {
+                    let total = 0;
+                    updatedMatches.forEach(m => {
+                        if (m.isCompleted && m.results[p.id]) total += m.results[p.id];
+                    });
+                    return { ...p, score: total };
+                });
+                const regenerated = generateSwissRound(tournament.id, scoredParticipants, round - 1);
+                updatedMatches = [...updatedMatches, ...regenerated];
+            }
+        }
+
+        // Step 3 — recompute scores for surviving participants (historical
+        // completed matches may have had the removed player's slot stripped).
+        const rescored = newParticipants.map(p => {
+            let total = 0;
+            updatedMatches.forEach(m => {
+                if (m.isCompleted && m.results[p.id]) total += m.results[p.id];
+            });
+            return { ...p, score: total };
+        });
+
         updateTournament({
             ...tournament,
-            participants: newParticipants,
+            participants: rescored,
             size: newSize,
             format: newFormat,
             maxRounds: newMaxRounds,
@@ -745,7 +802,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         <p>• Le tournoi passera à <strong className="text-foreground">{newSize} joueurs</strong>.</p>
                                         <p>• Format recalculé: <strong className="text-foreground">{getFormatLabel(newSize)}</strong>.</p>
                                         <p>• Rondes: <strong className="text-foreground">{newMax}</strong> · Qualifiés: <strong className="text-foreground">{newQual}</strong>.</p>
-                                        <p>• Les rondes déjà terminées restent intactes. Les tables non terminées libéreront la place du joueur.</p>
+                                        <p>• Les rondes déjà validées restent dans l&apos;historique.</p>
+                                        <p>• Les rondes suivantes non jouées seront <strong className="text-foreground">régénérées</strong> pour correspondre au nouveau format ({newSize} joueurs).</p>
                                     </div>
                                 );
                             })()}
