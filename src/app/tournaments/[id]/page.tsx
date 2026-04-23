@@ -3,7 +3,7 @@
 import { use, useState, useRef, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTournaments } from "@/lib/store";
-import { useAuth } from "@/lib/auth";
+import { useAuth, getApiUrl } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SwissRounds } from "@/components/SwissRounds";
@@ -394,6 +394,30 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 t => t.name === "CdF Finale 2026" && t.status === "brouillon"
             );
 
+            // Non-admins cannot see the Finale in their list (ownership-filtered
+            // on the API), so they call a dedicated endpoint that appends players
+            // to the shared "CdF Finale 2026" brouillon regardless of ownership.
+            if (!isAdmin) {
+                const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+                const res = await fetch(`${getApiUrl()}/api/tournaments/finale/add-players`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ participants: newParticipants }),
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.error || "Impossible d'ajouter les joueurs à la Finale. Réessayez plus tard.");
+                    return;
+                }
+                const { added } = await res.json();
+                setShowFinaleModal(false);
+                alert(`${added} joueur${added > 1 ? "s" : ""} ajouté${added > 1 ? "s" : ""} à la Finale CdF.`);
+                return;
+            }
+
             if (existingFinale) {
                 const existingEmails = new Set(
                     existingFinale.participants
@@ -416,20 +440,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     qualifiedCount: getQualifiedCount(size),
                 });
                 setShowFinaleModal(false);
-                // Only admins can view the Finale tournament; organizers just
-                // get a confirmation and stay on the qualifier.
-                if (isAdmin) {
-                    router.push(`/tournaments/${existingFinale.id}`);
-                } else {
-                    alert(`${toAdd.length} joueur${toAdd.length > 1 ? "s" : ""} ajouté${toAdd.length > 1 ? "s" : ""} à la Finale CdF.`);
-                }
-                return;
-            }
-
-            // Non-admins cannot create the Finale from scratch — only merge into
-            // one an admin has already pre-created.
-            if (!isAdmin) {
-                alert("La Finale CdF n'a pas encore été créée par l'administrateur. Réessayez plus tard.");
+                router.push(`/tournaments/${existingFinale.id}`);
                 return;
             }
 

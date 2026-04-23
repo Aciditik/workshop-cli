@@ -373,7 +373,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                     className="w-full text-xs h-8 bg-orange-500 hover:bg-orange-600 text-white font-prototype"
                                     onClick={() => startEditing(match)}
                                 >
-                                    Corriger les scores (admin)
+                                    Corriger les scores
                                 </Button>
                             )}
                         </>
