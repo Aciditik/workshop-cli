@@ -120,7 +120,10 @@ Quand toutes les tables sont validées :
 
 ## 8. Corriger un score déjà validé
 
-Si une erreur est détectée **après** validation d'une table, contactez un **Admin** : seule une intervention admin permet actuellement de rouvrir une table validée.
+Si une erreur est détectée **après** validation d'une table :
+
+- **Admin** : une table validée affiche un bouton **Corriger les scores (admin)** sur le tableau de bord. Il rouvre l'éditeur inline, permet d'ajuster les catégories, puis recalcule automatiquement les points de placement et les totaux des joueurs. Fonctionne aussi sur un tournoi déjà en statut *Fini*.
+- **Organisateur** : contacter un administrateur ; les corrections post-validation sont réservées au rôle *Admin*.
 
 > Astuce : dans la mesure du possible, toujours vérifier le détail de la carte (corporation + NT) **avant** de cliquer sur Valider.
 
@@ -134,7 +137,9 @@ Lorsque **toutes les tables de la dernière ronde** sont validées :
 - La bannière **Joueurs Qualifiés** apparaît avec la liste des qualifiés (selon le format).
 - Deux actions disponibles :
   - **Exporter le top N (CSV)** — télécharge la liste des qualifiés (nom, email, téléphone, score). Utile pour la communication post-tournoi.
-  - **Planifier la Finale CdF** (Admin uniquement) — crée automatiquement un tournoi « CdF Finale 2026 » en brouillon contenant les qualifiés.
+  - **Ajouter les joueurs à la finale de la CdF** — cochez les joueurs disponibles et confirmez.
+    - **Admin** : crée ou met à jour le tournoi « CdF Finale 2026 » et vous y redirige.
+    - **Organisateur** : les joueurs cochés sont ajoutés au tournoi Finale géré par l'administrateur. Vous restez sur votre tournoi (la Finale n'est visible que par les admins). Si l'admin n'a pas encore créé la Finale, une alerte vous invite à réessayer plus tard.
 
 ---
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTournaments } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
@@ -8,6 +9,8 @@ import { Trophy, Calendar, Users, ChevronRight, Trash2 } from "lucide-react";
 
 export default function Dashboard() {
   const { tournaments, isLoaded, deleteTournament } = useTournaments();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   if (!isLoaded) {
     return (
@@ -55,20 +58,22 @@ export default function Dashboard() {
           {tournaments.map((tournament) => (
             <Link key={tournament.id} href={`/tournaments/${tournament.id}`}>
               <Card className="hover:border-primary/50 transition-colors group cursor-pointer h-full flex flex-col relative">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-destructive z-10 hover:bg-destructive/10"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (confirm("Voulez-vous vraiment supprimer ce tournoi ?")) {
-                      deleteTournament(tournament.id);
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-destructive z-10 hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (confirm("Voulez-vous vraiment supprimer ce tournoi ?")) {
+                        deleteTournament(tournament.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
                 <span
                   className={`absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-prototype ${tournament.status === "fini"
                     ? "bg-green-500/10 text-green-500 border border-green-500/20"

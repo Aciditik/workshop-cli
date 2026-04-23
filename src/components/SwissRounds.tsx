@@ -20,6 +20,7 @@ interface SwissRoundsProps {
     eventDate?: string;
     maxRounds?: number;
     qualifiedIds?: string[];
+    isAdmin?: boolean;
 }
 
 // Category keys used to compute a player's raw NT total.
@@ -54,7 +55,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -184,68 +185,68 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {/* Pending review: show full scorecard for verification, or inline editor if admin clicked "Modifier". */}
-                    {match.isPendingReview && !match.isCompleted && match.scorecards ? (
-                        editingMatchId === match.id ? (
-                            <div className="space-y-3">
-                                {(match.participantIds || []).filter((id): id is string => id !== null).map(pId => {
-                                    const p = getParticipant(pId);
-                                    const sc = editDraft[pId];
-                                    if (!p || !sc) return null;
-                                    const total = sc.nt + sc.objectifs + sc.recompenses + sc.forets + sc.villes + sc.cartes;
-                                    return (
-                                        <div key={pId} className="rounded-md border border-orange-500/30 bg-orange-500/5 overflow-hidden">
-                                            <div className="flex items-center justify-between px-3 py-2 bg-orange-500/10 font-prototype text-sm">
-                                                <span className="font-prototype">{p.firstname} {p.name}</span>
-                                                <span className="text-orange-400 font-prototype">{total} pts</span>
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-2 p-2 text-xs">
-                                                {SCORE_CATEGORIES.map(({ key, label }) => (
-                                                    <div key={key} className="flex flex-col">
-                                                        <label className="text-muted-foreground font-prototype mb-1">{label}</label>
-                                                        <input
-                                                            type="number"
-                                                            inputMode="numeric"
-                                                            min={0}
-                                                            step={1}
-                                                            value={sc[key] as number}
-                                                            onChange={e => updateDraftField(pId, key, e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
-                                                            className="w-full text-center p-1.5 border border-border rounded bg-background text-foreground font-prototype focus:outline-none focus:ring-1 focus:ring-primary hide-arrows"
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="px-2 pb-2">
-                                                <label className="text-xs text-muted-foreground font-prototype mb-1 block">Tiebreaker (MC)</label>
-                                                <input
-                                                    type="number"
-                                                    inputMode="numeric"
-                                                    min={0}
-                                                    step={1}
-                                                    value={sc.megacredits}
-                                                    onChange={e => updateDraftField(pId, "megacredits", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
-                                                    className="w-full text-center p-1.5 border border-border rounded bg-background text-foreground text-xs font-prototype focus:outline-none focus:ring-1 focus:ring-primary hide-arrows"
-                                                />
-                                            </div>
+                    {/* Edit mode (inline): shown whenever admin/organizer has clicked
+                        Modifier / Corriger on a pending-review OR a validated match. */}
+                    {editingMatchId === match.id ? (
+                        <div className="space-y-3">
+                            {(match.participantIds || []).filter((id): id is string => id !== null).map(pId => {
+                                const p = getParticipant(pId);
+                                const sc = editDraft[pId];
+                                if (!p || !sc) return null;
+                                const total = sc.nt + sc.objectifs + sc.recompenses + sc.forets + sc.villes + sc.cartes;
+                                return (
+                                    <div key={pId} className="rounded-md border border-orange-500/30 bg-orange-500/5 overflow-hidden">
+                                        <div className="flex items-center justify-between px-3 py-2 bg-orange-500/10 font-prototype text-sm">
+                                            <span className="font-prototype">{p.firstname} {p.name}</span>
+                                            <span className="text-orange-400 font-prototype">{total} pts</span>
                                         </div>
-                                    );
-                                })}
-                                <div className="flex gap-2">
-                                    <Button
-                                        className="flex-1 text-xs h-8 bg-muted hover:bg-muted/80 text-foreground font-prototype"
-                                        onClick={cancelEditing}
-                                    >
-                                        Annuler
-                                    </Button>
-                                    <Button
-                                        className="flex-1 text-xs h-8 bg-green-500 hover:bg-green-600 text-white font-prototype"
-                                        onClick={() => saveEditing(match.id)}
-                                    >
-                                        Valider les modifications
-                                    </Button>
-                                </div>
+                                        <div className="grid grid-cols-3 gap-2 p-2 text-xs">
+                                            {SCORE_CATEGORIES.map(({ key, label }) => (
+                                                <div key={key} className="flex flex-col">
+                                                    <label className="text-muted-foreground font-prototype mb-1">{label}</label>
+                                                    <input
+                                                        type="number"
+                                                        inputMode="numeric"
+                                                        min={0}
+                                                        step={1}
+                                                        value={sc[key] as number}
+                                                        onChange={e => updateDraftField(pId, key, e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                                                        className="w-full text-center p-1.5 border border-border rounded bg-background text-foreground font-prototype focus:outline-none focus:ring-1 focus:ring-primary hide-arrows"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="px-2 pb-2">
+                                            <label className="text-xs text-muted-foreground font-prototype mb-1 block">Tiebreaker (MC)</label>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                min={0}
+                                                step={1}
+                                                value={sc.megacredits}
+                                                onChange={e => updateDraftField(pId, "megacredits", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                                                className="w-full text-center p-1.5 border border-border rounded bg-background text-foreground text-xs font-prototype focus:outline-none focus:ring-1 focus:ring-primary hide-arrows"
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="flex gap-2">
+                                <Button
+                                    className="flex-1 text-xs h-8 bg-muted hover:bg-muted/80 text-foreground font-prototype"
+                                    onClick={cancelEditing}
+                                >
+                                    Annuler
+                                </Button>
+                                <Button
+                                    className="flex-1 text-xs h-8 bg-green-500 hover:bg-green-600 text-white font-prototype"
+                                    onClick={() => saveEditing(match.id)}
+                                >
+                                    Valider les modifications
+                                </Button>
                             </div>
-                        ) : (
+                        </div>
+                    ) : match.isPendingReview && !match.isCompleted && match.scorecards ? (
                         <div className="space-y-3">
                             {(match.participantIds || []).filter((id): id is string => id !== null).map(pId => {
                                 const p = getParticipant(pId);
@@ -302,7 +303,6 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 </Button>
                             </div>
                         </div>
-                        )
                     ) : (
                         <>
                             {/* Normal players list */}
@@ -364,6 +364,16 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                     onClick={() => onSubmitResults(match.id, match.results)}
                                 >
                                     Valider les scores
+                                </Button>
+                            )}
+
+                            {/* Admin-only: re-open a validated match to correct scores. */}
+                            {match.isCompleted && isAdmin && match.scorecards && onEditScorecards && (
+                                <Button
+                                    className="w-full text-xs h-8 bg-orange-500 hover:bg-orange-600 text-white font-prototype"
+                                    onClick={() => startEditing(match)}
+                                >
+                                    Corriger les scores (admin)
                                 </Button>
                             )}
                         </>

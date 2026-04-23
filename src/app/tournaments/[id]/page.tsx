@@ -149,13 +149,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     // Admin / organizer inline-edit of a pending-review scorecard from the
     // dashboard. Overwrites both raw scorecards and placement results, then
-    // validates the match (same end state as submitMatchResults).
+    // validates the match (same end state as submitMatchResults). Admins may
+    // also correct already-validated matches, including on finished tournaments.
     const editMatchScorecards = (
         matchId: string,
         results: Record<string, number>,
         scorecards: Record<string, import("@/lib/types").PlayerScore>,
     ) => {
-        if (tournament.status !== "en_cours") return;
+        if (tournament.status === "brouillon") return;
 
         const updatedMatches = tournament.matches.map(m =>
             m.id === matchId
@@ -415,7 +416,20 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     qualifiedCount: getQualifiedCount(size),
                 });
                 setShowFinaleModal(false);
-                router.push(`/tournaments/${existingFinale.id}`);
+                // Only admins can view the Finale tournament; organizers just
+                // get a confirmation and stay on the qualifier.
+                if (isAdmin) {
+                    router.push(`/tournaments/${existingFinale.id}`);
+                } else {
+                    alert(`${toAdd.length} joueur${toAdd.length > 1 ? "s" : ""} ajouté${toAdd.length > 1 ? "s" : ""} à la Finale CdF.`);
+                }
+                return;
+            }
+
+            // Non-admins cannot create the Finale from scratch — only merge into
+            // one an admin has already pre-created.
+            if (!isAdmin) {
+                alert("La Finale CdF n'a pas encore été créée par l'administrateur. Réessayez plus tard.");
                 return;
             }
 
@@ -634,12 +648,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 <Download className="w-4 h-4" />
                                 Exporter le top {qualifiedCount * 2 + 1} (CSV)
                             </Button>
-                            {isAdmin && (
-                                <Button onClick={openFinaleModal} className="gap-2 font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black">
-                                    <CalendarPlus className="w-4 h-4" />
-                                    Planifier la Finale CdF
-                                </Button>
-                            )}
+                            <Button onClick={openFinaleModal} className="gap-2 font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black">
+                                <CalendarPlus className="w-4 h-4" />
+                                Ajouter les joueurs à la finale de la CdF
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -773,6 +785,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             onSubmitResults={submitMatchResults}
                             onDeclineResults={declineMatchResults}
                             onEditScorecards={editMatchScorecards}
+                            isAdmin={isAdmin}
                             currentRound={tournament.currentRound || 0}
                             tournamentId={tournament.id}
                             tournamentName={tournament.name}
@@ -923,9 +936,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 <CalendarPlus className="w-5 h-5 text-yellow-500" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-prototype">Planifier la Finale CdF</h3>
+                                <h3 className="text-lg font-prototype">Ajouter les joueurs à la finale de la CdF</h3>
                                 <p className="text-sm text-muted-foreground font-prototype">
-                                    Cochez les joueurs disponibles pour la Finale. Un nouveau tournoi sera créé avec eux.
+                                    Cochez les joueurs disponibles. {isAdmin ? "La Finale sera créée (ou mise à jour) avec eux." : "Ils seront ajoutés à la Finale gérée par l'administrateur."}
                                 </p>
                             </div>
                         </div>
@@ -992,7 +1005,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     onClick={createFinaleTournament}
                                     disabled={creatingFinale || Object.values(availability).filter(Boolean).length === 0}
                                 >
-                                    {creatingFinale ? "Création..." : "Créer le tournoi Finale"}
+                                    {creatingFinale ? "Envoi..." : (isAdmin ? "Créer / Mettre à jour la Finale" : "Ajouter à la Finale")}
                                 </Button>
                             </div>
                         </div>
