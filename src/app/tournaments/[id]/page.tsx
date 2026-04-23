@@ -473,7 +473,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const exportTopPlayers = () => {
         const exportCount = qualifiedCount * 2 + 1;
         const topPlayers = sortedParticipants.slice(0, exportCount);
-        const csvHeader = "Pr\u00e9nom,Nom,Email,T\u00e9l\u00e9phone";
+        const csvHeader = "Prénom,Nom,Email,Téléphone";
         const csvRows = topPlayers.map(p => `${p.firstname || ""},${p.name},${p.email || ""},${p.phone || ""}`);
         const csvContent = [csvHeader, ...csvRows].join("\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -664,7 +664,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     value={playerFirstname}
                                     onChange={(e) => setPlayerFirstname(e.target.value)}
                                     onKeyDown={handlePlayerKeyDown}
-                                    placeholder="Pr\u00e9nom *"
+                                    placeholder="Prénom *"
                                     required
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
@@ -691,7 +691,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     value={playerPhone}
                                     onChange={(e) => setPlayerPhone(e.target.value)}
                                     onKeyDown={handlePlayerKeyDown}
-                                    placeholder="T\u00e9l\u00e9phone *"
+                                    placeholder="Téléphone *"
                                     required
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
