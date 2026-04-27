@@ -46,7 +46,7 @@ function getRound1TableSizes(n: number): number[] {
         10: [5, 5],
         11: [4, 4, 3],
         12: [3, 3, 3, 3],
-        13: [3, 3, 3, 4],
+        13: [4, 3, 3, 3],
         14: [4, 4, 3, 3],
         15: [4, 4, 4, 3],
         16: [4, 4, 4, 4],
@@ -67,10 +67,90 @@ function getRound1TableSizes(n: number): number[] {
 }
 
 // ─── Round 2 Generation for Elimination (8-27) ──────────────────────
+//
+// Layouts are expressed as tokens "X#" where:
+//   - X is the Round 1 table letter (A = 1st table, B = 2nd, …)
+//   - # is the finishing placement at that table (1 = winner, 2 = second,
+//     3 = 3rd, 4 = 4th, 5 = 5th).
+// These layouts come directly from the official CdF specification.
+//
+// To change the distribution for a given player count, edit the token lists
+// below — no other code needs to change.
 
 interface Round2Config {
     finalistTables: { participantIds: string[]; label: string }[];
     consolationTables: { participantIds: string[]; label: string }[];
+}
+
+type TokenLayout = { finalist: string[][]; consolation: string[][] };
+
+const ROUND2_LAYOUTS: Record<number, TokenLayout> = {
+    8:  { finalist: [["A1","B1","A2","B2"]],
+          consolation: [["A3","B3","A4","B4"]] },
+    9:  { finalist: [["A1","B1","A2","B2"]],
+          consolation: [["A3","B3","A4","B4","B5"]] },
+    10: { finalist: [["A1","B1","A2","B2"]],
+          consolation: [["A3","B3","A4"], ["B4","A5","B5"]] },
+    11: { finalist: [["A1","B1","C1"]],
+          consolation: [["A2","B2","C2","A3"], ["B3","C3","A4","B4"]] },
+    12: { finalist: [["A1","B1","C1","D1"]],
+          consolation: [["A2","B2","C2","D2"], ["A3","B3","C3","D3"]] },
+    13: { finalist: [["A1","B1","C1","D1"]],
+          consolation: [["A2","B2","C2"], ["D2","A3","B3"], ["C3","D3","A4"]] },
+    14: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
+          consolation: [["A3","B3","C3"], ["D3","A4","B4"]] },
+    15: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
+          consolation: [["A3","B3","C3","D3"], ["C4","A4","B4"]] },
+    16: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
+          consolation: [["A3","B3","C4","D4"], ["C3","D3","A4","B4"]] },
+    17: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
+          consolation: [["A3","B3","C4","D4"], ["C3","D3","A4","B4","D5"]] },
+    18: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
+          consolation: [["A3","B3","C4","D4","C5"], ["C3","D3","A4","B4","D5"]] },
+    19: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
+          consolation: [["A3","B3","C3","D3"], ["C4","D4","A4","B4"], ["B5","C5","D5"]] },
+    20: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
+          consolation: [["A3","B3","C3","D3"], ["A4","B4","C4","D4"], ["A5","B5","C5","D5"]] },
+    21: { finalist: [["A1","B1","C1","D1","E1"], ["A2","B2","C2","D2","E2"]],
+          consolation: [["A3","B3","C3","D3"], ["E3","A4","B4","C4"], ["D4","E4","E5"]] },
+    22: { finalist: [["A1","B1","C1","D1","E1"], ["A2","B2","C2","D2","E2"]],
+          consolation: [["A3","B3","C3","D3"], ["E3","A4","B4","C4"], ["D4","D5","E4","E5"]] },
+    23: { finalist: [["A1","B1","C1","D1","E1"], ["A2","B2","C2","D2","E2"]],
+          consolation: [["A3","B3","C3","D3","E3"], ["A4","B4","C4","D4","E4"], ["C5","D5","E5"]] },
+    24: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
+          consolation: [["A3","B3","C4","D4"], ["A4","B4","E3","F3"], ["C3","D3","E4","F4"]] },
+    25: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
+          consolation: [["A3","B3","C4","D4"], ["A4","B4","E3","F3"], ["C3","D3","E4","F4","F5"]] },
+    26: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
+          consolation: [["A3","B3","C4","D4"], ["A4","B4","E3","F3","E5"], ["C3","D3","E4","F4","F5"]] },
+    27: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
+          consolation: [["A3","B3","C3","D3","E3"], ["F3","A4","D4","E4","F4"], ["B4","C4","D5","E5","F5"]] },
+};
+
+function getTableRankings(match: TableMatch): { winner: string; second: string; rest: string[] } {
+    const playerIds = match.participantIds.filter((id): id is string => id !== null);
+    const ranked = [...playerIds].sort((a, b) => (match.results[b] || 0) - (match.results[a] || 0));
+    return {
+        winner: ranked[0],
+        second: ranked[1] ?? "",
+        rest: ranked.slice(2),
+    };
+}
+
+// Resolve a token like "A1", "B2", "C4" into the actual participant id using
+// the per-R1-table rankings (0 = A, 1 = B, …).
+function resolveToken(
+    token: string,
+    rankings: { winner: string; second: string; rest: string[] }[],
+): string {
+    const letter = token.charCodeAt(0) - "A".charCodeAt(0);
+    const digit = parseInt(token.slice(1), 10);
+    const r = rankings[letter];
+    if (!r) return "";
+    if (digit === 1) return r.winner;
+    if (digit === 2) return r.second;
+    // digit 3 -> rest[0], 4 -> rest[1], 5 -> rest[2], ...
+    return r.rest[digit - 3] ?? "";
 }
 
 function getRound2Config(
@@ -78,240 +158,24 @@ function getRound2Config(
     round1Matches: TableMatch[],
 ): Round2Config {
     const sorted = [...round1Matches].sort((a, b) => a.tableNumber - b.tableNumber);
+    const rankings = sorted.map(getTableRankings);
 
-    function getTableRankings(match: TableMatch): { winner: string; second: string; rest: string[] } {
-        const playerIds = match.participantIds.filter((id): id is string => id !== null);
-        const ranked = [...playerIds].sort((a, b) => (match.results[b] || 0) - (match.results[a] || 0));
-        return {
-            winner: ranked[0],
-            second: ranked[1] ?? "",
-            rest: ranked.slice(2),
-        };
-    }
+    const layout = ROUND2_LAYOUTS[n];
+    if (!layout) return { finalistTables: [], consolationTables: [] };
 
-    const r = sorted.map(m => getTableRankings(m));
+    const resolve = (tokens: string[]) =>
+        tokens.map(t => resolveToken(t, rankings)).filter(Boolean);
 
-    // ─── 8-10 players (2 tables): 1 finalist table ────────────────
-    // Winners A+B vs seconds A+B
-    if (n >= 8 && n <= 10) {
-        const [tA, tB] = r;
-        const finalistIds = [tA.winner, tB.winner, tA.second, tB.second].filter(Boolean);
-        const consolation = [...tA.rest, ...tB.rest].filter(Boolean);
-        return {
-            finalistTables: [
-                { participantIds: finalistIds, label: "Finale 1" },
-            ],
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    // ─── 11 players (3 tables: 4,4,3): 1 finalist with 3 winners ──
-    if (n === 11) {
-        const [tA, tB, tC] = r;
-        const finalistIds = new Set([tA.winner, tB.winner, tC.winner]);
-        const consolation = [tA.second, tB.second, tC.second, ...tA.rest, ...tB.rest, ...tC.rest].filter(id => id && !finalistIds.has(id));
-        return {
-            finalistTables: [
-                { participantIds: [...finalistIds], label: "Finale 1" },
-            ],
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    // ─── 12 players (4 tables of 3): 1 finalist with 4 winners ────
-    if (n === 12) {
-        const [tA, tB, tC, tD] = r;
-        const finalistIds = new Set([tA.winner, tB.winner, tC.winner, tD.winner]);
-        const consolation = [tA.second, tB.second, tC.second, tD.second, ...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
-        return {
-            finalistTables: [
-                { participantIds: [...finalistIds], label: "Finale 1" },
-            ],
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    // ─── 13 players (4 tables: 3,3,3,4): 1 finalist with 4 winners
-    if (n === 13) {
-        const [tA, tB, tC, tD] = r;
-        const finalistIds = new Set([tA.winner, tB.winner, tC.winner, tD.winner]);
-        const consolation = [tA.second, tB.second, tC.second, tD.second, ...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
-        return {
-            finalistTables: [
-                { participantIds: [...finalistIds], label: "Finale 1" },
-            ],
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    // ─── 14 players (4 tables: 4,4,3,3): 2 finalist tables crossed ─
-    // Finale 1: winners A+B vs seconds C+D
-    // Finale 2: winners C+D vs seconds A+B
-    if (n === 14) {
-        const [tA, tB, tC, tD] = r;
-        const finalistTables = [
-            { participantIds: [tA.winner, tB.winner, tC.second, tD.second].filter(Boolean), label: "Finale 1" },
-            { participantIds: [tC.winner, tD.winner, tA.second, tB.second].filter(Boolean), label: "Finale 2" },
-        ];
-        const finalistIds = new Set(finalistTables.flatMap(t => t.participantIds));
-        const consolation = [...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
-        return {
-            finalistTables,
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    // ─── 15 players (4 tables: 4,4,4,3): 2 finalist tables crossed ─
-    if (n === 15) {
-        const [tA, tB, tC, tD] = r;
-        const finalistTables = [
-            { participantIds: [tA.winner, tB.winner, tC.second, tD.second].filter(Boolean), label: "Finale 1" },
-            { participantIds: [tC.winner, tD.winner, tA.second, tB.second].filter(Boolean), label: "Finale 2" },
-        ];
-        const finalistIds = new Set(finalistTables.flatMap(t => t.participantIds));
-        const consolation = [...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
-        return {
-            finalistTables,
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    // ─── 16-19 players (4 tables): 2 finalist tables, crossed ────────
-    if (n >= 16 && n <= 19) {
-        const [tA, tB, tC, tD] = r;
-        const finalistTables = [
-            { participantIds: [tA.winner, tB.winner, tC.second, tD.second], label: "Finale 1" },
-            { participantIds: [tC.winner, tD.winner, tA.second, tB.second], label: "Finale 2" },
-        ];
-        const finalistIds = new Set(finalistTables.flatMap(t => t.participantIds));
-        const consolation = [...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest].filter(id => id && !finalistIds.has(id));
-        return {
-            finalistTables,
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    // ─── 20 players (4 tables of 5): 2 finalist tables + consolation ─
-    if (n === 20) {
-        const [tA, tB, tC, tD] = r;
-        return {
-            finalistTables: [
-                { participantIds: [tA.winner, tB.winner, tC.second, tD.second], label: "Finale 1" },
-                { participantIds: [tC.winner, tD.winner, tA.second, tB.second], label: "Finale 2" },
-            ],
-            consolationTables: distributeToConsolation(
-                [...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest],
-                "Consolation"
-            ),
-        };
-    }
-
-    // ─── 21-23 players (5 tables): 2 finalist tables + consolation ────
-    if (n >= 21 && n <= 23) {
-        // Finalist 1: winners A,B + seconds D,E
-        // Finalist 2: winners D,E + seconds A,B
-        // C's winner and second go to consolation along with all rests
-        const [tA, tB, tC, tD, tE] = r;
-        const f1 = [tA.winner, tB.winner, tD.second, tE.second];
-        const f2 = [tD.winner, tE.winner, tA.second, tB.second];
-        const consolation = [tC.winner, tC.second, ...tA.rest, ...tB.rest, ...tC.rest, ...tD.rest, ...tE.rest].filter(Boolean);
-        return {
-            finalistTables: [
-                { participantIds: f1, label: "Finale 1" },
-                { participantIds: f2, label: "Finale 2" },
-            ],
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    // ─── 24-27 players (6 tables): 3 finalist tables + consolation ────
-    if (n >= 24 && n <= 27) {
-        const [tA, tB, tC, tD, tE, tF] = r;
-        const finalistTables = [
-            { participantIds: [tA.winner, tB.winner, tC.second, tD.second], label: "Finale 1" },
-            { participantIds: [tC.winner, tD.winner, tE.second, tF.second], label: "Finale 2" },
-            { participantIds: [tE.winner, tF.winner, tA.second, tB.second], label: "Finale 3" },
-        ];
-        const finalistIds = new Set(finalistTables.flatMap(t => t.participantIds));
-        const consolation = r.flatMap(t => [t.winner, t.second, ...t.rest]).filter(id => id && !finalistIds.has(id));
-        return {
-            finalistTables,
-            consolationTables: distributeToConsolation(consolation, "Consolation"),
-        };
-    }
-
-    return { finalistTables: [], consolationTables: [] };
-}
-
-// ─── Distribute remaining players into consolation tables of 3-5 ────
-function distributeToConsolation(
-    playerIds: string[],
-    labelPrefix: string
-): { participantIds: string[]; label: string }[] {
-    const n = playerIds.length;
-    if (n === 0) return [];
-
-    let tableSizes: number[];
-    if (n <= 5) {
-        tableSizes = [n];
-    } else {
-        // Prefer tables of 4, allow 3 or 5 to fill
-        // 4a + 5b = n or 4a + 3b = n
-        const remainder = n % 4;
-        if (remainder === 0) {
-            tableSizes = Array(n / 4).fill(4);
-        } else if (remainder === 1) {
-            // e.g. 13 → 2×4 + 1×5
-            tableSizes = [...Array(Math.floor(n / 4) - 1).fill(4), 5];
-        } else if (remainder === 2) {
-            // e.g. 14 → 2×4 + 2×3 or 1×4 + 2×5
-            // The rules sometimes use 3-player tables, let's prefer 5s first
-            tableSizes = [...Array(Math.floor(n / 4) - 1).fill(4), 3, 3];
-            // Actually, let's recalculate properly
-            const tables5 = Math.floor(remainder / 1); // not great, let's be explicit
-            // 4a + 5b = n, minimize total. b = (n - 4a) / 5... let's just handle common cases
-            // For consolation it doesn't matter as much, use 4s and one adjusted table
-            tableSizes = [...Array(Math.floor(n / 4)).fill(4)];
-            const leftover = n - tableSizes.length * 4;
-            if (leftover > 0) {
-                // Remove last table of 4, make it (4 + leftover) split
-                if (leftover <= 1 && tableSizes.length > 0) {
-                    tableSizes[tableSizes.length - 1] = 5;
-                } else {
-                    tableSizes.push(leftover);
-                }
-            }
-        } else if (remainder === 3) {
-            // e.g. 11 → 2×4 + 1×3 or 1×4 + 1×3 + 1×4
-            tableSizes = [...Array(Math.floor(n / 4)).fill(4), 3];
-        } else {
-            tableSizes = [...Array(Math.floor(n / 4)).fill(4)];
-        }
-    }
-
-    // Validate total
-    const total = tableSizes.reduce((a, b) => a + b, 0);
-    if (total !== n) {
-        // Fallback: just use one big batch split into 4s
-        tableSizes = [];
-        let remaining = n;
-        while (remaining > 0) {
-            const size = Math.min(remaining, remaining <= 5 ? remaining : 4);
-            tableSizes.push(size);
-            remaining -= size;
-        }
-    }
-
-    const tables: { participantIds: string[]; label: string }[] = [];
-    let cursor = 0;
-    for (let i = 0; i < tableSizes.length; i++) {
-        tables.push({
-            participantIds: playerIds.slice(cursor, cursor + tableSizes[i]),
-            label: `${labelPrefix} ${i + 1}`,
-        });
-        cursor += tableSizes[i];
-    }
-    return tables;
+    return {
+        finalistTables: layout.finalist.map((tokens, i) => ({
+            participantIds: resolve(tokens),
+            label: `Finale ${i + 1}`,
+        })),
+        consolationTables: layout.consolation.map((tokens, i) => ({
+            participantIds: resolve(tokens),
+            label: `Consolation ${i + 1}`,
+        })),
+    };
 }
 
 // ─── Swiss Round Table Distribution (28+ players) ───────────────────
