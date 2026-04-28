@@ -2,20 +2,20 @@ import { TableMatch, Participant, TournamentFormat } from "./types";
 
 // ─── Format Detection ──────────────────────────────────────────────
 export function getFormat(size: number): TournamentFormat {
-    if (size < 28) return "elimination";
+    if (size <= 28) return "elimination";
     return "swiss";
 }
 
 export function getMaxRounds(size: number): number {
-    return size < 28 ? 2 : 3;
+    return size <= 28 ? 2 : 3;
 }
 
 export function getQualifiedCount(size: number): number {
     if (size >= 8 && size <= 13) return 1;
     if (size >= 14 && size <= 15) return 2;
     if (size >= 16 && size <= 23) return 2;
-    if (size >= 24 && size <= 27) return 3;
-    if (size >= 28 && size <= 31) return 3;
+    if (size >= 24 && size <= 28) return 3;
+    if (size >= 29 && size <= 31) return 3;
     // 32+: 4 qualified, then +1 for every 8 additional players
     return 4 + Math.floor((size - 32) / 8);
 }
@@ -23,11 +23,11 @@ export function getQualifiedCount(size: number): number {
 export function isRecommendedSize(size: number): boolean {
     // 8-15 are all non-recommended, 16/20/24 and 28+ are recommended
     if (size < 16) return false;
-    return [16, 20, 24].includes(size) || size >= 28;
+    return [16, 20, 24, 28].includes(size) || size > 28;
 }
 
 export function getFormatLabel(size: number): string {
-    if (size < 28) return `2 rondes élimination directe`;
+    if (size <= 28) return `2 rondes élimination directe`;
     return `3 rondes suisse`;
 }
 
@@ -37,7 +37,7 @@ function tableLetterLabel(index: number): string {
     return `Table ${TABLE_LETTERS[index] || (index + 1)}`;
 }
 
-// ─── Round 1 Table Distribution (8-27 players) ──────────────────────
+// ─── Round 1 Table Distribution (8-28 players) ──────────────────────
 // Exact sizes per the official regulations document.
 function getRound1TableSizes(n: number): number[] {
     const exact: Record<number, number[]> = {
@@ -61,6 +61,7 @@ function getRound1TableSizes(n: number): number[] {
         25: [4, 4, 4, 4, 4, 5],
         26: [4, 4, 4, 4, 5, 5],
         27: [4, 4, 4, 5, 5, 5],
+        28: [4, 4, 5, 5, 5, 5],
     };
 
     return exact[n] || [];
@@ -125,6 +126,8 @@ const ROUND2_LAYOUTS: Record<number, TokenLayout> = {
           consolation: [["A3","B3","C4","D4"], ["A4","B4","E3","F3","E5"], ["C3","D3","E4","F4","F5"]] },
     27: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
           consolation: [["A3","B3","C3","D3","E3"], ["F3","A4","D4","E4","F4"], ["B4","C4","D5","E5","F5"]] },
+    28: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
+          consolation: [["A3","B3","C3","D3"], ["E3","F3","A4","B4"], ["D4","C4","E4","F4"], ["D5","C5","E5","F5"]] },
 };
 
 function getTableRankings(match: TableMatch): { winner: string; second: string; rest: string[] } {

@@ -331,19 +331,19 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                         }
                                         const nt = getNT(pId);
                                         return (
-                                            <div key={i} className="flex items-center justify-between p-2 rounded-md bg-accent/50 text-sm">
-                                                <div className="flex items-center gap-2">
+                                            <div key={i} className="flex flex-col gap-1 p-2 rounded-md bg-accent/50 text-sm">
+                                                <div className="flex items-center gap-2 min-w-0">
                                                     <span className="font-prototype">{p ? `${p.firstname} ${p.name}` : "Place vide"}</span>
                                                     {p && qualifiedSet.has(p.id) && (
-                                                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     {match.isCompleted && nt > 0 && (
-                                                        <span className="text-xs font-prototype text-muted-foreground">{nt} NT</span>
+                                                        <span className="text-xs font-prototype text-muted-foreground whitespace-nowrap">{nt} NT</span>
                                                     )}
                                                     {match.isCompleted && p && (
-                                                        <span className="font-prototype text-primary">{placement}</span>
+                                                        <span className="font-prototype text-primary whitespace-nowrap">{placement}</span>
                                                     )}
                                                 </div>
                                             </div>

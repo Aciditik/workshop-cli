@@ -772,6 +772,56 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 </Card>
             )}
 
+            {/* Classement section above the rounds — elimination format only, at end of tournament */}
+            {format === "elimination" && tournament.status === "fini" && (
+                <div className="space-y-4 mb-8">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-2xl font-prototype flex items-center gap-2">
+                            <Award className="w-6 h-6 text-primary" />
+                            Classement
+                        </h3>
+                    </div>
+                    <Card className="border-primary/20">
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-border">
+                                {sortedParticipants.map((p, index) => {
+                                    const ntScore = calculateNTScore(p.id);
+                                    const tableDiff = calculateTableDifference(p.id);
+                                    return (
+                                        <div key={p.id} className={`p-4 flex items-center justify-between gap-3 hover:bg-accent/30 transition-colors ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${index === 0 ? "bg-yellow-500" :
+                                                    index === 1 ? "bg-slate-300" :
+                                                        index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
+                                                    }`}>
+                                                    {index + 1}
+                                                </span>
+                                                <span className="font-prototype truncate" title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
+                                                {qualifiedIds.has(p.id) && (
+                                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {tableDiff > 0 && (
+                                                    <span className="text-sm font-prototype text-orange-600 whitespace-nowrap">
+                                                        Diff {tableDiff}
+                                                    </span>
+                                                )}
+                                                {ntScore > 0 && (
+                                                    <span className="text-sm font-prototype text-blue-600 whitespace-nowrap">
+                                                        {ntScore} NT
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-4">
                         <div className="flex items-center justify-between">
@@ -812,7 +862,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             <CardHeader className="bg-primary/5 border-b border-border">
                                 <CardTitle className="flex items-center gap-2 font-prototype">
                                     <Trophy className="w-5 h-5 text-primary" />
-                                    Joueurs
+                                    Liste de joueurs
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
@@ -823,33 +873,33 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         const tableDiff = calculateTableDifference(p.id);
                                         return (
                                             <div key={p.id} className={`p-4 flex items-center justify-between gap-3 hover:bg-accent/30 transition-colors group ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
-                                                <div className="flex items-center gap-3 min-w-0">
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
                                                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${index === 0 ? "bg-yellow-500" :
                                                         index === 1 ? "bg-slate-300" :
                                                             index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
                                                         }`}>
                                                         {index + 1}
                                                     </span>
-                                                    <span className="font-prototype truncate">{p.firstname} {p.name}</span>
+                                                    <span className="font-prototype">{p.firstname} {p.name}</span>
                                                     {qualifiedIds.has(p.id) && (
                                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-3 shrink-0">
-                                                    {tournament.status !== "brouillon" && (
+                                                    {tournament.status !== "brouillon" && format === "swiss" && (
                                                         <>
                                                             {tableDiff > 0 && (
-                                                                <span className="text-sm font-prototype text-orange-600">
+                                                                <span className="text-sm font-prototype text-orange-600 whitespace-nowrap">
                                                                     Diff {tableDiff}
                                                                 </span>
                                                             )}
                                                             {ntScore > 0 && (
-                                                                <span className="text-sm font-prototype text-blue-600">
+                                                                <span className="text-sm font-prototype text-blue-600 whitespace-nowrap">
                                                                     {ntScore} NT
                                                                 </span>
                                                             )}
                                                             {totalPoints !== null && (
-                                                                <span className="text-sm font-prototype text-muted-foreground">
+                                                                <span className="text-sm font-prototype text-muted-foreground whitespace-nowrap">
                                                                     {totalPoints} pts
                                                                 </span>
                                                             )}

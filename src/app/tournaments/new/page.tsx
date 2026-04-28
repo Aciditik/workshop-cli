@@ -242,7 +242,7 @@ export default function NewTournament() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-primary font-prototype">
                         <Users className="w-5 h-5" />
-                        Joueurs
+                        Liste de joueurs
                         {size > 0 && <span className="ml-auto text-sm font-prototype text-muted-foreground">{size} joueur{size > 1 ? "s" : ""}</span>}
                     </CardTitle>
                 </CardHeader>
@@ -345,10 +345,10 @@ export default function NewTournament() {
                                         <p className="text-xs font-prototype opacity-80">
                                             {getQualifiedCount(size)} joueur{getQualifiedCount(size) > 1 ? "s" : ""} qualifié{getQualifiedCount(size) > 1 ? "s" : ""} · {getMaxRounds(size)} rondes
                                         </p>
-                                        {size < 28 && (
+                                        {size <= 28 && (
                                             <p className="text-xs font-prototype opacity-80">Ronde 1 : tables aléatoires · Ronde 2 : tables croisées selon résultats</p>
                                         )}
-                                        {size >= 28 && (
+                                        {size > 28 && (
                                             <p className="text-xs font-prototype opacity-80">Format suisse : classement par points cumulés</p>
                                         )}
                                     </>
