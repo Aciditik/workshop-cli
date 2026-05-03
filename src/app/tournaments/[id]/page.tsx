@@ -18,7 +18,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus } from "lucide-react";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +35,47 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     // Admin mid-tournament player removal confirmation
     const [removeConfirm, setRemoveConfirm] = useState<Participant | null>(null);
+
+    // Admin edit-participant modal (available at any tournament stage)
+    const [editParticipant, setEditParticipant] = useState<Participant | null>(null);
+    const [editFirstname, setEditFirstname] = useState("");
+    const [editName, setEditName] = useState("");
+    const [editEmail, setEditEmail] = useState("");
+    const [editPhone, setEditPhone] = useState("");
+
+    const openEditParticipant = (p: Participant) => {
+        setEditParticipant(p);
+        setEditFirstname(p.firstname);
+        setEditName(p.name);
+        setEditEmail(p.email);
+        setEditPhone(p.phone);
+    };
+
+    const closeEditParticipant = () => {
+        setEditParticipant(null);
+    };
+
+    const saveEditParticipant = () => {
+        if (!editParticipant || !tournament) return;
+        const firstname = editFirstname.trim();
+        const name = editName.trim();
+        const email = editEmail.trim();
+        const phone = editPhone.trim();
+        if (!firstname || !name || !email || !phone) return;
+
+        const updatedParticipants = tournament.participants.map(p =>
+            p.id === editParticipant.id
+                ? { ...p, firstname, name, email, phone }
+                : p
+        );
+
+        updateTournament({
+            ...tournament,
+            participants: updatedParticipants,
+        });
+
+        closeEditParticipant();
+    };
 
     // Finale CdF planning modal (shown when tournament completed)
     const [showFinaleModal, setShowFinaleModal] = useState(false);
@@ -736,14 +777,26 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             </span>
                                             <span className="font-prototype">{p.firstname} {p.name}</span>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removePlayer(p.id)}
-                                            className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-                                            title="Supprimer"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            {isAdmin && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openEditParticipant(p)}
+                                                    className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                    title="Modifier les infos du joueur (admin)"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => removePlayer(p.id)}
+                                                className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                title="Supprimer"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -905,6 +958,16 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                             )}
                                                         </>
                                                     )}
+                                                    {isAdmin && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openEditParticipant(p)}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Modifier les infos du joueur (admin)"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                     {isAdmin && tournament.status === "en_cours" && (
                                                         <button
                                                             type="button"
@@ -976,6 +1039,74 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 }}
                             >
                                 Retirer le joueur
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Admin: edit participant infos (available at any tournament stage) */}
+            {editParticipant && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                    onClick={closeEditParticipant}
+                >
+                    <div
+                        className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-border flex items-start gap-3">
+                            <div className="bg-primary/20 p-2 rounded-full shrink-0">
+                                <Pencil className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-prototype">Modifier le joueur</h3>
+                                <p className="text-sm text-muted-foreground font-prototype">Action réservée à l&apos;administration.</p>
+                            </div>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input
+                                    type="text"
+                                    value={editFirstname}
+                                    onChange={(e) => setEditFirstname(e.target.value)}
+                                    placeholder="Prénom *"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                                <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    placeholder="Nom *"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                                <input
+                                    type="email"
+                                    value={editEmail}
+                                    onChange={(e) => setEditEmail(e.target.value)}
+                                    placeholder="Email *"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:col-span-2"
+                                />
+                                <input
+                                    type="tel"
+                                    value={editPhone}
+                                    onChange={(e) => setEditPhone(e.target.value)}
+                                    placeholder="Téléphone *"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:col-span-2"
+                                />
+                            </div>
+                        </div>
+                        <div className="p-5 border-t border-border flex flex-col-reverse sm:flex-row gap-3">
+                            <Button variant="outline" className="w-full font-prototype" onClick={closeEditParticipant}>
+                                Annuler
+                            </Button>
+                            <Button
+                                className="w-full gap-2 font-prototype"
+                                onClick={saveEditParticipant}
+                                disabled={!editFirstname.trim() || !editName.trim() || !editEmail.trim() || !editPhone.trim()}
+                            >
+                                <Check className="w-4 h-4" />
+                                Enregistrer
                             </Button>
                         </div>
                     </div>
