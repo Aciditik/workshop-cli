@@ -8,6 +8,19 @@ import { Trophy, CheckCircle2, ChevronUp, ChevronDown, ArrowLeft, AlertTriangle 
 import Image from "next/image";
 import Link from "next/link";
 
+// Form state uses null to distinguish "not yet entered" from a real 0
+type FormPlayerScore = {
+    corporation: string;
+    nt: number | null;
+    objectifs: number | null;
+    recompenses: number | null;
+    forets: number | null;
+    villes: number | null;
+    cartes: number | null;
+    megacredits: number | null;
+};
+
+// Wire type sent to the API (all fields resolved to numbers)
 type PlayerScore = {
     corporation: string;
     nt: number;
@@ -19,16 +32,46 @@ type PlayerScore = {
     megacredits: number;
 };
 
-const DEFAULT_SCORE: PlayerScore = {
+const DEFAULT_SCORE: FormPlayerScore = {
     corporation: "",
-    nt: 0,
-    objectifs: 0,
-    recompenses: 0,
-    forets: 0,
-    villes: 0,
-    cartes: 0,
-    megacredits: 0,
+    nt: null,
+    objectifs: null,
+    recompenses: null,
+    forets: null,
+    villes: null,
+    cartes: null,
+    megacredits: null,
 };
+
+function isCorporationValid(corp: string) {
+    return corp !== "" && corp !== "Choisissez votre corporation";
+}
+
+function isPlayerComplete(score: FormPlayerScore): boolean {
+    return (
+        isCorporationValid(score.corporation) &&
+        score.nt !== null &&
+        score.objectifs !== null &&
+        score.recompenses !== null &&
+        score.forets !== null &&
+        score.villes !== null &&
+        score.cartes !== null &&
+        score.megacredits !== null
+    );
+}
+
+function missingFields(score: FormPlayerScore): string[] {
+    const missing: string[] = [];
+    if (!isCorporationValid(score.corporation)) missing.push("Corporation");
+    if (score.nt === null) missing.push("NT");
+    if (score.objectifs === null) missing.push("Objectifs");
+    if (score.recompenses === null) missing.push("Récompenses");
+    if (score.forets === null) missing.push("Forêts");
+    if (score.villes === null) missing.push("Villes");
+    if (score.cartes === null) missing.push("Cartes");
+    if (score.megacredits === null) missing.push("Tiebreaker");
+    return missing;
+}
 
 const CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
     { key: "nt", label: "NT" },
@@ -57,9 +100,10 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [showRecap, setShowRecap] = useState(false);
+    const [showValidation, setShowValidation] = useState(false);
 
-    // Form state: mapping participantId -> score obj
-    const [scores, setScores] = useState<Record<string, PlayerScore>>({});
+    // Form state: mapping participantId -> score obj (null = not yet entered)
+    const [scores, setScores] = useState<Record<string, FormPlayerScore>>({});
 
     useEffect(() => {
         const loadTournament = async () => {
@@ -118,12 +162,14 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
 
     const getParticipant = (id: string) => tournament.participants.find(p => p.id === id);
 
-    const handleScoreChange = (playerId: string, category: keyof PlayerScore, value: string | number) => {
+    const handleScoreChange = (playerId: string, category: keyof FormPlayerScore, value: string | number | null) => {
         setScores(prev => ({
             ...prev,
             [playerId]: {
                 ...prev[playerId],
-                [category]: typeof value === 'number' ? Math.max(0, value) : value
+                [category]: typeof value === 'string'
+                    ? (value === '' ? null : Math.max(0, parseInt(value) || 0))
+                    : value
             }
         }));
     };
@@ -131,10 +177,13 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     const calculateTotal = (playerId: string) => {
         const pScores = scores[playerId];
         if (!pScores) return 0;
-        return pScores.nt + pScores.objectifs + pScores.recompenses + pScores.forets + pScores.villes + pScores.cartes;
+        return (pScores.nt ?? 0) + (pScores.objectifs ?? 0) + (pScores.recompenses ?? 0) +
+            (pScores.forets ?? 0) + (pScores.villes ?? 0) + (pScores.cartes ?? 0);
     };
 
-    // True as soon as any player has a non-zero category score — avoids showing
+    const allPlayersComplete = activePlayers.length > 0 && activePlayers.every(pId => isPlayerComplete(scores[pId] ?? DEFAULT_SCORE));
+
+    // True as soon as any player has a non-null category score — avoids showing
     // a default "winner" medal before anyone has actually entered scores.
     const hasAnyScore = activePlayers.some(pId => calculateTotal(pId) > 0);
 
@@ -182,21 +231,36 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     const rankings = getRankings();
 
     const handleSubmit = async () => {
-        if (Object.keys(scores).length === 0) return;
+        if (!allPlayersComplete) return;
 
         setSubmitting(true);
         try {
-            // We submit the calculated placement points back to the API
             const pointsToSubmit: Record<string, number> = {};
             activePlayers.forEach(pId => {
                 pointsToSubmit[pId] = rankings[pId]?.points || 0;
+            });
+
+            // Resolve nulls to 0 before sending to the API
+            const scorecardsToSubmit: Record<string, PlayerScore> = {};
+            activePlayers.forEach(pId => {
+                const s = scores[pId];
+                scorecardsToSubmit[pId] = {
+                    corporation: s.corporation,
+                    nt: s.nt ?? 0,
+                    objectifs: s.objectifs ?? 0,
+                    recompenses: s.recompenses ?? 0,
+                    forets: s.forets ?? 0,
+                    villes: s.villes ?? 0,
+                    cartes: s.cartes ?? 0,
+                    megacredits: s.megacredits ?? 0,
+                };
             });
 
             const apiUrl = process.env.NODE_ENV === 'production' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000");
             await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}/table/${tableId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ results: pointsToSubmit, scorecards: scores })
+                body: JSON.stringify({ results: pointsToSubmit, scorecards: scorecardsToSubmit })
             });
             setSubmitted(true);
         } catch (e) {
@@ -243,8 +307,11 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                     {activePlayers.map((pId, i) => {
                         const p = getParticipant(pId);
                         const rank = rankings[pId];
+                        const playerScore = scores[pId] ?? DEFAULT_SCORE;
+                        const missing = showValidation ? missingFields(playerScore) : [];
+                        const hasErrors = missing.length > 0;
                         return (
-                            <div key={pId} className="glass rounded-xl overflow-hidden">
+                            <div key={pId} className={`glass rounded-xl overflow-hidden ${showValidation && hasErrors ? "ring-1 ring-destructive" : ""}`}>
                                 <div className="bg-primary/20 px-4 py-3 flex items-center justify-between">
                                     <div>
                                         <div className="text-xs text-muted-foreground font-prototype">Joueur #{i + 1}</div>
@@ -261,35 +328,47 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                 </div>
                                 <div className="p-4 space-y-3">
                                     <div>
-                                        <label className="text-xs text-muted-foreground font-prototype block mb-1">Corporation</label>
+                                        <label className="text-xs text-muted-foreground font-prototype block mb-1">
+                                            Corporation <span className="text-destructive">*</span>
+                                        </label>
                                         <select
-                                            className="w-full p-2 border border-border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                            value={scores[pId]?.corporation || ""}
+                                            className={`w-full p-2 border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary ${showValidation && !isCorporationValid(playerScore.corporation) ? "border-destructive ring-1 ring-destructive" : "border-border"}`}
+                                            value={playerScore.corporation}
                                             onChange={(e) => handleScoreChange(pId, "corporation", e.target.value)}
                                         >
                                             {CORPORATIONS.map(c => (
-                                                <option key={c} value={c === "Select Corporation" ? "" : c} className="font-prototype">{c}</option>
+                                                <option key={c} value={c} className="font-prototype">{c}</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
-                                        {CATEGORIES.map(cat => (
-                                            <div key={cat.key}>
-                                                <label className="text-xs text-muted-foreground font-prototype block mb-1">{cat.label}</label>
-                                                <input
-                                                    type="number"
-                                                    inputMode="numeric"
-                                                    pattern="[0-9]*"
-                                                    step="1"
-                                                    min="0"
-                                                    placeholder="0"
-                                                    className="w-full text-center p-2 border border-border rounded-md bg-background text-foreground font-prototype focus:outline-none focus:ring-2 focus:ring-primary hide-arrows"
-                                                    value={scores[pId]?.[cat.key] || ''}
-                                                    onChange={(e) => handleScoreChange(pId, cat.key, e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
-                                                />
-                                            </div>
-                                        ))}
+                                        {CATEGORIES.map(cat => {
+                                            const isInvalid = showValidation && cat.key !== "corporation" && playerScore[cat.key] === null;
+                                            return (
+                                                <div key={cat.key}>
+                                                    <label className="text-xs text-muted-foreground font-prototype block mb-1">
+                                                        {cat.label} <span className="text-destructive">*</span>
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        inputMode="numeric"
+                                                        pattern="[0-9]*"
+                                                        step="1"
+                                                        min="0"
+                                                        placeholder="—"
+                                                        className={`w-full text-center p-2 border rounded-md bg-background text-foreground font-prototype focus:outline-none focus:ring-2 focus:ring-primary hide-arrows ${isInvalid ? "border-destructive ring-1 ring-destructive placeholder:text-destructive/60" : "border-border"}`}
+                                                        value={playerScore[cat.key] === null ? '' : playerScore[cat.key] as number}
+                                                        onChange={(e) => handleScoreChange(pId, cat.key, e.target.value)}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                     </div>
+                                    {showValidation && hasErrors && (
+                                        <p className="text-xs text-destructive font-prototype">
+                                            Champs manquants : {missing.join(", ")}
+                                        </p>
+                                    )}
                                     <div className="flex items-center justify-between pt-3 border-t border-border/50">
                                         <span className="text-sm font-prototype text-muted-foreground">Total NT</span>
                                         <span className="text-2xl font-prototype text-primary">{calculateTotal(pId)}</span>
@@ -328,46 +407,54 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                         {/* CORPORATION */}
                         <div className="flex bg-secondary text-secondary-foreground font-bold">
                             <div className="w-48 font-prototype flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/50 text-center">
-                                Corporation
+                                Corporation <span className="text-destructive ml-1">*</span>
                             </div>
-                            {activePlayers.map(pId => (
-                                <div key={pId} className="flex-1 min-w-[150px] p-3 bg-muted/20 border-r border-border border-b border-border flex items-center justify-center">
-                                    <select
-                                        className="w-full p-2 border border-border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                                        value={scores[pId]?.corporation || ""}
-                                        onChange={(e) => handleScoreChange(pId, "corporation", e.target.value)}
-                                    >
-                                        {CORPORATIONS.map(c => (
-                                            <option key={c} value={c === "Select Corporation" ? "" : c}>{c}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            ))}
+                            {activePlayers.map(pId => {
+                                const playerScore = scores[pId] ?? DEFAULT_SCORE;
+                                const isInvalid = showValidation && !isCorporationValid(playerScore.corporation);
+                                return (
+                                    <div key={pId} className="flex-1 min-w-[150px] p-3 bg-muted/20 border-r border-border border-b border-border flex items-center justify-center">
+                                        <select
+                                            className={`w-full p-2 border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary ${isInvalid ? "border-destructive ring-1 ring-destructive" : "border-border"}`}
+                                            value={playerScore.corporation}
+                                            onChange={(e) => handleScoreChange(pId, "corporation", e.target.value)}
+                                        >
+                                            {CORPORATIONS.map(c => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         {/* CATEGORY ROWS */}
                         {CATEGORIES.map(cat => (
                             <div key={cat.key} className="flex bg-secondary/80 text-secondary-foreground font-prototype">
                                 <div className="w-48 flex-shrink-0 p-4 flex items-center justify-center border-r border-border border-b border-border/30 text-center">
-                                    {cat.label}
+                                    {cat.label} <span className="text-destructive ml-1">*</span>
                                 </div>
-                                {activePlayers.map(pId => (
-                                    <div key={pId} className="flex-1 min-w-[150px] p-3 bg-card border-r border-border border-b border-border flex items-center justify-center">
-                                        <div className="flex items-center w-full max-w-[120px] border border-border rounded-md overflow-hidden bg-background">
-                                            <input
-                                                type="number"
-                                                inputMode="numeric"
-                                                pattern="[0-9]*"
-                                                step="1"
-                                                min="0"
-                                                placeholder="0"
-                                                className="w-full text-center p-2 text-foreground font-prototype focus:outline-none focus:ring-1 focus:ring-inset focus:ring-primary hide-arrows bg-transparent placeholder:text-muted-foreground"
-                                                value={scores[pId]?.[cat.key] || ''}
-                                                onChange={(e) => handleScoreChange(pId, cat.key, e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
-                                            />
+                                {activePlayers.map(pId => {
+                                    const playerScore = scores[pId] ?? DEFAULT_SCORE;
+                                    const isInvalid = showValidation && playerScore[cat.key] === null;
+                                    return (
+                                        <div key={pId} className="flex-1 min-w-[150px] p-3 bg-card border-r border-border border-b border-border flex items-center justify-center">
+                                            <div className={`flex items-center w-full max-w-[120px] border rounded-md overflow-hidden bg-background ${isInvalid ? "border-destructive ring-1 ring-destructive" : "border-border"}`}>
+                                                <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    step="1"
+                                                    min="0"
+                                                    placeholder="—"
+                                                    className="w-full text-center p-2 text-foreground font-prototype focus:outline-none hide-arrows bg-transparent placeholder:text-muted-foreground"
+                                                    value={playerScore[cat.key] === null ? '' : playerScore[cat.key] as number}
+                                                    onChange={(e) => handleScoreChange(pId, cat.key, e.target.value)}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ))}
 
@@ -414,14 +501,20 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                 <div className="pt-4 pb-12 w-full max-w-sm mx-auto">
                     <Button
                         className="w-full h-14 text-xl font-prototype shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all transform hover:scale-[1.02] ring-1 ring-primary/50"
-                        onClick={() => setShowRecap(true)}
-                        disabled={submitting || Object.keys(scores).length === 0 || !hasAnyScore}
+                        onClick={() => {
+                            if (!allPlayersComplete) {
+                                setShowValidation(true);
+                            } else {
+                                setShowRecap(true);
+                            }
+                        }}
+                        disabled={submitting}
                     >
                         {submitting ? "Envoi..." : "Envoi à l'admin"}
                     </Button>
-                    {!hasAnyScore && (
-                        <p className="text-xs text-muted-foreground text-center mt-2 font-prototype">
-                            Saisissez au moins un score avant d&apos;envoyer.
+                    {showValidation && !allPlayersComplete && (
+                        <p className="text-xs text-destructive text-center mt-2 font-prototype">
+                            Tous les champs sont obligatoires pour chaque joueur.
                         </p>
                     )}
                 </div>

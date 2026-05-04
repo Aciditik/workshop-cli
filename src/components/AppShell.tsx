@@ -1,7 +1,7 @@
 "use client";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X } from "lucide-react";
+import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -105,6 +105,13 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
           >
             <PlusCircle className="w-5 h-5 group-hover:text-primary transition-colors" />
             <span className="font-prototype">Nouveau tournoi</span>
+          </Link>
+          <Link
+            href="/stats"
+            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
+          >
+            <BarChart3 className="w-5 h-5 group-hover:text-primary transition-colors" />
+            <span className="font-prototype">Statistiques</span>
           </Link>
         </nav>
 
