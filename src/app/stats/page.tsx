@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { BarChart3, Trophy, Users, Star, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 
@@ -274,6 +276,10 @@ function CorporationsView({ entries }: { entries: Entry[] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const [data, setData] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -287,6 +293,10 @@ export default function StatsPage() {
   const [view, setView] = useState<View>("leaderboard");
 
   useEffect(() => {
+    if (!isAdmin) {
+      router.push("/");
+      return;
+    }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
     fetch(`${apiUrl}/api/public/stats`)
       .then((r) => {
@@ -296,7 +306,7 @@ export default function StatsPage() {
       .then(setData)
       .catch(() => setError("Impossible de charger les statistiques."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAdmin, router]);
 
   function handleSortMetric(m: SortMetric) {
     if (sortMetric === m) {
@@ -349,7 +359,7 @@ export default function StatsPage() {
       </div>
 
       {/* Summary counters */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <div className="bg-primary/10 p-2.5 rounded-full shrink-0">
@@ -369,17 +379,6 @@ export default function StatsPage() {
             <div>
               <p className="text-2xl font-prototype font-bold">{data.entries.length}</p>
               <p className="text-xs text-muted-foreground font-prototype">Scorecards</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="col-span-2 sm:col-span-1">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="bg-yellow-500/10 p-2.5 rounded-full shrink-0">
-              <Star className="w-5 h-5 text-yellow-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-prototype font-bold">{qualifiedCount}</p>
-              <p className="text-xs text-muted-foreground font-prototype">Qualifiés (scorecards)</p>
             </div>
           </CardContent>
         </Card>
