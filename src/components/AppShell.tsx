@@ -1,7 +1,7 @@
 "use client";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3 } from "lucide-react";
+import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3, Timer } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -14,13 +14,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user && pathname !== "/login" && !pathname.startsWith("/t/")) {
+    if (
+      !isLoading &&
+      !user &&
+      pathname !== "/login" &&
+      !pathname.startsWith("/t/") &&
+      pathname !== "/chrono"
+    ) {
       router.push("/login");
     }
   }, [isLoading, user, pathname, router]);
 
-  // Public pages (login, public tournament view /t/...)
-  if (pathname === "/login" || pathname.startsWith("/t/")) {
+  // Public pages (login, public tournament view /t/..., chrono standalone window)
+  if (pathname === "/login" || pathname.startsWith("/t/") || pathname === "/chrono") {
     return <>{children}</>;
   }
 
@@ -109,13 +115,15 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               <span className="font-prototype">Statistiques</span>
             </Link>
           )}
-          <Link
-            href="/tournaments/new"
+          <a
+            href="/chrono"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
           >
-            <PlusCircle className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-prototype">Nouveau tournoi</span>
-          </Link>
+            <Timer className="w-5 h-5 group-hover:text-primary transition-colors" />
+            <span className="font-prototype">Chronomètre</span>
+          </a>
         </nav>
 
         <div className="p-4 border-t border-border/50 space-y-3">
