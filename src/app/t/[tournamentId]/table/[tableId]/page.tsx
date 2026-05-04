@@ -129,7 +129,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     // Ensure all players have a default score object initialized
     useEffect(() => {
         if (activePlayers.length > 0 && Object.keys(scores).length === 0) {
-            const initialScores: Record<string, PlayerScore> = {};
+            const initialScores: Record<string, FormPlayerScore> = {};
             activePlayers.forEach(pId => {
                 initialScores[pId] = { ...DEFAULT_SCORE };
             });
