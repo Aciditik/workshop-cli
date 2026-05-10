@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useRef, KeyboardEvent } from "react";
+import { use, useState, useRef, useEffect, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTournaments } from "@/lib/store";
 import { useAuth, getApiUrl } from "@/lib/auth";
@@ -18,7 +18,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil } from "lucide-react";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +27,28 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const { user } = useAuth();
     const router = useRouter();
     const isAdmin = user?.role === "admin";
+    const { token } = useAuth();
+
+    // Admin tournament edit modal (name, date, logo, owner)
+    const [showTournamentEdit, setShowTournamentEdit] = useState(false);
+    const [editTName, setEditTName] = useState("");
+    const [editTDate, setEditTDate] = useState("");
+    const [editTLogoUrl, setEditTLogoUrl] = useState("");
+    const [editTLogoFileName, setEditTLogoFileName] = useState("");
+    const [editTOwnerId, setEditTOwnerId] = useState("");
+    const [organizers, setOrganizers] = useState<{ id: string; name: string; email: string; city?: string }[]>([]);
+    const [savingTournament, setSavingTournament] = useState(false);
+
+    useEffect(() => {
+        if (!isAdmin || !token) return;
+        fetch(`${getApiUrl()}/api/auth/users`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(res => (res.ok ? res.json() : []))
+            .then(data => setOrganizers(data))
+            .catch(() => { });
+    }, [isAdmin, token]);
+
     const [playerFirstname, setPlayerFirstname] = useState("");
     const [playerName, setPlayerName] = useState("");
     const [playerEmail, setPlayerEmail] = useState("");
@@ -75,6 +97,52 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         });
 
         closeEditParticipant();
+    };
+
+    // Admin: tournament edit modal handlers
+    const openTournamentEdit = () => {
+        if (!tournament) return;
+        setEditTName(tournament.name);
+        setEditTDate(tournament.eventDate || "");
+        setEditTLogoUrl(tournament.logoUrl || "");
+        setEditTLogoFileName("");
+        setEditTOwnerId(tournament.ownerId || "");
+        setShowTournamentEdit(true);
+    };
+
+    const closeTournamentEdit = () => {
+        if (savingTournament) return;
+        setShowTournamentEdit(false);
+    };
+
+    const handleEditLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) { alert("Merci d'uploader une image (PNG, JPG, SVG)"); return; }
+        if (file.size > 800 * 1024) { alert("Fichier trop lourd (max 800 ko)"); return; }
+        setEditTLogoFileName(file.name);
+        const reader = new FileReader();
+        reader.onloadend = () => setEditTLogoUrl(reader.result as string);
+        reader.readAsDataURL(file);
+    };
+
+    const saveTournamentEdit = async () => {
+        if (!tournament) return;
+        const name = editTName.trim();
+        if (!name || !editTDate) return;
+        setSavingTournament(true);
+        try {
+            await updateTournament({
+                ...tournament,
+                name,
+                eventDate: editTDate,
+                logoUrl: editTLogoUrl || undefined,
+                ownerId: editTOwnerId || undefined,
+            } as Tournament);
+            setShowTournamentEdit(false);
+        } finally {
+            setSavingTournament(false);
+        }
     };
 
     // Finale CdF planning modal (shown when tournament completed)
@@ -662,15 +730,29 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         </p>
                     </div>
                 </div>
-                <Button
-                    onClick={refresh}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
-                >
-                    <RotateCcw className="w-4 h-4" />
-                    Refresh
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    {isAdmin && (
+                        <Button
+                            onClick={openTournamentEdit}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
+                            title="Modifier le tournoi (admin)"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Modifier le tournoi
+                        </Button>
+                    )}
+                    <Button
+                        onClick={refresh}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        Refresh
+                    </Button>
+                </div>
             </div>
 
             {/* Qualified Players Banner */}
@@ -958,16 +1040,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                             )}
                                                         </>
                                                     )}
-                                                    {isAdmin && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openEditParticipant(p)}
-                                                            className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                            title="Modifier les infos du joueur (admin)"
-                                                        >
-                                                            <Pencil className="w-4 h-4" />
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openEditParticipant(p)}
+                                                        className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Modifier les infos du joueur"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
                                                     {isAdmin && tournament.status === "en_cours" && (
                                                         <button
                                                             type="button"
@@ -1061,7 +1141,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </div>
                             <div>
                                 <h3 className="text-lg font-prototype">Modifier le joueur</h3>
-                                <p className="text-sm text-muted-foreground font-prototype">Action réservée à l&apos;administration.</p>
+                                <p className="text-sm text-muted-foreground font-prototype">Mettez à jour les informations du joueur.</p>
                             </div>
                         </div>
                         <div className="p-5 space-y-3">
@@ -1107,6 +1187,117 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             >
                                 <Check className="w-4 h-4" />
                                 Enregistrer
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Admin: edit tournament infos (name, date, logo, owner) */}
+            {showTournamentEdit && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                    onClick={closeTournamentEdit}
+                >
+                    <div
+                        className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-border flex items-start gap-3">
+                            <div className="bg-primary/20 p-2 rounded-full shrink-0">
+                                <Settings className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-prototype">Modifier le tournoi</h3>
+                                <p className="text-sm text-muted-foreground font-prototype">
+                                    Action réservée à l&apos;administration. Modifiable à tout moment, même en cours de tournoi.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-5 space-y-4 overflow-y-auto">
+                            <div className="space-y-2">
+                                <label className="text-sm font-prototype">Nom du tournoi *</label>
+                                <input
+                                    type="text"
+                                    value={editTName}
+                                    onChange={(e) => setEditTName(e.target.value)}
+                                    placeholder="Nom du tournoi"
+                                    className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-prototype">Date de l&apos;événement *</label>
+                                <input
+                                    type="date"
+                                    value={editTDate}
+                                    onChange={(e) => setEditTDate(e.target.value)}
+                                    className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-prototype">Organisateur</label>
+                                <select
+                                    value={editTOwnerId}
+                                    onChange={(e) => setEditTOwnerId(e.target.value)}
+                                    className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    <option value="">Admin (moi-même)</option>
+                                    {organizers.map(o => (
+                                        <option key={o.id} value={o.id}>
+                                            {o.city ? `${o.name} (${o.city})` : o.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs font-prototype text-muted-foreground">
+                                    Réassigner le tournoi à un organisateur ou le reprendre. L&apos;ancien organisateur perdra l&apos;accès.
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-prototype">Logo du tournoi</label>
+                                <div className="relative">
+                                    <input
+                                        id="editLogoUpload"
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                                        onChange={handleEditLogoUpload}
+                                        className="hidden"
+                                    />
+                                    <label
+                                        htmlFor="editLogoUpload"
+                                        className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/20"
+                                    >
+                                        <Upload className="w-6 h-6 text-primary mb-1" />
+                                        <span className="text-sm font-prototype text-foreground">
+                                            {editTLogoFileName || "Téléchargez un nouveau logo"}
+                                        </span>
+                                        <span className="text-xs font-prototype text-muted-foreground mt-0.5">PNG, SVG • max 800 ko</span>
+                                    </label>
+                                    {editTLogoUrl && (
+                                        <div className="mt-3 flex items-center justify-center gap-3">
+                                            <img src={editTLogoUrl} alt="Logo preview" className="max-h-16 max-w-32 object-contain" />
+                                            <button
+                                                type="button"
+                                                onClick={() => { setEditTLogoUrl(""); setEditTLogoFileName(""); }}
+                                                className="text-xs font-prototype text-destructive hover:underline"
+                                            >
+                                                Retirer le logo
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-5 border-t border-border flex flex-col-reverse sm:flex-row gap-3">
+                            <Button variant="outline" className="w-full font-prototype" onClick={closeTournamentEdit} disabled={savingTournament}>
+                                Annuler
+                            </Button>
+                            <Button
+                                className="w-full gap-2 font-prototype"
+                                onClick={saveTournamentEdit}
+                                disabled={!editTName.trim() || !editTDate || savingTournament}
+                            >
+                                <Check className="w-4 h-4" />
+                                {savingTournament ? "Enregistrement..." : "Enregistrer"}
                             </Button>
                         </div>
                     </div>
