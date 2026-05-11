@@ -7,10 +7,20 @@ import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { Trophy, Calendar, Users, ChevronRight, Trash2 } from "lucide-react";
 
+const isFinaleTournament = (name: string) => /finale/i.test(name);
+
 export default function Dashboard() {
   const { tournaments, isLoaded, deleteTournament } = useTournaments();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+
+  // Finale tournaments always pinned first; the rest sorted by event date (newest first).
+  const sortedTournaments = [...tournaments].sort((a, b) => {
+    const aFinale = isFinaleTournament(a.name);
+    const bFinale = isFinaleTournament(b.name);
+    if (aFinale !== bFinale) return aFinale ? -1 : 1;
+    return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime();
+  });
 
   if (!isLoaded) {
     return (
@@ -55,9 +65,11 @@ export default function Dashboard() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tournaments.map((tournament) => (
+          {sortedTournaments.map((tournament) => {
+            const isFinale = isFinaleTournament(tournament.name);
+            return (
             <Link key={tournament.id} href={`/tournaments/${tournament.id}`}>
-              <Card className="hover:border-primary/50 transition-colors group cursor-pointer h-full flex flex-col relative">
+              <Card className={`hover:border-primary/50 transition-colors group cursor-pointer h-full flex flex-col relative ${isFinale ? "bg-zinc-950 border-yellow-500/40 hover:border-yellow-500/70 shadow-lg shadow-yellow-500/10" : ""}`}>
                 {isAdmin && (
                   <Button
                     variant="ghost"
@@ -117,7 +129,8 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

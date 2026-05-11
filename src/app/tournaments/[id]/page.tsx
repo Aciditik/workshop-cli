@@ -621,6 +621,33 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const qualifiedIds = new Set(tournament.qualifiedIds || []);
 
+    // Finale-only: map each finalist (by email) to the source qualifier tournament
+    // they were qualified from, so we can display that tournament's logo next to
+    // their name in the player lists.
+    const isFinaleTournament = /finale/i.test(tournament.name);
+    const qualifierTournamentByEmail = new Map<string, Tournament>();
+    if (isFinaleTournament) {
+        const others = tournaments.filter(t => t.id !== tournament.id && !/finale/i.test(t.name));
+        for (const t of others) {
+            const qSet = new Set(t.qualifiedIds || []);
+            for (const p of t.participants) {
+                if (!qSet.has(p.id)) continue;
+                const email = (p.email || "").trim().toLowerCase();
+                if (!email) continue;
+                const existing = qualifierTournamentByEmail.get(email);
+                if (!existing || new Date(t.eventDate).getTime() > new Date(existing.eventDate).getTime()) {
+                    qualifierTournamentByEmail.set(email, t);
+                }
+            }
+        }
+    }
+    const getQualifierTournament = (p: Participant): Tournament | null => {
+        if (!isFinaleTournament) return null;
+        const email = (p.email || "").trim().toLowerCase();
+        if (!email) return null;
+        return qualifierTournamentByEmail.get(email) ?? null;
+    };
+
     // Calculate total placement points for each participant (5,3,2,1 system)
     const calculateTotalPoints = (participantId: string): number => {
         let total = 0;
@@ -851,12 +878,23 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         {/* Player list with delete buttons */}
                         {tournament.participants.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {tournament.participants.map((p, index) => (
+                                {tournament.participants.map((p, index) => {
+                                    const qualifierT = getQualifierTournament(p);
+                                    return (
                                     <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-md border bg-card/50 text-sm group">
                                         <div className="flex items-center gap-2">
                                             <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-prototype text-muted-foreground shrink-0">
                                                 {index + 1}
                                             </span>
+                                            {qualifierT?.logoUrl && (
+                                                <img
+                                                    src={qualifierT.logoUrl}
+                                                    alt={qualifierT.name}
+                                                    title={`Qualifié via ${qualifierT.name}`}
+                                                    className="w-6 h-6 object-contain shrink-0"
+                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                />
+                                            )}
                                             <span className="font-prototype">{p.firstname} {p.name}</span>
                                         </div>
                                         <div className="flex items-center gap-1">
@@ -880,7 +918,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             </button>
                                         </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
 
@@ -1006,6 +1045,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
                                         const ntScore = calculateNTScore(p.id);
                                         const tableDiff = calculateTableDifference(p.id);
+                                        const qualifierT = getQualifierTournament(p);
                                         return (
                                             <div key={p.id} className={`p-4 flex items-center justify-between gap-3 hover:bg-accent/30 transition-colors group ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1015,6 +1055,15 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         }`}>
                                                         {index + 1}
                                                     </span>
+                                                    {qualifierT?.logoUrl && (
+                                                        <img
+                                                            src={qualifierT.logoUrl}
+                                                            alt={qualifierT.name}
+                                                            title={`Qualifié via ${qualifierT.name}`}
+                                                            className="w-7 h-7 object-contain shrink-0"
+                                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                        />
+                                                    )}
                                                     <span className="font-prototype">{p.firstname} {p.name}</span>
                                                     {qualifiedIds.has(p.id) && (
                                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
