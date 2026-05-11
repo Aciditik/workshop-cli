@@ -167,9 +167,11 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
             ...prev,
             [playerId]: {
                 ...prev[playerId],
-                [category]: typeof value === 'string'
-                    ? (value === '' ? null : Math.max(0, parseInt(value) || 0))
-                    : value
+                [category]: category === 'corporation'
+                    ? (value as string)
+                    : typeof value === 'string'
+                        ? (value === '' ? null : Math.max(0, parseInt(value) || 0))
+                        : value
             }
         }));
     };
