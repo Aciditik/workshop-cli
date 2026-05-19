@@ -152,6 +152,22 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const tournament = isLoaded ? getTournament(id) : null;
 
+    // Auto-refresh while the tournament is in progress so newly-submitted
+    // scorecards from other devices show up without a manual reload.
+    const tournamentStatus = tournament?.status;
+    const refreshRef = useRef(refresh);
+    refreshRef.current = refresh;
+    useEffect(() => {
+        if (tournamentStatus !== "en_cours") return;
+        const interval = setInterval(() => { refreshRef.current(); }, 10000);
+        const onFocus = () => { refreshRef.current(); };
+        window.addEventListener("focus", onFocus);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener("focus", onFocus);
+        };
+    }, [tournamentStatus]);
+
     if (!isLoaded) return <div className="p-8 animate-pulse font-prototype text-muted-foreground">Loading...</div>;
     if (!tournament) return <div className="p-8 font-prototype text-destructive">Tournament not found.</div>;
 
@@ -770,15 +786,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             Modifier le tournoi
                         </Button>
                     )}
-                    <Button
-                        onClick={refresh}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
-                    >
-                        <RotateCcw className="w-4 h-4" />
-                        Refresh
-                    </Button>
                 </div>
             </div>
 
