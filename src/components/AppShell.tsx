@@ -125,6 +125,9 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <Timer className="w-5 h-5 group-hover:text-primary transition-colors" />
             <span className="font-prototype">Chronomètre</span>
           </a>
+        </nav>
+
+        <div className="p-4 space-y-3">
           <button
             type="button"
             onClick={() => setHelpOpen(true)}
@@ -133,10 +136,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <HelpCircle className="w-5 h-5 group-hover:text-primary transition-colors" />
             <span className="font-prototype">Aide</span>
           </button>
-        </nav>
-
-        <div className="p-4 border-t border-border/50 space-y-3">
-          <div className="flex items-center gap-3 px-2">
+          <div className="flex items-center gap-3 px-2 pt-3 border-t border-border/50">
             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-prototype shrink-0">
               {user?.name?.charAt(0).toUpperCase()}
             </div>
