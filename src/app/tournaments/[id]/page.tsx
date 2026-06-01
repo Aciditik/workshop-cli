@@ -720,25 +720,22 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         return matchesCounted > 0 ? totalDifference : 0;
     };
 
-    // Sort participants: first by placement points, then by NT scores, then by table difference
+    // Sort participants:
+    //   1) Placement points (5/3/2/1 with +1 boost) — descending
+    //   2) Table difference vs. table winner — ascending (smaller is better)
+    //   3) Total NT points won across the tournament — descending
     const sortedParticipants = [...tournament.participants].sort((a, b) => {
         const pointsA = calculateTotalPoints(a.id);
         const pointsB = calculateTotalPoints(b.id);
-        const ntA = calculateNTScore(a.id);
-        const ntB = calculateNTScore(b.id);
+        if (pointsB !== pointsA) return pointsB - pointsA;
+
         const diffA = calculateTableDifference(a.id);
         const diffB = calculateTableDifference(b.id);
-        
-        // First sort by placement points (descending)
-        if (pointsB !== pointsA) {
-            return pointsB - pointsA;
-        }
-        // Then sort by NT scores (descending)
-        if (ntB !== ntA) {
-            return ntB - ntA;
-        }
-        // Finally sort by table difference (ascending - smaller difference is better)
-        return diffA - diffB;
+        if (diffA !== diffB) return diffA - diffB;
+
+        const ntA = calculateNTScore(a.id);
+        const ntB = calculateNTScore(b.id);
+        return ntB - ntA;
     });
 
     return (
