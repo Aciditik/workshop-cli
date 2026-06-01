@@ -49,10 +49,40 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             .catch(() => { });
     }, [isAdmin, token]);
 
+    // Check-in state for brouillon tournaments (persisted in localStorage).
+    // Lets the organizer click each player to mark them as present.
+    const [checkedInIds, setCheckedInIds] = useState<Set<string>>(new Set());
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(`checkedIn:${id}`);
+            if (raw) setCheckedInIds(new Set(JSON.parse(raw)));
+        } catch { /* ignore */ }
+    }, [id]);
+    const toggleCheckIn = (participantId: string) => {
+        setCheckedInIds(prev => {
+            const next = new Set(prev);
+            if (next.has(participantId)) next.delete(participantId);
+            else next.add(participantId);
+            try { localStorage.setItem(`checkedIn:${id}`, JSON.stringify([...next])); } catch { /* ignore */ }
+            return next;
+        });
+    };
+
     const [playerFirstname, setPlayerFirstname] = useState("");
     const [playerName, setPlayerName] = useState("");
     const [playerEmail, setPlayerEmail] = useState("");
     const [playerPhone, setPlayerPhone] = useState("");
+    // Finale only: when manually adding a player, organizer can pick the
+    // qualifier tournament they came from. The mapping participantId -> sourceTournamentId
+    // is persisted in localStorage so we can show that tournament's logo next to the player.
+    const [sourceTournamentId, setSourceTournamentId] = useState("");
+    const [finaleSourceMap, setFinaleSourceMap] = useState<Record<string, string>>({});
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(`finaleSource:${id}`);
+            if (raw) setFinaleSourceMap(JSON.parse(raw));
+        } catch { /* ignore */ }
+    }, [id]);
     const playerInputRef = useRef<HTMLInputElement>(null);
 
     // Admin mid-tournament player removal confirmation
@@ -345,10 +375,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             size: tournament.participants.length + 1,
         });
 
+        // Finale-only: persist the qualifier-tournament choice so we can show its logo.
+        if (/finale/i.test(tournament.name) && sourceTournamentId) {
+            const next = { ...finaleSourceMap, [newParticipant.id]: sourceTournamentId };
+            setFinaleSourceMap(next);
+            try { localStorage.setItem(`finaleSource:${id}`, JSON.stringify(next)); } catch { /* ignore */ }
+        }
+
         setPlayerFirstname("");
         setPlayerName("");
         setPlayerEmail("");
         setPlayerPhone("");
+        setSourceTournamentId("");
         playerInputRef.current?.focus();
     };
 
@@ -659,6 +697,13 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     }
     const getQualifierTournament = (p: Participant): Tournament | null => {
         if (!isFinaleTournament) return null;
+        // 1) Explicit per-participant mapping (set when adding a player manually in Finale).
+        const mappedId = finaleSourceMap[p.id];
+        if (mappedId) {
+            const mapped = tournaments.find(t => t.id === mappedId);
+            if (mapped) return mapped;
+        }
+        // 2) Fallback: deduce from the qualifiedIds of other tournaments using the email.
         const email = (p.email || "").trim().toLowerCase();
         if (!email) return null;
         return qualifierTournamentByEmail.get(email) ?? null;
@@ -873,58 +918,104 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                             </div>
+                            {isFinaleTournament && (
+                                <div className="space-y-1">
+                                    <label className="text-xs font-prototype text-muted-foreground">
+                                        Tournoi qualificatif (optionnel)
+                                    </label>
+                                    <select
+                                        value={sourceTournamentId}
+                                        onChange={(e) => setSourceTournamentId(e.target.value)}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    >
+                                        <option value="">— Aucun —</option>
+                                        {[...tournaments]
+                                            .filter(t => t.id !== tournament.id && !/finale/i.test(t.name))
+                                            .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
+                                            .map(t => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.name} — {new Date(t.eventDate).toLocaleDateString()}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                            )}
                             <Button onClick={addPlayer} className="gap-2 w-full md:w-auto font-prototype">
                                 <Plus className="w-4 h-4" />
                                 Ajouter le joueur
                             </Button>
                         </div>
 
-                        {/* Player list with delete buttons */}
+                        {/* Player list with check-in toggle */}
                         {tournament.participants.length > 0 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {tournament.participants.map((p, index) => {
-                                    const qualifierT = getQualifierTournament(p);
-                                    return (
-                                    <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-md border bg-card/50 text-sm group">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-prototype text-muted-foreground shrink-0">
-                                                {index + 1}
-                                            </span>
-                                            {qualifierT?.logoUrl && (
-                                                <img
-                                                    src={qualifierT.logoUrl}
-                                                    alt={qualifierT.name}
-                                                    title={`Qualifié via ${qualifierT.name}`}
-                                                    className="w-6 h-6 object-contain shrink-0"
-                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                />
-                                            )}
-                                            <span className="font-prototype">{p.firstname} {p.name}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            {isAdmin && (
+                            <>
+                                <div className="flex items-center justify-between text-sm font-prototype text-muted-foreground">
+                                    <span>
+                                        Cliquez sur un joueur pour le marquer présent.
+                                    </span>
+                                    <span className="tabular-nums">
+                                        <span className="text-green-500 font-bold">{checkedInIds.size}</span>
+                                        <span> / {tournament.participants.length} présents</span>
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {tournament.participants.map((p, index) => {
+                                        const qualifierT = getQualifierTournament(p);
+                                        const isCheckedIn = checkedInIds.has(p.id);
+                                        return (
+                                        <div
+                                            key={p.id}
+                                            onClick={() => toggleCheckIn(p.id)}
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCheckIn(p.id); } }}
+                                            title={isCheckedIn ? "Cliquez pour marquer absent" : "Cliquez pour marquer présent"}
+                                            className={`flex items-center justify-between px-3 py-2 rounded-md border text-sm group cursor-pointer transition-colors select-none ${isCheckedIn
+                                                ? "bg-green-500/10 border-green-500/40 hover:bg-green-500/15"
+                                                : "bg-card/50 hover:bg-accent/40"
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-prototype shrink-0 ${isCheckedIn ? "bg-green-500 text-black" : "bg-muted text-muted-foreground"
+                                                    }`}>
+                                                    {isCheckedIn ? <Check className="w-3 h-3" /> : index + 1}
+                                                </span>
+                                                {qualifierT?.logoUrl && (
+                                                    <img
+                                                        src={qualifierT.logoUrl}
+                                                        alt={qualifierT.name}
+                                                        title={`Qualifié via ${qualifierT.name}`}
+                                                        className="w-6 h-6 object-contain shrink-0"
+                                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                    />
+                                                )}
+                                                <span className={`font-prototype truncate ${isCheckedIn ? "" : "text-muted-foreground"}`}>{p.firstname} {p.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                {isAdmin && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); openEditParticipant(p); }}
+                                                        className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Modifier les infos du joueur (admin)"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 <button
                                                     type="button"
-                                                    onClick={() => openEditParticipant(p)}
-                                                    className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                    title="Modifier les infos du joueur (admin)"
+                                                    onClick={(e) => { e.stopPropagation(); removePlayer(p.id); }}
+                                                    className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                    title="Supprimer"
                                                 >
-                                                    <Pencil className="w-4 h-4" />
+                                                    <X className="w-4 h-4" />
                                                 </button>
-                                            )}
-                                            <button
-                                                type="button"
-                                                onClick={() => removePlayer(p.id)}
-                                                className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                title="Supprimer"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    );
-                                })}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
                         )}
 
                         {tournament.participants.length === 0 && (
