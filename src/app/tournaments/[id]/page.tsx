@@ -966,31 +966,25 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     const ntScore = calculateNTScore(p.id);
                                     const tableDiff = calculateTableDifference(p.id);
                                     return (
-                                        <div key={p.id} className={`p-4 flex items-center justify-between gap-3 hover:bg-accent/30 transition-colors ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
-                                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${index === 0 ? "bg-yellow-500" :
-                                                    index === 1 ? "bg-slate-300" :
-                                                        index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
-                                                    }`}>
-                                                    {index + 1}
-                                                </span>
+                                        <div key={p.id} className={`px-4 py-3 grid grid-cols-[1.5rem_1fr_5rem_6rem] items-center gap-3 hover:bg-accent/30 transition-colors ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
+                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? "bg-yellow-500" :
+                                                index === 1 ? "bg-slate-300" :
+                                                    index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
+                                                }`}>
+                                                {index + 1}
+                                            </span>
+                                            <div className="flex items-center gap-2 min-w-0">
                                                 <span className="font-prototype truncate" title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
                                                 {qualifiedIds.has(p.id) && (
                                                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                {tableDiff > 0 && (
-                                                    <span className="text-sm font-prototype text-orange-600 whitespace-nowrap">
-                                                        Diff {tableDiff}
-                                                    </span>
-                                                )}
-                                                {ntScore > 0 && (
-                                                    <span className="text-sm font-prototype text-blue-600 whitespace-nowrap">
-                                                        {ntScore} NT
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <span className="text-sm font-prototype text-orange-600 text-right tabular-nums">
+                                                {tableDiff > 0 ? `Diff ${tableDiff}` : ""}
+                                            </span>
+                                            <span className="text-sm font-prototype text-blue-600 text-right tabular-nums">
+                                                {ntScore > 0 ? `${ntScore} NT` : ""}
+                                            </span>
                                         </div>
                                     );
                                 })}
@@ -1050,9 +1044,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         const ntScore = calculateNTScore(p.id);
                                         const tableDiff = calculateTableDifference(p.id);
                                         const qualifierT = getQualifierTournament(p);
+                                        const showStats = tournament.status !== "brouillon" && format === "swiss";
                                         return (
-                                            <div key={p.id} className={`p-4 flex items-center justify-between gap-3 hover:bg-accent/30 transition-colors group ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
-                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div
+                                                key={p.id}
+                                                className={`px-3 py-3 flex flex-col gap-2 hover:bg-accent/30 transition-colors group ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
+                                            >
+                                                {/* Row 1: rank + name + actions */}
+                                                <div className="flex items-center gap-2">
                                                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${index === 0 ? "bg-yellow-500" :
                                                         index === 1 ? "bg-slate-300" :
                                                             index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
@@ -1068,50 +1067,45 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                                         />
                                                     )}
-                                                    <span className="font-prototype">{p.firstname} {p.name}</span>
+                                                    <span className="font-prototype flex-1 min-w-0 break-words" title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
                                                     {qualifiedIds.has(p.id) && (
                                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
                                                     )}
-                                                </div>
-                                                <div className="flex items-center gap-3 shrink-0">
-                                                    {tournament.status !== "brouillon" && format === "swiss" && (
-                                                        <>
-                                                            {tableDiff > 0 && (
-                                                                <span className="text-sm font-prototype text-orange-600 whitespace-nowrap">
-                                                                    Diff {tableDiff}
-                                                                </span>
-                                                            )}
-                                                            {ntScore > 0 && (
-                                                                <span className="text-sm font-prototype text-blue-600 whitespace-nowrap">
-                                                                    {ntScore} NT
-                                                                </span>
-                                                            )}
-                                                            {totalPoints !== null && (
-                                                                <span className="text-sm font-prototype text-muted-foreground whitespace-nowrap">
-                                                                    {totalPoints} pts
-                                                                </span>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openEditParticipant(p)}
-                                                        className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="Modifier les infos du joueur"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </button>
-                                                    {isAdmin && tournament.status === "en_cours" && (
+                                                    <div className="flex items-center gap-1 shrink-0">
                                                         <button
                                                             type="button"
-                                                            onClick={() => setRemoveConfirm(p)}
-                                                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                            title="Retirer ce joueur du tournoi (admin)"
+                                                            onClick={() => openEditParticipant(p)}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Modifier les infos du joueur"
                                                         >
-                                                            <X className="w-4 h-4" />
+                                                            <Pencil className="w-4 h-4" />
                                                         </button>
-                                                    )}
+                                                        {isAdmin && tournament.status === "en_cours" && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setRemoveConfirm(p)}
+                                                                className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                                title="Retirer ce joueur du tournoi (admin)"
+                                                            >
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
+                                                {/* Row 2: stats aligned in fixed columns */}
+                                                {showStats && (
+                                                    <div className="pl-8 grid grid-cols-3 gap-2 text-sm font-prototype tabular-nums">
+                                                        <span className="text-orange-600 text-right">
+                                                            {tableDiff > 0 ? `Diff ${tableDiff}` : ""}
+                                                        </span>
+                                                        <span className="text-blue-600 text-right">
+                                                            {ntScore > 0 ? `${ntScore} NT` : ""}
+                                                        </span>
+                                                        <span className="text-muted-foreground text-right">
+                                                            {totalPoints !== null ? `${totalPoints} pts` : ""}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
