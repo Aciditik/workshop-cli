@@ -1,7 +1,7 @@
 "use client";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3, Timer } from "lucide-react";
+import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3, Timer, HelpCircle, Phone } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -52,6 +52,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const isAdmin = user?.role === "admin";
 
   // Close sidebar on route change (mobile)
@@ -124,6 +125,14 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <Timer className="w-5 h-5 group-hover:text-primary transition-colors" />
             <span className="font-prototype">Chronomètre</span>
           </a>
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group text-left"
+          >
+            <HelpCircle className="w-5 h-5 group-hover:text-primary transition-colors" />
+            <span className="font-prototype">Aide</span>
+          </button>
         </nav>
 
         <div className="p-4 border-t border-border/50 space-y-3">
@@ -181,6 +190,55 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 
         <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8 relative">{children}</div>
       </main>
+
+      {/* Help / contact modal */}
+      {helpOpen && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setHelpOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setHelpOpen(false)}
+              className="absolute top-3 right-3 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Fermer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                <HelpCircle className="w-6 h-6 text-primary" />
+              </div>
+              <h2 className="text-xl font-prototype">Besoin d&apos;aide&nbsp;?</h2>
+            </div>
+
+            <div className="space-y-3 text-sm font-prototype leading-relaxed">
+              <p>
+                Cette application a été développée par&nbsp;
+                <span className="font-bold text-foreground">Mathieu DUQUAIRE</span>.
+              </p>
+              <p className="text-muted-foreground">
+                Si vous rencontrez un problème ou avez besoin d&apos;assistance pendant un tournoi,
+                n&apos;hésitez pas à m&apos;appeler directement&nbsp;:
+              </p>
+              <a
+                href="tel:+33619101579"
+                className="flex items-center gap-3 px-4 py-3 rounded-md border border-primary/30 bg-primary/10 hover:bg-primary/15 transition-colors text-foreground"
+              >
+                <Phone className="w-5 h-5 text-primary" />
+                <span className="font-bold tabular-nums">06 19 10 15 79</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
