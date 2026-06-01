@@ -1048,64 +1048,63 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         return (
                                             <div
                                                 key={p.id}
-                                                className={`px-3 py-3 flex flex-col gap-2 hover:bg-accent/30 transition-colors group ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
+                                                className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
                                             >
-                                                {/* Row 1: rank + name + actions */}
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${index === 0 ? "bg-yellow-500" :
-                                                        index === 1 ? "bg-slate-300" :
-                                                            index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
-                                                        }`}>
-                                                        {index + 1}
-                                                    </span>
-                                                    {qualifierT?.logoUrl && (
-                                                        <img
-                                                            src={qualifierT.logoUrl}
-                                                            alt={qualifierT.name}
-                                                            title={`Qualifié via ${qualifierT.name}`}
-                                                            className="w-7 h-7 object-contain shrink-0"
-                                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                        />
-                                                    )}
-                                                    <span className="font-prototype flex-1 min-w-0 break-words" title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
-                                                    {qualifiedIds.has(p.id) && (
-                                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
-                                                    )}
-                                                    <div className="flex items-center gap-1 shrink-0">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openEditParticipant(p)}
-                                                            className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                            title="Modifier les infos du joueur"
-                                                        >
-                                                            <Pencil className="w-4 h-4" />
-                                                        </button>
-                                                        {isAdmin && tournament.status === "en_cours" && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setRemoveConfirm(p)}
-                                                                className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                                title="Retirer ce joueur du tournoi (admin)"
-                                                            >
-                                                                <X className="w-4 h-4" />
-                                                            </button>
+                                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${index === 0 ? "bg-yellow-500 text-black" :
+                                                    index === 1 ? "bg-slate-300 text-black" :
+                                                        index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"
+                                                    }`}>
+                                                    {index + 1}
+                                                </span>
+                                                {qualifierT?.logoUrl && (
+                                                    <img
+                                                        src={qualifierT.logoUrl}
+                                                        alt={qualifierT.name}
+                                                        title={`Qualifié via ${qualifierT.name}`}
+                                                        className="w-7 h-7 object-contain shrink-0"
+                                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                    />
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-prototype truncate" title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
+                                                        {qualifiedIds.has(p.id) && (
+                                                            <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 shrink-0" />
                                                         )}
                                                     </div>
+                                                    {showStats && (
+                                                        <div className="text-xs font-prototype tabular-nums mt-0.5 flex items-center gap-2">
+                                                            <span className="text-orange-600">Diff {tableDiff}</span>
+                                                            <span className="text-muted-foreground">·</span>
+                                                            <span className="text-blue-600">{ntScore} NT</span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                {/* Row 2: stats aligned in fixed columns */}
-                                                {showStats && (
-                                                    <div className="pl-8 grid grid-cols-3 gap-2 text-sm font-prototype tabular-nums">
-                                                        <span className="text-orange-600 text-right">
-                                                            {tableDiff > 0 ? `Diff ${tableDiff}` : ""}
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    {showStats && totalPoints !== null && (
+                                                        <span className="font-prototype text-base text-primary tabular-nums px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                                                            {totalPoints}<span className="text-xs text-muted-foreground ml-0.5">pts</span>
                                                         </span>
-                                                        <span className="text-blue-600 text-right">
-                                                            {ntScore > 0 ? `${ntScore} NT` : ""}
-                                                        </span>
-                                                        <span className="text-muted-foreground text-right">
-                                                            {totalPoints !== null ? `${totalPoints} pts` : ""}
-                                                        </span>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openEditParticipant(p)}
+                                                        className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Modifier les infos du joueur"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                    {isAdmin && tournament.status === "en_cours" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setRemoveConfirm(p)}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Retirer ce joueur du tournoi (admin)"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })}
