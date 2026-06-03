@@ -18,7 +18,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload } from "lucide-react";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
@@ -85,8 +85,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     }, [id]);
     const playerInputRef = useRef<HTMLInputElement>(null);
 
-    // Admin mid-tournament player removal confirmation
-    const [removeConfirm, setRemoveConfirm] = useState<Participant | null>(null);
+    // Admin mid-tournament DNF confirmation
+    const [dnfConfirm, setDnfConfirm] = useState<Participant | null>(null);
 
     // Admin edit-participant modal (available at any tournament stage)
     const [editParticipant, setEditParticipant] = useState<Participant | null>(null);
@@ -221,15 +221,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
         let newMatches;
 
+        // Only active (non-DNF) players are seated in new rounds.
+        const activePlayers = tournament.participants.filter(p => !p.dnf);
+
         if (format === "elimination" && nextRound === 2) {
             // Elimination Round 2: crossed finalist tables
             const round1Matches = tournament.matches.filter(m => m.round === 1);
             console.log("Generating elimination Round 2 with", round1Matches.length, "Round 1 matches");
-            newMatches = generateEliminationRound2(tournament.id, playerCount, round1Matches);
+            newMatches = generateEliminationRound2(tournament.id, activePlayers.length, round1Matches);
         } else {
             // Swiss rounds 2-3: sorted by score
-            console.log("Generating Swiss round", nextRound, "with", tournament.participants.length, "participants");
-            newMatches = generateSwissRound(tournament.id, tournament.participants, currentRound);
+            console.log("Generating Swiss round", nextRound, "with", activePlayers.length, "active participants");
+            newMatches = generateSwissRound(tournament.id, activePlayers, currentRound);
         }
 
         console.log("Generated", newMatches.length, "new matches");
@@ -346,6 +349,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     };
 
     const playerCount = tournament.participants.length;
+    const activeCount = tournament.participants.filter(p => !p.dnf).length;
+    const dnfCount = playerCount - activeCount;
     const canGenerateNextRound = () => {
         if (currentRound >= maxRounds) return false;
         const roundMatches = tournament.matches.filter(m => m.round === currentRound);
@@ -391,44 +396,43 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     };
 
     const removePlayer = (participantId: string) => {
-        // Draft: always allowed. In-progress: admin only. Completed: never (results are frozen).
-        if (tournament.status === "fini") return;
-        if (tournament.status === "en_cours" && !isAdmin) return;
+        // Draft only: simple removal.
+        if (tournament.status !== "brouillon") return;
 
         const newParticipants = tournament.participants.filter(p => p.id !== participantId);
-        const newSize = newParticipants.length;
+        updateTournament({
+            ...tournament,
+            participants: newParticipants,
+            size: newParticipants.length,
+        });
+    };
 
-        // Draft: simple removal.
-        if (tournament.status === "brouillon") {
-            updateTournament({
-                ...tournament,
-                participants: newParticipants,
-                size: newSize,
-            });
+    // Admin-only DNF: mark a player as dropped mid-tournament.
+    // Their completed match stats are preserved; they are removed from
+    // uncompleted matches only. Total inscrit count stays the same; format
+    // is recalculated from the number of active (non-DNF) players.
+    const markDnf = (participantId: string) => {
+        if (tournament.status !== "en_cours" || !isAdmin) return;
+
+        const activeAfter = tournament.participants.filter(p => !p.dnf && p.id !== participantId);
+        if (activeAfter.length < 8) {
+            alert("Impossible: le tournoi doit conserver au minimum 8 joueurs actifs.");
             return;
         }
 
-        // Mid-tournament (admin): block if it would go below the minimum playable size.
-        if (newSize < 8) {
-            alert("Impossible: un tournoi doit conserver au minimum 8 joueurs.");
-            return;
-        }
+        // Mark player as DNF, keep in participants list.
+        const updatedParticipants = tournament.participants.map(p =>
+            p.id === participantId ? { ...p, dnf: true } : p
+        );
 
-        // Recompute format metadata based on the new size.
-        // maxRounds is never lowered below the current round to avoid invalidating
-        // rounds already generated / en cours.
-        const newFormat = getFormat(newSize);
-        const newMaxRounds = Math.max(getMaxRounds(newSize), currentRound);
-        const newQualifiedCount = getQualifiedCount(newSize);
+        const newActiveCount = activeAfter.length;
+        const newFormat = getFormat(newActiveCount);
+        const newMaxRounds = Math.max(getMaxRounds(newActiveCount), currentRound);
+        const newQualifiedCount = getQualifiedCount(newActiveCount);
 
-        // Step 1 — clean the removed player out of every match.
-        // Completed matches: keep them (historical record), but strip the removed
-        // player from participantIds/results/scorecards so the UI no longer shows
-        // them and their points don't influence future ranking computations.
-        // Uncompleted matches: same treatment — they'll either be regenerated
-        // below (for future rounds) or simply show a freed slot.
-        let updatedMatches = tournament.matches.map(m => {
-            if (!m.participantIds.includes(participantId)) return m;
+        // Remove player only from *uncompleted* matches (completed round data stays intact).
+        const updatedMatches = tournament.matches.map(m => {
+            if (!m.participantIds.includes(participantId) || m.isCompleted) return m;
             return {
                 ...m,
                 participantIds: m.participantIds.map(pid => pid === participantId ? null : pid),
@@ -443,75 +447,82 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             };
         });
 
-        // Step 2 — regenerate any *uncompleted* future round that contained the
-        // removed player, so that slots cascade correctly instead of leaving
-        // "Place vide" and an oversized consolation table (matches the canonical
-        // tournament config for the new player count).
-        const impactedRounds = Array.from(new Set(
-            tournament.matches
-                .filter(m => m.round > 1 && m.participantIds.includes(participantId))
-                .map(m => m.round)
-        )).sort((a, b) => a - b);
-
-        for (const round of impactedRounds) {
-            const roundMatches = updatedMatches.filter(m => m.round === round);
-            // Only regenerate if the whole round is still uncompleted. If any
-            // table is already validated we keep history and leave a null slot.
-            if (roundMatches.some(m => m.isCompleted)) continue;
-
-            // Drop this round's matches, then regenerate.
-            updatedMatches = updatedMatches.filter(m => m.round !== round);
-
-            if (newFormat === "elimination" && round === 2) {
-                // Regenerate finalist + consolation tables from the Round 1
-                // completed matches, pretending the removed player was never there.
-                const round1ForRanking = updatedMatches
-                    .filter(m => m.round === 1)
-                    .map(m => ({
-                        ...m,
-                        // participantIds already had the removed player nulled out in step 1
-                        // results already stripped of their entry in step 1
-                    }));
-                const regenerated = generateEliminationRound2(tournament.id, newSize, round1ForRanking);
-                updatedMatches = [...updatedMatches, ...regenerated];
-            } else {
-                // Swiss: regenerate the next round from participants' accumulated
-                // scores (computed from all *remaining* completed matches).
-                const scoredParticipants = newParticipants.map(p => {
-                    let total = 0;
-                    updatedMatches.forEach(m => {
-                        if (m.isCompleted && m.results[p.id]) {
-                            total += m.results[p.id];
-                        }
-                    });
-                    return { ...p, score: total };
-                });
-                const regenerated = generateSwissRound(tournament.id, scoredParticipants, round - 1);
-                updatedMatches = [...updatedMatches, ...regenerated];
-            }
-        }
-
-        // Step 3 — recompute scores for surviving participants (historical
-        // completed matches may have had the removed player's slot stripped).
-        const rescored = newParticipants.map(p => {
-            let total = 0;
-            updatedMatches.forEach(m => {
-                if (m.isCompleted && m.results[p.id]) {
-                    total += m.results[p.id];
-                }
-            });
-            return { ...p, score: total };
-        });
-
         updateTournament({
             ...tournament,
-            participants: rescored,
-            size: newSize,
+            participants: updatedParticipants,
             format: newFormat,
             maxRounds: newMaxRounds,
             qualifiedCount: newQualifiedCount,
             matches: updatedMatches,
         });
+    };
+
+    // Drag & drop: swap two players between tables of the current round.
+    // Allowed only while the round is not completed (per-match guarded in SwissRounds).
+    // Any submitted scorecard/result for the dragged player follows them to the new table.
+    const handleSwapPlayers = (
+        fromMatchId: string,
+        fromPid: string,
+        toMatchId: string,
+        toPid: string | null,
+    ) => {
+        if (tournament.status !== "en_cours") return;
+        if (fromMatchId === toMatchId && fromPid === toPid) return;
+
+        const fromMatch = tournament.matches.find(m => m.id === fromMatchId);
+        const toMatch = tournament.matches.find(m => m.id === toMatchId);
+        if (!fromMatch || !toMatch) return;
+        // Never touch validated tables.
+        if (fromMatch.isCompleted || toMatch.isCompleted) return;
+
+        const moveResult = (m: typeof fromMatch, pid: string) => m.results?.[pid];
+        const moveCard = (m: typeof fromMatch, pid: string) => m.scorecards?.[pid];
+
+        const updatedMatches = tournament.matches.map(m => {
+            if (m.id !== fromMatchId && m.id !== toMatchId) return m;
+
+            const newIds = [...m.participantIds];
+            const newResults = { ...(m.results || {}) };
+            const newCards = { ...(m.scorecards || {}) };
+
+            if (m.id === fromMatchId) {
+                const idx = newIds.indexOf(fromPid);
+                if (idx !== -1) newIds[idx] = toPid;
+                delete newResults[fromPid];
+                delete newCards[fromPid];
+                if (toPid) {
+                    const r = moveResult(toMatch, toPid);
+                    if (r !== undefined) newResults[toPid] = r;
+                    const c = moveCard(toMatch, toPid);
+                    if (c !== undefined) newCards[toPid] = c;
+                }
+            }
+            if (m.id === toMatchId) {
+                if (toPid) {
+                    const idx = newIds.indexOf(toPid);
+                    if (idx !== -1) newIds[idx] = fromPid;
+                    delete newResults[toPid];
+                    delete newCards[toPid];
+                } else {
+                    const empty = newIds.indexOf(null);
+                    if (empty !== -1) newIds[empty] = fromPid;
+                    else newIds.push(fromPid);
+                }
+                const r = moveResult(fromMatch, fromPid);
+                if (r !== undefined) newResults[fromPid] = r;
+                const c = moveCard(fromMatch, fromPid);
+                if (c !== undefined) newCards[fromPid] = c;
+            }
+
+            return {
+                ...m,
+                participantIds: newIds,
+                results: newResults,
+                scorecards: Object.keys(newCards).length > 0 ? newCards : m.scorecards,
+            };
+        });
+
+        updateTournament({ ...tournament, matches: updatedMatches });
     };
 
     // ── Finale CdF ────────────────────────────────────────────────────────────
@@ -770,6 +781,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     //   2) Table difference vs. table winner — ascending (smaller is better)
     //   3) Total NT points won across the tournament — descending
     const sortedParticipants = [...tournament.participants].sort((a, b) => {
+        // DNF players are always pushed to the bottom of the classement.
+        if (!!a.dnf !== !!b.dnf) return a.dnf ? 1 : -1;
+
         const pointsA = calculateTotalPoints(a.id);
         const pointsB = calculateTotalPoints(b.id);
         if (pointsB !== pointsA) return pointsB - pointsA;
@@ -811,7 +825,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </span>
                         </h1>
                         <p className="text-xs sm:text-sm font-prototype text-muted-foreground">
-                            {playerCount} joueur{playerCount > 1 ? "s" : ""} • {getFormatLabel(playerCount)} • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}
+                            {playerCount} inscrit{playerCount > 1 ? "s" : ""}
+                            {dnfCount > 0 && (
+                                <> • <span className="text-orange-500">{activeCount} actif{activeCount > 1 ? "s" : ""} ({dnfCount} DNF)</span></>
+                            )}
+                            {" • "}{getFormatLabel(activeCount)} • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}
                         </p>
                     </div>
                 </div>
@@ -1057,16 +1075,20 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     const ntScore = calculateNTScore(p.id);
                                     const tableDiff = calculateTableDifference(p.id);
                                     return (
-                                        <div key={p.id} className={`px-4 py-3 grid grid-cols-[1.5rem_1fr_5rem_6rem] items-center gap-3 hover:bg-accent/30 transition-colors ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
-                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index === 0 ? "bg-yellow-500" :
+                                        <div key={p.id} className={`px-4 py-3 grid grid-cols-[1.5rem_1fr_5rem_6rem] items-center gap-3 hover:bg-accent/30 transition-colors ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
+                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${p.dnf ? "bg-muted text-muted-foreground" :
+                                                index === 0 ? "bg-yellow-500" :
                                                 index === 1 ? "bg-slate-300" :
                                                     index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
                                                 }`}>
-                                                {index + 1}
+                                                {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
                                             </span>
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <span className="font-prototype truncate" title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
-                                                {qualifiedIds.has(p.id) && (
+                                                <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""}`} title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
+                                                {p.dnf && (
+                                                    <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
+                                                )}
+                                                {!p.dnf && qualifiedIds.has(p.id) && (
                                                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
                                                 )}
                                             </div>
@@ -1109,6 +1131,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             onSubmitResults={submitMatchResults}
                             onDeclineResults={declineMatchResults}
                             onEditScorecards={editMatchScorecards}
+                            onSwapPlayers={handleSwapPlayers}
                             isAdmin={isAdmin}
                             currentRound={tournament.currentRound || 0}
                             tournamentId={tournament.id}
@@ -1139,13 +1162,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         return (
                                             <div
                                                 key={p.id}
-                                                className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
+                                                className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
                                             >
-                                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${index === 0 ? "bg-yellow-500 text-black" :
+                                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
+                                                    index === 0 ? "bg-yellow-500 text-black" :
                                                     index === 1 ? "bg-slate-300 text-black" :
                                                         index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"
                                                     }`}>
-                                                    {index + 1}
+                                                    {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
                                                 </span>
                                                 {qualifierT?.logoUrl && (
                                                     <img
@@ -1158,8 +1182,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="font-prototype truncate" title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
-                                                        {qualifiedIds.has(p.id) && (
+                                                        <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""}`} title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
+                                                        {p.dnf && (
+                                                            <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
+                                                        )}
+                                                        {!p.dnf && qualifiedIds.has(p.id) && (
                                                             <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 shrink-0" />
                                                         )}
                                                     </div>
@@ -1185,14 +1212,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                     >
                                                         <Pencil className="w-4 h-4" />
                                                     </button>
-                                                    {isAdmin && tournament.status === "en_cours" && (
+                                                    {isAdmin && tournament.status === "en_cours" && !p.dnf && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => setRemoveConfirm(p)}
-                                                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                            title="Retirer ce joueur du tournoi (admin)"
+                                                            onClick={() => setDnfConfirm(p)}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Marquer DNF — abandonne le tournoi (admin)"
                                                         >
-                                                            <X className="w-4 h-4" />
+                                                            <Ban className="w-4 h-4" />
                                                         </button>
                                                     )}
                                                 </div>
@@ -1205,57 +1232,55 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     </div>
                 </div>
 
-            {/* Admin: Confirm player removal mid-tournament */}
-            {removeConfirm && (
+            {/* Admin: Confirm DNF mid-tournament */}
+            {dnfConfirm && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-                    onClick={() => setRemoveConfirm(null)}
+                    onClick={() => setDnfConfirm(null)}
                 >
                     <div
                         className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-5 border-b border-border flex items-start gap-3">
-                            <div className="bg-red-500/20 p-2 rounded-full shrink-0">
-                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                            <div className="bg-orange-500/20 p-2 rounded-full shrink-0">
+                                <Ban className="w-5 h-5 text-orange-500" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-prototype">Retirer un joueur du tournoi</h3>
-                                <p className="text-sm text-muted-foreground font-prototype">Cette action est réservée à l&apos;administration.</p>
+                                <h3 className="text-lg font-prototype">Marquer DNF — abandon</h3>
+                                <p className="text-sm text-muted-foreground font-prototype">Action réservée à l&apos;administration. Irréversible.</p>
                             </div>
                         </div>
                         <div className="p-5 space-y-3 text-sm font-prototype">
                             <p>
-                                Vous êtes sur le point de retirer{" "}
-                                <strong>{removeConfirm.firstname} {removeConfirm.name}</strong> du tournoi.
+                                <strong>{dnfConfirm.firstname} {dnfConfirm.name}</strong> abandonne le tournoi (DNF).
                             </p>
                             {(() => {
-                                const newSize = tournament.participants.length - 1;
-                                const newMax = Math.max(getMaxRounds(newSize), currentRound);
-                                const newQual = getQualifiedCount(newSize);
+                                const activeAfter = tournament.participants.filter(p => !p.dnf && p.id !== dnfConfirm.id);
+                                const n = activeAfter.length;
                                 return (
                                     <div className="rounded-lg border border-border bg-background/50 p-3 space-y-1 text-xs text-muted-foreground">
-                                        <p>• Le tournoi passera à <strong className="text-foreground">{newSize} joueurs</strong>.</p>
-                                        <p>• Format recalculé: <strong className="text-foreground">{getFormatLabel(newSize)}</strong>.</p>
-                                        <p>• Rondes: <strong className="text-foreground">{newMax}</strong> · Qualifiés: <strong className="text-foreground">{newQual}</strong>.</p>
-                                        <p>• Les rondes déjà validées restent dans l&apos;historique.</p>
-                                        <p>• Les rondes suivantes non jouées seront <strong className="text-foreground">régénérées</strong> pour correspondre au nouveau format ({newSize} joueurs).</p>
+                                        <p>• Le joueur reste inscrit (<strong className="text-foreground">{tournament.participants.length} inscrits</strong>) mais est marqué <strong className="text-orange-500">DNF</strong>.</p>
+                                        <p>• Le format passe à <strong className="text-foreground">{n} joueurs actifs</strong> ({getFormatLabel(n)}).</p>
+                                        <p>• Ses scores des rondes déjà jouées sont <strong className="text-foreground">conservés</strong>.</p>
+                                        <p>• Il est retiré des tables non encore validées.</p>
                                     </div>
                                 );
                             })()}
                         </div>
                         <div className="p-5 border-t border-border flex flex-col-reverse sm:flex-row gap-3">
-                            <Button variant="outline" className="w-full font-prototype" onClick={() => setRemoveConfirm(null)}>
+                            <Button variant="outline" className="w-full font-prototype" onClick={() => setDnfConfirm(null)}>
                                 Annuler
                             </Button>
                             <Button
-                                className="w-full font-prototype bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                                className="w-full font-prototype bg-orange-500 hover:bg-orange-600 text-white"
                                 onClick={() => {
-                                    removePlayer(removeConfirm.id);
-                                    setRemoveConfirm(null);
+                                    markDnf(dnfConfirm.id);
+                                    setDnfConfirm(null);
                                 }}
                             >
-                                Retirer le joueur
+                                <Ban className="w-4 h-4 mr-2" />
+                                Confirmer le DNF
                             </Button>
                         </div>
                     </div>

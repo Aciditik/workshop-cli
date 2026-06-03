@@ -5,7 +5,7 @@ import { TableMatch, Participant, PlayerScore } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QRCodeModal } from "@/components/QRCodeModal";
-import { Star, ChevronDown, ChevronRight } from "lucide-react";
+import { Star, ChevronDown, ChevronRight, GripVertical } from "lucide-react";
 
 interface SwissRoundsProps {
     matches: TableMatch[];
@@ -13,6 +13,7 @@ interface SwissRoundsProps {
     onSubmitResults: (matchId: string, results: Record<string, number>) => void;
     onDeclineResults: (matchId: string) => void;
     onEditScorecards?: (matchId: string, results: Record<string, number>, scorecards: Record<string, PlayerScore>) => void;
+    onSwapPlayers?: (fromMatchId: string, fromPid: string, toMatchId: string, toPid: string | null) => void;
     currentRound: number;
     tournamentId: string;
     tournamentName: string;
@@ -55,11 +56,14 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
     const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set([currentRound]));
+    // Drag & drop: track source player and the row currently hovered as a drop target.
+    const [dragSource, setDragSource] = useState<{ matchId: string; pid: string } | null>(null);
+    const [dragOver, setDragOver] = useState<{ matchId: string; pid: string | null } | null>(null);
     // Inline edit mode for pending-review scorecards.
     const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
     const [editDraft, setEditDraft] = useState<Record<string, PlayerScore>>({});
@@ -321,6 +325,10 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                         return sc.nt + sc.objectifs + sc.recompenses + sc.forets + sc.villes + sc.cartes;
                                     };
 
+                                    // Drag & drop is allowed for the active round while the
+                                    // table is neither validated nor awaiting score review.
+                                    const canDrag = !!onSwapPlayers && round === currentRound && !match.isCompleted && !match.isPendingReview;
+
                                     return sortedIds.map((pId, i) => {
                                         const p = getParticipant(pId);
                                         let placement = "";
@@ -330,9 +338,31 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                             placement = `${rank}${suffixes[rank - 1] || "ème"}`;
                                         }
                                         const nt = getNT(pId);
+                                        const isDragging = dragSource?.matchId === match.id && dragSource?.pid === pId;
+                                        const isDropTarget = dragOver?.matchId === match.id && dragOver?.pid === pId
+                                            && dragSource && !(dragSource.matchId === match.id && dragSource.pid === pId);
                                         return (
-                                            <div key={i} className="flex flex-col gap-1 p-2 rounded-md bg-accent/50 text-sm">
+                                            <div
+                                                key={i}
+                                                draggable={canDrag && !!p}
+                                                onDragStart={canDrag && p ? () => setDragSource({ matchId: match.id, pid: pId }) : undefined}
+                                                onDragEnd={canDrag ? () => { setDragSource(null); setDragOver(null); } : undefined}
+                                                onDragOver={canDrag ? (e) => { e.preventDefault(); setDragOver({ matchId: match.id, pid: pId }); } : undefined}
+                                                onDragLeave={canDrag ? () => setDragOver(prev => (prev?.matchId === match.id && prev?.pid === pId ? null : prev)) : undefined}
+                                                onDrop={canDrag ? (e) => {
+                                                    e.preventDefault();
+                                                    if (dragSource && onSwapPlayers && !(dragSource.matchId === match.id && dragSource.pid === pId)) {
+                                                        onSwapPlayers(dragSource.matchId, dragSource.pid, match.id, pId);
+                                                    }
+                                                    setDragSource(null);
+                                                    setDragOver(null);
+                                                } : undefined}
+                                                className={`flex flex-col gap-1 p-2 rounded-md bg-accent/50 text-sm transition-all ${canDrag && p ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-40" : ""} ${isDropTarget ? "ring-2 ring-primary bg-primary/10" : ""}`}
+                                            >
                                                 <div className="flex items-center gap-2 min-w-0">
+                                                    {canDrag && p && (
+                                                        <GripVertical className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+                                                    )}
                                                     <span className="font-prototype">{p ? `${p.firstname} ${p.name}` : "Place vide"}</span>
                                                     {p && qualifiedSet.has(p.id) && (
                                                         <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />

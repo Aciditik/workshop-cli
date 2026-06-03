@@ -8,6 +8,7 @@ export interface Participant {
     email: string;
     phone: string;
     score: number; // Accrued points
+    dnf?: boolean; // Dropped / Did Not Finish — permanent, admin only
 }
 
 export interface PlayerScore {
