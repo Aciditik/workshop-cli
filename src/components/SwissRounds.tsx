@@ -116,7 +116,12 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
     return (
         <div className="space-y-4">
             {rounds.map(round => {
-                const roundMatches = matches.filter(m => m.round === round).sort((a, b) => a.tableNumber - b.tableNumber);
+                const roundMatches = matches
+                    .filter(m => m.round === round)
+                    // Hide tables left completely empty (e.g. after consolidating players),
+                    // unless they have already been validated.
+                    .filter(m => m.isCompleted || (m.participantIds || []).filter(Boolean).length > 0)
+                    .sort((a, b) => a.tableNumber - b.tableNumber);
 
                 if (roundMatches.length === 0) return null;
 
@@ -175,15 +180,36 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
         const playerCount = (match.participantIds || []).filter((id): id is string => id !== null).length;
         const scale = playerCount === 3 ? "3/2/1" : playerCount === 5 ? "5/3/2/1/0" : "5/3/2/1";
 
+        // Drag & drop: this table can receive a *move* (player from another table)
+        // while the active round is not validated / pending review.
+        const canDropTable = !!onSwapPlayers && round === currentRound && !match.isCompleted && !match.isPendingReview;
+        const draggingFromOther = dragSource && dragSource.matchId !== match.id;
+        const isFull = playerCount >= 5;
+        // Highlight the whole card as a move target only when dragging from another
+        // table and there's room (≤5 after the move).
+        const cardMoveActive = canDropTable && draggingFromOther && !isFull;
+
         return (
             <Card
                 key={match.id}
-                className={`${match.isCompleted ? "opacity-75 bg-muted/20" : isFinalist ? "border-yellow-500/50 bg-yellow-500/5" : "border-primary/50"}`}
+                onDragOver={canDropTable && draggingFromOther ? (e) => { e.preventDefault(); } : undefined}
+                onDrop={canDropTable && draggingFromOther ? (e) => {
+                    e.preventDefault();
+                    if (dragSource && onSwapPlayers) {
+                        // Move into this table (empty slot). Parent enforces the 3–5 rule.
+                        onSwapPlayers(dragSource.matchId, dragSource.pid, match.id, null);
+                    }
+                    setDragSource(null);
+                    setDragOver(null);
+                } : undefined}
+                className={`${match.isCompleted ? "opacity-75 bg-muted/20" : isFinalist ? "border-yellow-500/50 bg-yellow-500/5" : "border-primary/50"} ${cardMoveActive ? "ring-2 ring-primary/60" : ""} ${canDropTable && draggingFromOther && isFull ? "opacity-60" : ""}`}
             >
                 <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
                     <CardTitle className="text-sm font-prototype text-muted-foreground flex items-center gap-3 flex-wrap">
                         <span className={isFinalist ? "text-yellow-400 font-prototype" : "font-prototype"}>{displayLabel}</span>
-                        {/* <span className="text-xs text-muted-foreground/60 font-normal">{playerCount}p · {scale} pts</span> */}
+                        {canDropTable && (
+                            <span className={`text-xs font-prototype ${isFull ? "text-orange-500" : "text-muted-foreground/60"}`}>{playerCount}/5</span>
+                        )}
                         {match.isCompleted && <span className="text-green-500 font-prototype">Validé</span>}
                         {match.isPendingReview && !match.isCompleted && <span className="text-yellow-500 font-prototype">En attente</span>}
                     </CardTitle>
@@ -351,6 +377,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                                 onDragLeave={canDrag ? () => setDragOver(prev => (prev?.matchId === match.id && prev?.pid === pId ? null : prev)) : undefined}
                                                 onDrop={canDrag ? (e) => {
                                                     e.preventDefault();
+                                                    e.stopPropagation();
                                                     if (dragSource && onSwapPlayers && !(dragSource.matchId === match.id && dragSource.pid === pId)) {
                                                         onSwapPlayers(dragSource.matchId, dragSource.pid, match.id, pId);
                                                     }

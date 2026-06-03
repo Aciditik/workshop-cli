@@ -94,6 +94,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const [editName, setEditName] = useState("");
     const [editEmail, setEditEmail] = useState("");
     const [editPhone, setEditPhone] = useState("");
+    // Finale only: qualifier tournament for the player being edited.
+    const [editSourceTournamentId, setEditSourceTournamentId] = useState("");
 
     const openEditParticipant = (p: Participant) => {
         setEditParticipant(p);
@@ -101,6 +103,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         setEditName(p.name);
         setEditEmail(p.email);
         setEditPhone(p.phone);
+        setEditSourceTournamentId(finaleSourceMap[p.id] || "");
     };
 
     const closeEditParticipant = () => {
@@ -125,6 +128,16 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             ...tournament,
             participants: updatedParticipants,
         });
+
+        // Finale-only: persist (or clear) the qualifier-tournament choice so the
+        // correct tournament logo shows next to the player.
+        if (/finale/i.test(tournament.name)) {
+            const next = { ...finaleSourceMap };
+            if (editSourceTournamentId) next[editParticipant.id] = editSourceTournamentId;
+            else delete next[editParticipant.id];
+            setFinaleSourceMap(next);
+            try { localStorage.setItem(`finaleSource:${id}`, JSON.stringify(next)); } catch { /* ignore */ }
+        }
 
         closeEditParticipant();
     };
@@ -197,6 +210,35 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             window.removeEventListener("focus", onFocus);
         };
     }, [tournamentStatus]);
+
+    // Safety net: if the final round is fully validated but the tournament is
+    // still "en_cours" (e.g. the last table was validated before an empty table
+    // was consolidated away), finalize it automatically. The optimistic status
+    // change to "fini" prevents this effect from re-firing.
+    const finalizedRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!tournament || tournament.status !== "en_cours") return;
+        const tMaxRounds = tournament.maxRounds || 3;
+        const tCurrentRound = tournament.currentRound || 0;
+        if (tCurrentRound < tMaxRounds) return;
+        const relevant = tournament.matches.filter(
+            m => m.isCompleted || m.participantIds.filter(Boolean).length > 0
+        );
+        if (relevant.length === 0 || !relevant.every(m => m.isCompleted)) return;
+        if (finalizedRef.current === tournament.id) return;
+        finalizedRef.current = tournament.id;
+        updateTournament({
+            ...tournament,
+            status: "fini",
+            qualifiedIds: determineQualifiedPlayers(
+                tournament.format || "swiss",
+                tournament.size,
+                tournament.matches,
+                tournament.participants
+            ),
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tournament]);
 
     if (!isLoaded) return <div className="p-8 animate-pulse font-prototype text-muted-foreground">Loading...</div>;
     if (!tournament) return <div className="p-8 font-prototype text-destructive">Tournament not found.</div>;
@@ -278,8 +320,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             qualifiedIds: undefined as string[] | undefined,
         };
 
-        // Check if ALL tables (including finale/consolation) are completed
-        const allTablesCompleted = updatedMatches.every(m => m.isCompleted);
+        // Check if ALL tables (including finale/consolation) are completed.
+        // Empty tables left after consolidating players are ignored.
+        const allTablesCompleted = updatedMatches
+            .filter(m => m.isCompleted || m.participantIds.filter(Boolean).length > 0)
+            .every(m => m.isCompleted);
 
         // Tournament completes when current round is max AND all tables are truly done
         if (allTablesCompleted && currentRound === maxRounds) {
@@ -337,7 +382,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             qualifiedIds: undefined as string[] | undefined,
         };
 
-        const allTablesCompleted = updatedMatches.every(m => m.isCompleted);
+        const allTablesCompleted = updatedMatches
+            .filter(m => m.isCompleted || m.participantIds.filter(Boolean).length > 0)
+            .every(m => m.isCompleted);
         if (allTablesCompleted && currentRound === maxRounds) {
             newTournamentData.status = "fini";
             newTournamentData.qualifiedIds = determineQualifiedPlayers(
@@ -353,7 +400,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const dnfCount = playerCount - activeCount;
     const canGenerateNextRound = () => {
         if (currentRound >= maxRounds) return false;
-        const roundMatches = tournament.matches.filter(m => m.round === currentRound);
+        const roundMatches = tournament.matches
+            .filter(m => m.round === currentRound)
+            // Ignore tables left completely empty after consolidating players.
+            .filter(m => m.isCompleted || m.participantIds.filter(Boolean).length > 0);
         // All matches must be validated (isCompleted) — pending review is not enough
         return roundMatches.length > 0 && roundMatches.every(m => m.isCompleted);
     };
@@ -475,6 +525,25 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         // Never touch validated tables.
         if (fromMatch.isCompleted || toMatch.isCompleted) return;
 
+        // Table size rule: 3 minimum, 5 maximum. Swaps (toPid set) keep both
+        // table sizes unchanged so they are always allowed. A move (toPid null)
+        // shrinks the source and grows the target — guard both bounds.
+        const countPlayers = (m: typeof fromMatch) => m.participantIds.filter(Boolean).length;
+        if (toPid === null && fromMatchId !== toMatchId) {
+            const fromCount = countPlayers(fromMatch);
+            if (countPlayers(toMatch) + 1 > 5) {
+                alert("Impossible: une table ne peut pas dépasser 5 joueurs.");
+                return;
+            }
+            // Don't break a *valid* table (≥3) down to 1 or 2 players. Emptying a
+            // table entirely, or moving out of an already-undersized table
+            // (e.g. to consolidate a leftover 1-2 player table), is allowed.
+            if (fromCount >= 3 && fromCount - 1 < 3) {
+                alert("Impossible: une table valide doit conserver au minimum 3 joueurs (videz-la entièrement pour la regrouper).");
+                return;
+            }
+        }
+
         const moveResult = (m: typeof fromMatch, pid: string) => m.results?.[pid];
         const moveCard = (m: typeof fromMatch, pid: string) => m.scorecards?.[pid];
 
@@ -522,7 +591,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             };
         });
 
-        updateTournament({ ...tournament, matches: updatedMatches });
+        // Remove any non-validated table left completely empty after the move.
+        const cleanedMatches = updatedMatches.filter(
+            m => m.isCompleted || m.participantIds.filter(Boolean).length > 0
+        );
+
+        updateTournament({ ...tournament, matches: cleanedMatches });
     };
 
     // ── Finale CdF ────────────────────────────────────────────────────────────
@@ -690,18 +764,25 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // they were qualified from, so we can display that tournament's logo next to
     // their name in the player lists.
     const isFinaleTournament = /finale/i.test(tournament.name);
+    const normalizeName = (firstname: string, name: string) =>
+        `${firstname} ${name}`.trim().toLowerCase().replace(/\s+/g, " ");
     const qualifierTournamentByEmail = new Map<string, Tournament>();
+    const qualifierTournamentByName = new Map<string, Tournament>();
     if (isFinaleTournament) {
         const others = tournaments.filter(t => t.id !== tournament.id && !/finale/i.test(t.name));
         for (const t of others) {
             const qSet = new Set(t.qualifiedIds || []);
             for (const p of t.participants) {
                 if (!qSet.has(p.id)) continue;
+                const newer = (existing?: Tournament) =>
+                    !existing || new Date(t.eventDate).getTime() > new Date(existing.eventDate).getTime();
                 const email = (p.email || "").trim().toLowerCase();
-                if (!email) continue;
-                const existing = qualifierTournamentByEmail.get(email);
-                if (!existing || new Date(t.eventDate).getTime() > new Date(existing.eventDate).getTime()) {
+                if (email && newer(qualifierTournamentByEmail.get(email))) {
                     qualifierTournamentByEmail.set(email, t);
+                }
+                const nameKey = normalizeName(p.firstname, p.name);
+                if (nameKey && newer(qualifierTournamentByName.get(nameKey))) {
+                    qualifierTournamentByName.set(nameKey, t);
                 }
             }
         }
@@ -716,8 +797,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         }
         // 2) Fallback: deduce from the qualifiedIds of other tournaments using the email.
         const email = (p.email || "").trim().toLowerCase();
-        if (!email) return null;
-        return qualifierTournamentByEmail.get(email) ?? null;
+        if (email && qualifierTournamentByEmail.has(email)) {
+            return qualifierTournamentByEmail.get(email)!;
+        }
+        // 3) Last resort: match by normalized full name (handles mistyped/empty emails).
+        return qualifierTournamentByName.get(normalizeName(p.firstname, p.name)) ?? null;
     };
 
     // Calculate total placement points for each participant (5,3,2,1 system)
@@ -1337,6 +1421,28 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:col-span-2"
                                 />
                             </div>
+                            {isFinaleTournament && (
+                                <div className="space-y-1">
+                                    <label className="text-xs font-prototype text-muted-foreground">
+                                        Tournoi qualificatif (optionnel)
+                                    </label>
+                                    <select
+                                        value={editSourceTournamentId}
+                                        onChange={(e) => setEditSourceTournamentId(e.target.value)}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    >
+                                        <option value="">— Aucun —</option>
+                                        {[...tournaments]
+                                            .filter(t => t.id !== tournament.id && !/finale/i.test(t.name))
+                                            .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
+                                            .map(t => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.name} — {new Date(t.eventDate).toLocaleDateString()}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
                         <div className="p-5 border-t border-border flex flex-col-reverse sm:flex-row gap-3">
                             <Button variant="outline" className="w-full font-prototype" onClick={closeEditParticipant}>
