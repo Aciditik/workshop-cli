@@ -217,10 +217,16 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // change to "fini" prevents this effect from re-firing.
     const finalizedRef = useRef<string | null>(null);
     useEffect(() => {
-        if (!tournament || tournament.status !== "en_cours") return;
+        if (!tournament) return;
         const tMaxRounds = tournament.maxRounds || 3;
         const tCurrentRound = tournament.currentRound || 0;
-        if (tCurrentRound < tMaxRounds) return;
+        // Case A: final round fully validated but still "en_cours" → finalize it.
+        const needsFinalize = tournament.status === "en_cours" && tCurrentRound >= tMaxRounds;
+        // Case B: already "fini" but qualifiers were never resolved (e.g. computed
+        // empty due to table reorg before the robust logic) → recompute them.
+        const needsQualifiers = tournament.status === "fini"
+            && (!tournament.qualifiedIds || tournament.qualifiedIds.length === 0);
+        if (!needsFinalize && !needsQualifiers) return;
         const relevant = tournament.matches.filter(
             m => m.isCompleted || m.participantIds.filter(Boolean).length > 0
         );

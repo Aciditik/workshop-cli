@@ -350,13 +350,26 @@ export function determineQualifiedPlayers(
             const playerIds = match.participantIds.filter((id): id is string => id !== null);
             // Winner = player with highest points
             const sorted = [...playerIds].sort((a, b) => (match.results[b] || 0) - (match.results[a] || 0));
-            if (sorted[0]) qualifiedIds.push(sorted[0]);
+            if (sorted[0] && !qualifiedIds.includes(sorted[0])) qualifiedIds.push(sorted[0]);
+        }
+
+        // Safety net: if finalist tables were reorganized/emptied and we couldn't
+        // resolve enough winners, fill the remaining spots with the top scorers
+        // (excluding DNF players and anyone already qualified).
+        if (qualifiedIds.length < qualifiedCount) {
+            const fillers = [...participants]
+                .filter(p => !p.dnf && !qualifiedIds.includes(p.id))
+                .sort((a, b) => b.score - a.score);
+            for (const p of fillers) {
+                if (qualifiedIds.length >= qualifiedCount) break;
+                qualifiedIds.push(p.id);
+            }
         }
 
         return qualifiedIds.slice(0, qualifiedCount);
     } else {
-        // Swiss: top N players by total score after all rounds
-        const sorted = [...participants].sort((a, b) => b.score - a.score);
+        // Swiss: top N active players by total score after all rounds
+        const sorted = [...participants].filter(p => !p.dnf).sort((a, b) => b.score - a.score);
         return sorted.slice(0, qualifiedCount).map(p => p.id);
     }
 }
