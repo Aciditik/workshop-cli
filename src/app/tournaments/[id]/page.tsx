@@ -18,7 +18,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban } from "lucide-react";
+import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
@@ -87,6 +87,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     // Admin mid-tournament DNF confirmation
     const [dnfConfirm, setDnfConfirm] = useState<Participant | null>(null);
+
+    // Delete tournament confirmation
+    const [deleteConfirm, setDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     // Admin edit-participant modal (available at any tournament stage)
     const [editParticipant, setEditParticipant] = useState<Participant | null>(null);
@@ -360,6 +364,30 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // dashboard. Overwrites both raw scorecards and placement results, then
     // validates the match (same end state as submitMatchResults). Admins may
     // also correct already-validated matches, including on finished tournaments.
+    const deleteTournament = async () => {
+        if (!token) return;
+        setDeleting(true);
+        try {
+            const res = await fetch(`${getApiUrl()}/api/tournaments/${id}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.error || "Erreur lors de la suppression");
+                setDeleting(false);
+                return;
+            }
+            // Remove from local store and redirect
+            await refresh();
+            router.push("/");
+        } catch (err) {
+            console.error("Delete tournament error:", err);
+            alert("Erreur lors de la suppression");
+            setDeleting(false);
+        }
+    };
+
     const editMatchScorecards = (
         matchId: string,
         results: Record<string, number>,
@@ -936,6 +964,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             Modifier le tournoi
                         </Button>
                     )}
+                    {(isAdmin || tournament.ownerId === user?.id) && (
+                        <Button
+                            onClick={() => setDeleteConfirm(true)}
+                            variant="destructive"
+                            size="sm"
+                            className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
+                            title="Supprimer le tournoi"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Supprimer
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -1461,6 +1501,49 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             >
                                 <Check className="w-4 h-4" />
                                 Enregistrer
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete tournament confirmation */}
+            {deleteConfirm && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                    onClick={() => setDeleteConfirm(false)}
+                >
+                    <div
+                        className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-5 border-b border-border flex items-start gap-3">
+                            <div className="bg-destructive/20 p-2 rounded-full shrink-0">
+                                <Trash2 className="w-5 h-5 text-destructive" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-prototype">Supprimer le tournoi</h3>
+                                <p className="text-sm text-muted-foreground font-prototype">
+                                    Cette action est irréversible. Tous les joueurs, matchs et résultats seront définitivement supprimés.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-5 border-t border-border flex flex-col-reverse sm:flex-row gap-3">
+                            <Button variant="outline" className="w-full font-prototype" onClick={() => setDeleteConfirm(false)} disabled={deleting}>
+                                Annuler
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                className="w-full gap-2 font-prototype"
+                                onClick={deleteTournament}
+                                disabled={deleting}
+                            >
+                                {deleting ? "Suppression..." : (
+                                    <>
+                                        <Trash2 className="w-4 h-4" />
+                                        Supprimer définitivement
+                                    </>
+                                )}
                             </Button>
                         </div>
                     </div>
