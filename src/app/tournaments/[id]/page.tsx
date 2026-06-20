@@ -107,7 +107,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         setEditName(p.name);
         setEditEmail(p.email);
         setEditPhone(p.phone);
-        setEditSourceTournamentId(finaleSourceMap[p.id] || "");
+        setEditSourceTournamentId(p.sourceTournamentId || finaleSourceMap[p.id] || "");
     };
 
     const closeEditParticipant = () => {
@@ -122,9 +122,19 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const phone = editPhone.trim();
         if (!firstname || !name || !email || !phone) return;
 
+        const isFinale = /finale/i.test(tournament.name);
         const updatedParticipants = tournament.participants.map(p =>
             p.id === editParticipant.id
-                ? { ...p, firstname, name, email, phone }
+                ? {
+                    ...p,
+                    firstname,
+                    name,
+                    email,
+                    phone,
+                    // Finale-only: persist (or clear) the qualifier tournament
+                    // server-side so the origin shows from any device.
+                    ...(isFinale ? { sourceTournamentId: editSourceTournamentId || undefined } : {}),
+                }
                 : p
         );
 
@@ -132,16 +142,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             ...tournament,
             participants: updatedParticipants,
         });
-
-        // Finale-only: persist (or clear) the qualifier-tournament choice so the
-        // correct tournament logo shows next to the player.
-        if (/finale/i.test(tournament.name)) {
-            const next = { ...finaleSourceMap };
-            if (editSourceTournamentId) next[editParticipant.id] = editSourceTournamentId;
-            else delete next[editParticipant.id];
-            setFinaleSourceMap(next);
-            try { localStorage.setItem(`finaleSource:${id}`, JSON.stringify(next)); } catch { /* ignore */ }
-        }
 
         closeEditParticipant();
     };
@@ -449,6 +449,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const phone = playerPhone.trim();
         if (!firstname || !name || !email || !phone || tournament.status !== "brouillon") return;
 
+        const isFinale = /finale/i.test(tournament.name);
         const newParticipant: Participant = {
             id: crypto.randomUUID(),
             firstname,
@@ -456,6 +457,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             email,
             phone,
             score: 0,
+            // Finale-only: persist the qualifier tournament server-side so the
+            // origin is visible from any device (not just the one that added it).
+            ...(isFinale && sourceTournamentId ? { sourceTournamentId } : {}),
         };
 
         updateTournament({
@@ -463,13 +467,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             participants: [...tournament.participants, newParticipant],
             size: tournament.participants.length + 1,
         });
-
-        // Finale-only: persist the qualifier-tournament choice so we can show its logo.
-        if (/finale/i.test(tournament.name) && sourceTournamentId) {
-            const next = { ...finaleSourceMap, [newParticipant.id]: sourceTournamentId };
-            setFinaleSourceMap(next);
-            try { localStorage.setItem(`finaleSource:${id}`, JSON.stringify(next)); } catch { /* ignore */ }
-        }
 
         setPlayerFirstname("");
         setPlayerName("");
@@ -496,7 +493,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // uncompleted matches only. Total inscrit count stays the same; format
     // is recalculated from the number of active (non-DNF) players.
     const markDnf = (participantId: string) => {
-        if (tournament.status !== "en_cours" || !isAdmin) return;
+        const canManage = isAdmin || tournament.ownerId === user?.id;
+        if (tournament.status !== "en_cours" || !canManage) return;
 
         const activeAfter = tournament.participants.filter(p => !p.dnf && p.id !== participantId);
         if (activeAfter.length < 8) {
@@ -514,9 +512,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const newMaxRounds = Math.max(getMaxRounds(newActiveCount), currentRound);
         const newQualifiedCount = getQualifiedCount(newActiveCount);
 
-        // Remove player only from *uncompleted* matches (completed round data stays intact).
+        // Remove player only from matches that are neither validated nor being
+        // validated (completed/pending-review round data stays intact).
         const updatedMatches = tournament.matches.map(m => {
-            if (!m.participantIds.includes(participantId) || m.isCompleted) return m;
+            if (!m.participantIds.includes(participantId) || m.isCompleted || m.isPendingReview) return m;
             return {
                 ...m,
                 participantIds: m.participantIds.map(pid => pid === participantId ? null : pid),
@@ -666,6 +665,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     email: src?.email || "",
                     phone: src?.phone || "",
                     score: 0,
+                    // Remember which qualifier this finalist came from (cross-device).
+                    sourceTournamentId: tournament.id,
                 };
             });
 
@@ -823,7 +824,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     }
     const getQualifierTournament = (p: Participant): Tournament | null => {
         if (!isFinaleTournament) return null;
-        // 1) Explicit per-participant mapping (set when adding a player manually in Finale).
+        // 1) Server-persisted mapping on the participant (visible from any device).
+        if (p.sourceTournamentId) {
+            const mapped = tournaments.find(t => t.id === p.sourceTournamentId);
+            if (mapped) return mapped;
+        }
+        // 1b) Legacy per-device mapping in localStorage (older data only).
         const mappedId = finaleSourceMap[p.id];
         if (mappedId) {
             const mapped = tournaments.find(t => t.id === mappedId);
@@ -1102,7 +1108,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         Cliquez sur un joueur pour le marquer présent.
                                     </span>
                                     <span className="tabular-nums">
-                                        <span className="text-green-500 font-bold">{checkedInIds.size}</span>
+                                        <span className="text-green-500 font-bold">{tournament.participants.filter(p => checkedInIds.has(p.id)).length}</span>
                                         <span> / {tournament.participants.length} présents</span>
                                     </span>
                                 </div>
@@ -1342,12 +1348,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                     >
                                                         <Pencil className="w-4 h-4" />
                                                     </button>
-                                                    {isAdmin && tournament.status === "en_cours" && !p.dnf && (
+                                                    {(isAdmin || tournament.ownerId === user?.id) && tournament.status === "en_cours" && !p.dnf && (
                                                         <button
                                                             type="button"
                                                             onClick={() => setDnfConfirm(p)}
                                                             className="p-1 rounded-md text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                            title="Marquer DNF — abandonne le tournoi (admin)"
+                                                            title="Marquer DNF — abandonne le tournoi"
                                                         >
                                                             <Ban className="w-4 h-4" />
                                                         </button>
@@ -1378,7 +1384,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </div>
                             <div>
                                 <h3 className="text-lg font-prototype">Marquer DNF — abandon</h3>
-                                <p className="text-sm text-muted-foreground font-prototype">Action réservée à l&apos;administration. Irréversible.</p>
+                                <p className="text-sm text-muted-foreground font-prototype">Action irréversible.</p>
                             </div>
                         </div>
                         <div className="p-5 space-y-3 text-sm font-prototype">

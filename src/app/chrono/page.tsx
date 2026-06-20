@@ -22,7 +22,7 @@ const PRESETS: Preset[] = [
   { label: "Round 3", hours: 2 },
   { label: "Quart de finale", hours: 2 },
   { label: "Demi-finale", hours: 2, minutes: 30 },
-  { label: "Finale (illimité)", direction: "up" },
+  { label: "Finale", direction: "up" },
 ];
 
 const DIGIT_HEIGHT = 250;
@@ -55,140 +55,63 @@ export default function ChronoPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [direction, setDirection] = useState<Direction>("down");
 
-  // Initial duration (used for replay)
-  const [durationHours, setDurationHours] = useState(0);
-  const [durationMinutes, setDurationMinutes] = useState(5);
-  const [durationSeconds, setDurationSeconds] = useState(0);
+  // Initial duration in seconds (used for replay)
+  const [durationSeconds, setDurationSeconds] = useState(5 * 60);
+  // Current remaining/elapsed time in seconds
+  const [totalSeconds, setTotalSeconds] = useState(5 * 60);
 
-  // Current time
-  const [currentHours, setCurrentHours] = useState(0);
-  const [currentMinuteTens, setCurrentMinuteTens] = useState(0);
-  const [currentMinutesOnes, setCurrentMinutesOnes] = useState(5);
-  const [currentSecondsTens, setCurrentSecondsTens] = useState(0);
-  const [currentSecondsOnes, setCurrentSecondsOnes] = useState(0);
-
-  const stateRef = useRef({
-    isAnimated,
-    direction,
-    currentHours,
-    currentMinuteTens,
-    currentMinutesOnes,
-    currentSecondsTens,
-    currentSecondsOnes,
-  });
+  // Wall-clock anchor for drift-free timing. When running, we remember the
+  // seconds value at start (base) and the real timestamp it started (startedAt),
+  // then derive the displayed time from Date.now() on every tick. This keeps the
+  // chrono accurate even when the browser throttles setInterval in a background
+  // tab (the classic cause of a timer falling behind real time).
+  const anchorRef = useRef<{ base: number; startedAt: number } | null>(null);
+  const directionRef = useRef<Direction>(direction);
 
   useEffect(() => {
-    stateRef.current = {
-      isAnimated,
-      direction,
-      currentHours,
-      currentMinuteTens,
-      currentMinutesOnes,
-      currentSecondsTens,
-      currentSecondsOnes,
-    };
-  }, [
-    isAnimated,
-    direction,
-    currentHours,
-    currentMinuteTens,
-    currentMinutesOnes,
-    currentSecondsTens,
-    currentSecondsOnes,
-  ]);
+    directionRef.current = direction;
+  }, [direction]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const s = stateRef.current;
-      if (!s.isAnimated) return;
-
-      let h = s.currentHours;
-      let mt = s.currentMinuteTens;
-      let mo = s.currentMinutesOnes;
-      let st = s.currentSecondsTens;
-      let so = s.currentSecondsOnes;
-
-      if (s.direction === "down") {
-        so--;
-        if (so < 0) {
-          so = 9;
-          st--;
-          if (st < 0) {
-            so = 9;
-            st = 5;
-            mo--;
-            if (mo < 0) {
-              so = 9;
-              st = 5;
-              mo = 9;
-              mt--;
-              if (mt < 0) {
-                so = 9;
-                st = 5;
-                mo = 9;
-                mt = 5;
-                h--;
-                if (h < 0) h = 9;
-              }
-            }
-          }
-        }
-
-        if (so <= 0 && st <= 0 && mo <= 0 && mt <= 0 && h <= 0) {
+    const tick = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+      const elapsed = Math.floor((Date.now() - anchor.startedAt) / 1000);
+      if (directionRef.current === "down") {
+        const next = anchor.base - elapsed;
+        if (next <= 0) {
+          anchorRef.current = null;
+          setTotalSeconds(0);
           setIsAnimated(false);
           setIsEnded(true);
+        } else {
+          setTotalSeconds(next);
         }
       } else {
-        so++;
-        if (so > 9) {
-          so = 0;
-          st++;
-          if (st > 5) {
-            so = 0;
-            st = 0;
-            mo++;
-            if (mo > 9) {
-              so = 0;
-              st = 0;
-              mo = 0;
-              mt++;
-              if (mt > 5) {
-                so = 0;
-                st = 0;
-                mo = 0;
-                mt = 0;
-                h++;
-              }
-            }
-          }
-        }
+        setTotalSeconds(anchor.base + elapsed);
       }
-
-      setCurrentHours(h);
-      setCurrentMinuteTens(mt);
-      setCurrentMinutesOnes(mo);
-      setCurrentSecondsTens(st);
-      setCurrentSecondsOnes(so);
-    }, 1000);
-
-    return () => clearInterval(interval);
+    };
+    const interval = setInterval(tick, 250);
+    // Re-sync immediately when the tab regains focus/visibility.
+    const onVisible = () => tick();
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   const setTimer = (hours: number, minutes: number, seconds: number) => {
     const h = Math.min(hours, 9);
     const m = Math.min(minutes, 59);
     const sec = Math.min(seconds, 59);
+    const total = h * 3600 + m * 60 + sec;
 
-    setDurationHours(h);
-    setDurationMinutes(m);
-    setDurationSeconds(sec);
-
-    setCurrentHours(h);
-    setCurrentMinuteTens(Math.floor(m / 10));
-    setCurrentMinutesOnes(m - Math.floor(m / 10) * 10);
-    setCurrentSecondsTens(Math.floor(sec / 10));
-    setCurrentSecondsOnes(sec - Math.floor(sec / 10) * 10);
-
+    anchorRef.current = null;
+    setDurationSeconds(total);
+    setTotalSeconds(total);
     setIsEnded(false);
   };
 
@@ -202,21 +125,34 @@ export default function ChronoPage() {
   };
 
   const handlePlay = () => {
-    const hasTime =
-      currentSecondsOnes > 0 ||
-      currentSecondsTens > 0 ||
-      currentMinutesOnes > 0 ||
-      currentMinuteTens > 0 ||
-      currentHours > 0;
-    if (direction === "up" || hasTime) {
-      setIsAnimated((v) => !v);
+    if (isAnimated) {
+      // Pause: freeze on the currently displayed value.
+      anchorRef.current = null;
+      setIsAnimated(false);
+      return;
+    }
+    if (direction === "up" || totalSeconds > 0) {
+      anchorRef.current = { base: totalSeconds, startedAt: Date.now() };
+      setIsAnimated(true);
     }
   };
 
   const handleReplay = () => {
+    anchorRef.current = null;
     setIsAnimated(false);
-    setTimer(durationHours, durationMinutes, durationSeconds);
+    setTotalSeconds(durationSeconds);
+    setIsEnded(false);
   };
+
+  // Derive the individual digit values from the single source of truth.
+  const clamped = Math.max(0, totalSeconds);
+  const currentHours = Math.min(Math.floor(clamped / 3600), 9);
+  const dispMinutes = Math.floor((clamped % 3600) / 60);
+  const dispSeconds = clamped % 60;
+  const currentMinuteTens = Math.floor(dispMinutes / 10);
+  const currentMinutesOnes = dispMinutes % 10;
+  const currentSecondsTens = Math.floor(dispSeconds / 10);
+  const currentSecondsOnes = dispSeconds % 10;
 
   // Offsets for digit-wrapper translateY
   const hoursOffset = (10 - currentHours) * DIGIT_HEIGHT;

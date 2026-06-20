@@ -60,19 +60,6 @@ function isPlayerComplete(score: FormPlayerScore): boolean {
     );
 }
 
-function missingFields(score: FormPlayerScore): string[] {
-    const missing: string[] = [];
-    if (!isCorporationValid(score.corporation)) missing.push("Corporation");
-    if (score.nt === null) missing.push("NT");
-    if (score.objectifs === null) missing.push("Objectifs");
-    if (score.recompenses === null) missing.push("Récompenses");
-    if (score.forets === null) missing.push("Forêts");
-    if (score.villes === null) missing.push("Villes");
-    if (score.cartes === null) missing.push("Cartes");
-    if (score.megacredits === null) missing.push("Tiebreaker");
-    return missing;
-}
-
 const CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
     { key: "nt", label: "NT" },
     { key: "objectifs", label: "Objectifs" },
@@ -304,37 +291,26 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                     <p className="text-muted-foreground font-prototype text-sm sm:text-base">{tournament.name} - Round {match.round}</p>
                 </div>
 
-                {/* MOBILE LAYOUT: one card per player */}
+                {/* MOBILE LAYOUT: one block per CATEGORY (line by line: all players'
+                    Corporation, then all NT, then all Objectifs, etc.) */}
                 <div className="md:hidden space-y-4">
-                    {activePlayers.map((pId, i) => {
-                        const p = getParticipant(pId);
-                        const rank = rankings[pId];
-                        const playerScore = scores[pId] ?? DEFAULT_SCORE;
-                        const missing = showValidation ? missingFields(playerScore) : [];
-                        const hasErrors = missing.length > 0;
-                        return (
-                            <div key={pId} className={`glass rounded-xl overflow-hidden ${showValidation && hasErrors ? "ring-1 ring-destructive" : ""}`}>
-                                <div className="bg-primary/20 px-4 py-3 flex items-center justify-between">
-                                    <div>
-                                        <div className="text-xs text-muted-foreground font-prototype">Joueur #{i + 1}</div>
-                                        <div className="font-prototype">{p ? `${p.firstname} ${p.name}` : "Unknown"}</div>
-                                    </div>
-                                    {rank && (
-                                        <div className="flex items-center gap-1 font-prototype text-lg">
-                                            {rank.rank === 1 && <span className="text-yellow-500 text-xl drop-shadow-md">🥇</span>}
-                                            {rank.rank === 2 && <span className="text-gray-300 text-xl drop-shadow-md">🥈</span>}
-                                            {rank.rank === 3 && <span className="text-orange-500 text-xl drop-shadow-md">🥉</span>}
-                                            <span>{rank.displayRank}</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4 space-y-3">
-                                    <div>
+                    {/* Corporation block */}
+                    <div className="glass rounded-xl overflow-hidden">
+                        <div className="bg-primary/20 px-4 py-3 font-prototype">
+                            Corporation <span className="text-destructive">*</span>
+                        </div>
+                        <div className="p-4 space-y-3">
+                            {activePlayers.map((pId, i) => {
+                                const p = getParticipant(pId);
+                                const playerScore = scores[pId] ?? DEFAULT_SCORE;
+                                const isInvalid = showValidation && !isCorporationValid(playerScore.corporation);
+                                return (
+                                    <div key={pId}>
                                         <label className="text-xs text-muted-foreground font-prototype block mb-1">
-                                            Corporation <span className="text-destructive">*</span>
+                                            Joueur #{i + 1} — {p ? `${p.firstname} ${p.name}` : "Unknown"}
                                         </label>
                                         <select
-                                            className={`w-full p-2 border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary ${showValidation && !isCorporationValid(playerScore.corporation) ? "border-destructive ring-1 ring-destructive" : "border-border"}`}
+                                            className={`w-full p-2 border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary ${isInvalid ? "border-destructive ring-1 ring-destructive" : "border-border"}`}
                                             value={playerScore.corporation}
                                             onChange={(e) => handleScoreChange(pId, "corporation", e.target.value)}
                                         >
@@ -343,42 +319,69 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {CATEGORIES.map(cat => {
-                                            const isInvalid = showValidation && cat.key !== "corporation" && playerScore[cat.key] === null;
-                                            return (
-                                                <div key={cat.key}>
-                                                    <label className="text-xs text-muted-foreground font-prototype block mb-1">
-                                                        {cat.label} <span className="text-destructive">*</span>
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        inputMode="numeric"
-                                                        pattern="[0-9]*"
-                                                        step="1"
-                                                        min="0"
-                                                        placeholder="—"
-                                                        className={`w-full text-center p-2 border rounded-md bg-background text-foreground font-prototype focus:outline-none focus:ring-2 focus:ring-primary hide-arrows ${isInvalid ? "border-destructive ring-1 ring-destructive placeholder:text-destructive/60" : "border-border"}`}
-                                                        value={playerScore[cat.key] === null ? '' : playerScore[cat.key] as number}
-                                                        onChange={(e) => handleScoreChange(pId, cat.key, e.target.value)}
-                                                    />
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    {showValidation && hasErrors && (
-                                        <p className="text-xs text-destructive font-prototype">
-                                            Champs manquants : {missing.join(", ")}
-                                        </p>
-                                    )}
-                                    <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                                        <span className="text-sm font-prototype text-muted-foreground">Total NT</span>
-                                        <span className="text-2xl font-prototype text-primary">{calculateTotal(pId)}</span>
-                                    </div>
-                                </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* One block per scoring category */}
+                    {CATEGORIES.map(cat => (
+                        <div key={cat.key} className="glass rounded-xl overflow-hidden">
+                            <div className="bg-primary/20 px-4 py-3 font-prototype">
+                                {cat.label} <span className="text-destructive">*</span>
                             </div>
-                        );
-                    })}
+                            <div className="p-4 grid grid-cols-2 gap-3">
+                                {activePlayers.map((pId, i) => {
+                                    const p = getParticipant(pId);
+                                    const playerScore = scores[pId] ?? DEFAULT_SCORE;
+                                    const isInvalid = showValidation && playerScore[cat.key] === null;
+                                    return (
+                                        <div key={pId}>
+                                            <label className="text-xs text-muted-foreground font-prototype block mb-1 truncate">
+                                                #{i + 1} {p ? p.firstname : ""}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                step="1"
+                                                min="0"
+                                                placeholder="—"
+                                                className={`w-full text-center p-2 border rounded-md bg-background text-foreground font-prototype focus:outline-none focus:ring-2 focus:ring-primary hide-arrows ${isInvalid ? "border-destructive ring-1 ring-destructive placeholder:text-destructive/60" : "border-border"}`}
+                                                value={playerScore[cat.key] === null ? '' : playerScore[cat.key] as number}
+                                                onChange={(e) => handleScoreChange(pId, cat.key, e.target.value)}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* Totals & ranking recap */}
+                    <div className="glass rounded-xl overflow-hidden">
+                        <div className="bg-primary/40 px-4 py-3 font-prototype">Total NT &amp; Classement</div>
+                        <div className="p-4 space-y-2">
+                            {activePlayers.map((pId, i) => {
+                                const p = getParticipant(pId);
+                                const rank = rankings[pId];
+                                return (
+                                    <div key={pId} className="flex items-center justify-between gap-3 py-1.5 border-b border-border/40 last:border-0">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            {rank?.rank === 1 && <span className="text-yellow-500 text-lg drop-shadow-md">🥇</span>}
+                                            {rank?.rank === 2 && <span className="text-gray-300 text-lg drop-shadow-md">🥈</span>}
+                                            {rank?.rank === 3 && <span className="text-orange-500 text-lg drop-shadow-md">🥉</span>}
+                                            <span className="font-prototype truncate text-sm">#{i + 1} {p ? `${p.firstname} ${p.name}` : "Unknown"}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            {rank && <span className="text-xs font-prototype text-muted-foreground">{rank.displayRank}</span>}
+                                            <span className="text-xl font-prototype text-primary">{calculateTotal(pId)}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
 
                 {/* DESKTOP LAYOUT: original table */}

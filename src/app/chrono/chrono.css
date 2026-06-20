@@ -134,12 +134,12 @@
 
 .chrono-menu-wrapper {
   position: absolute;
-  bottom: 0;
+  bottom: 60px;
   right: 20px;
   background: rgba(0, 0, 0, 0.7);
   color: white;
   font-family: sans-serif;
-  border-radius: 8px 8px 0 0;
+  border-radius: 8px;
   overflow: hidden;
 }
 

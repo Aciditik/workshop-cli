@@ -9,6 +9,7 @@ export interface Participant {
     phone: string;
     score: number; // Accrued points
     dnf?: boolean; // Dropped / Did Not Finish — permanent, admin only
+    sourceTournamentId?: string; // Finale only: qualifier tournament this player came from (persisted server-side)
 }
 
 export interface PlayerScore {
