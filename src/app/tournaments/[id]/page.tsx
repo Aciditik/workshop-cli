@@ -83,6 +83,56 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             if (raw) setFinaleSourceMap(JSON.parse(raw));
         } catch { /* ignore */ }
     }, [id]);
+
+    // Finale only: auto-backfill sourceTournamentId server-side for participants
+    // that can be matched via email or name against qualifier tournaments.
+    // This migrates data that was previously stored only in localStorage on another device.
+    useEffect(() => {
+        if (!isLoaded) return;
+        const tournament = getTournament(id);
+        if (!tournament) return;
+        if (!/finale/i.test(tournament.name)) return;
+
+        const norm = (fn: string, n: string) => `${fn} ${n}`.trim().toLowerCase().replace(/\s+/g, " ");
+        const emailMap = new Map<string, string>(); // email -> tournamentId
+        const nameMap = new Map<string, string>();  // name -> tournamentId
+
+        const others = tournaments.filter(t => t.id !== tournament.id && !/finale/i.test(t.name));
+        for (const t of others) {
+            const qSet = new Set(t.qualifiedIds || []);
+            for (const p of t.participants) {
+                if (!qSet.has(p.id)) continue;
+                const tDate = new Date(t.eventDate).getTime();
+                const email = (p.email || "").trim().toLowerCase();
+                if (email) {
+                    const existing = emailMap.get(email);
+                    const existingDate = existing ? new Date(others.find(o => o.id === existing)?.eventDate || 0).getTime() : 0;
+                    if (tDate > existingDate) emailMap.set(email, t.id);
+                }
+                const nameKey = norm(p.firstname, p.name);
+                if (nameKey) {
+                    const existing = nameMap.get(nameKey);
+                    const existingDate = existing ? new Date(others.find(o => o.id === existing)?.eventDate || 0).getTime() : 0;
+                    if (tDate > existingDate) nameMap.set(nameKey, t.id);
+                }
+            }
+        }
+
+        let changed = false;
+        const updatedParticipants = tournament.participants.map(p => {
+            if (p.sourceTournamentId) return p;
+            const email = (p.email || "").trim().toLowerCase();
+            const matched = (email && emailMap.get(email)) || nameMap.get(norm(p.firstname, p.name));
+            if (matched) { changed = true; return { ...p, sourceTournamentId: matched }; }
+            return p;
+        });
+
+        if (changed) {
+            updateTournament({ ...tournament, participants: updatedParticipants });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoaded, id]);
+
     const playerInputRef = useRef<HTMLInputElement>(null);
 
     // Admin mid-tournament DNF confirmation
