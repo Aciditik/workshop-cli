@@ -608,21 +608,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         // Never touch validated tables.
         if (fromMatch.isCompleted || toMatch.isCompleted) return;
 
-        // Table size rule: 3 minimum, 5 maximum. Swaps (toPid set) keep both
+        // Table size rule: 5 maximum, no minimum. Swaps (toPid set) keep both
         // table sizes unchanged so they are always allowed. A move (toPid null)
-        // shrinks the source and grows the target — guard both bounds.
+        // grows the target — guard the upper bound only. A table left empty by
+        // a move is deleted below.
         const countPlayers = (m: typeof fromMatch) => m.participantIds.filter(Boolean).length;
         if (toPid === null && fromMatchId !== toMatchId) {
-            const fromCount = countPlayers(fromMatch);
             if (countPlayers(toMatch) + 1 > 5) {
                 alert("Impossible: une table ne peut pas dépasser 5 joueurs.");
-                return;
-            }
-            // Don't break a *valid* table (≥3) down to 1 or 2 players. Emptying a
-            // table entirely, or moving out of an already-undersized table
-            // (e.g. to consolidate a leftover 1-2 player table), is allowed.
-            if (fromCount >= 3 && fromCount - 1 < 3) {
-                alert("Impossible: une table valide doit conserver au minimum 3 joueurs (videz-la entièrement pour la regrouper).");
                 return;
             }
         }
