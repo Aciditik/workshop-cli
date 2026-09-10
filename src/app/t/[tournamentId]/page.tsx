@@ -14,8 +14,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
     const [search, setSearch] = useState("");
 
     useEffect(() => {
-        // Use relative URL in production (same domain), absolute URL for local development
-        const apiUrl = process.env.NODE_ENV === 'production' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000");
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
         const loadTournament = async () => {
             try {
                 const res = await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`);

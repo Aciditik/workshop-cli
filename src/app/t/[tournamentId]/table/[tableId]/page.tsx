@@ -95,8 +95,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     useEffect(() => {
         const loadTournament = async () => {
             try {
-                // Use relative URL in production (same domain), absolute URL for local development
-                const apiUrl = process.env.NODE_ENV === 'production' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000");
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
                 const res = await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}`);
                 if (!res.ok) throw new Error("Not found");
                 const data = await res.json();
@@ -245,7 +244,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                 };
             });
 
-            const apiUrl = process.env.NODE_ENV === 'production' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000");
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
             await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}/table/${tableId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
