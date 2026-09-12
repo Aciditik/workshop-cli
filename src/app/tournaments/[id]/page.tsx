@@ -133,6 +133,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoaded, id]);
 
+    // Player list search + origin filter (sidebar "Liste de joueurs").
+    const [playerListSearch, setPlayerListSearch] = useState("");
+    const [playerListOriginFilter, setPlayerListOriginFilter] = useState("");
+
     const playerInputRef = useRef<HTMLInputElement>(null);
 
     // Admin mid-tournament DNF confirmation
@@ -887,6 +891,19 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         return qualifierTournamentByName.get(normalizeName(p.firstname, p.name)) ?? null;
     };
 
+    // Finale only: distinct list of qualifier tournaments actually represented
+    // among the current participants, used to populate the origin filter dropdown.
+    const originTournamentOptions = isFinaleTournament
+        ? Array.from(
+            new Map(
+                tournament.participants
+                    .map(p => getQualifierTournament(p))
+                    .filter((t): t is Tournament => !!t)
+                    .map(t => [t.id, t] as const)
+            ).values()
+        ).sort((a, b) => a.name.localeCompare(b.name))
+        : [];
+
     // Calculate total placement points for each participant (5,3,2,1 system)
     const calculateTotalPoints = (participantId: string): number => {
         let total = 0;
@@ -963,6 +980,17 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const ntB = calculateNTScore(b.id);
         return ntB - ntA;
     });
+
+    // Player list filtered by search text (name/firstname) and, for the Finale,
+    // by origin qualifier tournament.
+    const filteredSortedParticipants = sortedParticipants
+        .map((p, index) => ({ p, index }))
+        .filter(({ p }) => {
+            const search = playerListSearch.trim().toLowerCase();
+            const matchesSearch = !search || `${p.firstname} ${p.name}`.toLowerCase().includes(search);
+            const matchesOrigin = !playerListOriginFilter || getQualifierTournament(p)?.id === playerListOriginFilter;
+            return matchesSearch && matchesOrigin;
+        });
 
     return (
         <div className="space-y-8">
@@ -1324,15 +1352,39 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
                     <div>
                         <Card className="sticky top-8 border-primary/20">
-                            <CardHeader className="bg-primary/5 border-b border-border">
+                            <CardHeader className="bg-primary/5 border-b border-border space-y-3">
                                 <CardTitle className="flex items-center gap-2 font-prototype">
                                     <Trophy className="w-5 h-5 text-primary" />
                                     Liste de joueurs
                                 </CardTitle>
+                                <input
+                                    type="text"
+                                    value={playerListSearch}
+                                    onChange={(e) => setPlayerListSearch(e.target.value)}
+                                    placeholder="Rechercher un joueur..."
+                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                                {isFinaleTournament && originTournamentOptions.length > 0 && (
+                                    <select
+                                        value={playerListOriginFilter}
+                                        onChange={(e) => setPlayerListOriginFilter(e.target.value)}
+                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    >
+                                        <option value="">Tous les tournois d&apos;origine</option>
+                                        {originTournamentOptions.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </CardHeader>
                             <CardContent className="p-0">
                                 <div className="divide-y divide-border">
-                                    {sortedParticipants.map((p, index) => {
+                                    {filteredSortedParticipants.length === 0 && (
+                                        <p className="text-sm font-prototype text-muted-foreground text-center py-4">
+                                            Aucun joueur ne correspond à la recherche.
+                                        </p>
+                                    )}
+                                    {filteredSortedParticipants.map(({ p, index }) => {
                                         const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
                                         const ntScore = calculateNTScore(p.id);
                                         const tableDiff = calculateTableDifference(p.id);
