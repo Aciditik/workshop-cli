@@ -1102,6 +1102,29 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        {/* Search / filter existing players */}
+                        <div className="space-y-2">
+                            <input
+                                type="text"
+                                value={playerListSearch}
+                                onChange={(e) => setPlayerListSearch(e.target.value)}
+                                placeholder="Rechercher un joueur..."
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            />
+                            {isFinaleTournament && originTournamentOptions.length > 0 && (
+                                <select
+                                    value={playerListOriginFilter}
+                                    onChange={(e) => setPlayerListOriginFilter(e.target.value)}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    <option value="">Tous les tournois d&apos;origine</option>
+                                    {originTournamentOptions.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+
                         {/* Add player form */}
                         <div className="space-y-2">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -1184,7 +1207,15 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {tournament.participants.map((p, index) => {
+                                    {tournament.participants
+                                        .map((p, index) => ({ p, index }))
+                                        .filter(({ p }) => {
+                                            const search = playerListSearch.trim().toLowerCase();
+                                            const matchesSearch = !search || `${p.firstname} ${p.name}`.toLowerCase().includes(search);
+                                            const matchesOrigin = !playerListOriginFilter || getQualifierTournament(p)?.id === playerListOriginFilter;
+                                            return matchesSearch && matchesOrigin;
+                                        })
+                                        .map(({ p, index }) => {
                                         const qualifierT = getQualifierTournament(p);
                                         const isCheckedIn = checkedInIds.has(p.id);
                                         return (
@@ -1352,30 +1383,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
                     <div>
                         <Card className="sticky top-8 border-primary/20">
-                            <CardHeader className="bg-primary/5 border-b border-border space-y-3">
+                            <CardHeader className="bg-primary/5 border-b border-border">
                                 <CardTitle className="flex items-center gap-2 font-prototype">
                                     <Trophy className="w-5 h-5 text-primary" />
                                     Liste de joueurs
                                 </CardTitle>
-                                <input
-                                    type="text"
-                                    value={playerListSearch}
-                                    onChange={(e) => setPlayerListSearch(e.target.value)}
-                                    placeholder="Rechercher un joueur..."
-                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                />
-                                {isFinaleTournament && originTournamentOptions.length > 0 && (
-                                    <select
-                                        value={playerListOriginFilter}
-                                        onChange={(e) => setPlayerListOriginFilter(e.target.value)}
-                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                    >
-                                        <option value="">Tous les tournois d&apos;origine</option>
-                                        {originTournamentOptions.map(t => (
-                                            <option key={t.id} value={t.id}>{t.name}</option>
-                                        ))}
-                                    </select>
-                                )}
                             </CardHeader>
                             <CardContent className="p-0">
                                 <div className="divide-y divide-border">
