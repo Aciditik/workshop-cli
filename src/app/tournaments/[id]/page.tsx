@@ -18,7 +18,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2 } from "lucide-react";
+import { UserRoundSearch, Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
@@ -1096,35 +1096,40 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             {tournament.status === "brouillon" && (
                 <Card className="border-orange-500/30 bg-orange-500/5">
                     <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-muted-foreground font-prototype">
+                            <UserRoundSearch className="w-5 h-5" />
+                            Rechercher un joueur
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 pb-4 border-b border-border">
+                        <input
+                            type="text"
+                            value={playerListSearch}
+                            onChange={(e) => setPlayerListSearch(e.target.value)}
+                            placeholder="Rechercher un joueur..."
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        />
+                        {isFinaleTournament && originTournamentOptions.length > 0 && (
+                            <select
+                                value={playerListOriginFilter}
+                                onChange={(e) => setPlayerListOriginFilter(e.target.value)}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                                <option value="">Tous les tournois d&apos;origine</option>
+                                {originTournamentOptions.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                        )}
+                    </CardContent>
+
+                    <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-orange-400 font-prototype">
                             <UserPlus className="w-5 h-5" />
                             Ajouter des joueurs
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* Search / filter existing players */}
-                        <div className="space-y-2">
-                            <input
-                                type="text"
-                                value={playerListSearch}
-                                onChange={(e) => setPlayerListSearch(e.target.value)}
-                                placeholder="Rechercher un joueur..."
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            />
-                            {isFinaleTournament && originTournamentOptions.length > 0 && (
-                                <select
-                                    value={playerListOriginFilter}
-                                    onChange={(e) => setPlayerListOriginFilter(e.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                >
-                                    <option value="">Tous les tournois d&apos;origine</option>
-                                    {originTournamentOptions.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-
                         {/* Add player form */}
                         <div className="space-y-2">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
