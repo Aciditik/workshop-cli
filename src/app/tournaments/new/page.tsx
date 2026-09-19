@@ -4,11 +4,13 @@ import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTournaments } from "@/lib/store";
 import { useAuth, getApiUrl } from "@/lib/auth";
-import { Tournament, Participant } from "@/lib/types";
-import { getFormat, getMaxRounds, getQualifiedCount, getFormatLabel, isRecommendedSize, generateRound1 } from "@/lib/qualifier-rules";
+import { Tournament, Participant, TournamentFormat } from "@/lib/types";
+import { getFormat, getMaxRounds, getQualifiedCount, getFormatLabel, isRecommendedSize, generateRound1, generateBracketRound1 } from "@/lib/qualifier-rules";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Trophy, ChevronLeft, Upload, Info, Plus, X, Play, Users } from "lucide-react";
+import Icon from "@mdi/react";
+import { mdiTournament } from "@mdi/js";
 import Link from "next/link";
 
 export default function NewTournament() {
@@ -27,6 +29,10 @@ export default function NewTournament() {
     const inputRef = useRef<HTMLInputElement>(null);
     const [organizers, setOrganizers] = useState<{ id: string; name: string; email: string; city?: string }[]>([]);
     const [selectedOwnerId, setSelectedOwnerId] = useState("");
+    // Manual format choice for 29+ players (swiss stage vs. table-based elimination tree).
+    // Defaults to "swiss" — required for tournaments already in brouillon before this
+    // feature existed, and it's the safest/simplest default otherwise.
+    const [selectedFormat, setSelectedFormat] = useState<TournamentFormat>("swiss");
 
     const isAdmin = user?.role === "admin";
 
@@ -124,9 +130,13 @@ export default function NewTournament() {
         }));
 
         const tournamentId = crypto.randomUUID();
-        const format = getFormat(size);
+        // 29+ players: honor the organizer's manual choice (swiss vs. bracket).
+        // Below that threshold the format is always the fixed 2-round elimination.
+        const format = size >= 29 ? selectedFormat : getFormat(size);
         const maxRounds = getMaxRounds(size);
-        const round1Matches = generateRound1(tournamentId, participants, size);
+        const round1Matches = format === "bracket"
+            ? generateBracketRound1(tournamentId, participants, size)
+            : generateRound1(tournamentId, participants, size);
 
         const newTournament: Tournament = {
             id: tournamentId,
@@ -323,6 +333,45 @@ export default function NewTournament() {
                         </p>
                     )}
 
+                    {/* Format choice — 29+ players: manual pick between swiss stage and bracket tree */}
+                    {size >= 29 && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-prototype">Style de tournoi</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedFormat("swiss")}
+                                    className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+                                        selectedFormat === "swiss"
+                                            ? "border-primary bg-primary/10"
+                                            : "border-border hover:bg-accent/40"
+                                    }`}
+                                >
+                                    <Users className="w-6 h-6 shrink-0 text-primary" />
+                                    <div>
+                                        <p className="font-prototype text-sm">Suisse</p>
+                                        <p className="text-xs font-prototype text-muted-foreground">3 rondes, classement par points cumulés</p>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedFormat("bracket")}
+                                    className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+                                        selectedFormat === "bracket"
+                                            ? "border-primary bg-primary/10"
+                                            : "border-border hover:bg-accent/40"
+                                    }`}
+                                >
+                                    <Icon path={mdiTournament} size={1} className="shrink-0 text-primary" />
+                                    <div>
+                                        <p className="font-prototype text-sm">Élimination (arbre)</p>
+                                        <p className="text-xs font-prototype text-muted-foreground">Quarts · Demies · Finale, tables de 4 en priorité</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Format info — shown once there's at least 1 player */}
                     {size >= 1 && (
                         <div className={`flex items-start gap-2 p-3 rounded-lg border text-sm ${
@@ -339,7 +388,7 @@ export default function NewTournament() {
                                 ) : (
                                     <>
                                         <p className="font-prototype">
-                                            {getFormatLabel(size)}
+                                            {getFormatLabel(size, size >= 29 ? selectedFormat : undefined)}
                                             {!isRecommendedSize(size) && " (non recommandé)"}
                                         </p>
                                         <p className="text-xs font-prototype opacity-80">
@@ -348,7 +397,10 @@ export default function NewTournament() {
                                         {size <= 28 && (
                                             <p className="text-xs font-prototype opacity-80">Ronde 1 : tables aléatoires · Ronde 2 : tables croisées selon résultats</p>
                                         )}
-                                        {size > 28 && (
+                                        {size > 28 && selectedFormat === "bracket" && (
+                                            <p className="text-xs font-prototype opacity-80">Arbre d&apos;élimination : tables et joueurs réduits de moitié à chaque ronde</p>
+                                        )}
+                                        {size > 28 && selectedFormat !== "bracket" && (
                                             <p className="text-xs font-prototype opacity-80">Format suisse : classement par points cumulés</p>
                                         )}
                                     </>

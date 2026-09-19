@@ -26,8 +26,9 @@ export function isRecommendedSize(size: number): boolean {
     return [16, 20, 24, 28].includes(size) || size > 28;
 }
 
-export function getFormatLabel(size: number): string {
+export function getFormatLabel(size: number, format?: TournamentFormat): string {
     if (size <= 28) return `2 rondes élimination directe`;
+    if (format === "bracket") return `3 rondes élimination (arbre)`;
     return `3 rondes suisse`;
 }
 
@@ -332,6 +333,123 @@ export function generateSwissRound(
     return matches;
 }
 
+// ─── Bracket Format (29+, opt-in): 3-round table-based elimination tree ────
+// Quarterfinals → Semifinals → Finale, halving both the player pool and the
+// table count each round. Table sizes prefer 4, then 3, then 5 (never lower
+// than 3 except for the tiny leftover pools of 1-2 that can occur at the very
+// end of the tree).
+export function getBracketTableSizes(n: number): number[] {
+    if (n <= 0) return [];
+    if (n <= 5) return [n];
+
+    const r = n % 4;
+    if (r === 0) return Array(n / 4).fill(4);
+    if (r === 3) return [...Array(Math.floor(n / 4)).fill(4), 3];
+    if (r === 2) return [...Array(Math.floor(n / 4) - 1).fill(4), 3, 3];
+    // r === 1
+    return [...Array(Math.floor(n / 4) - 1).fill(4), 5];
+}
+
+function bracketRoundLabel(round: number): string {
+    if (round === 1) return "Quart de finale";
+    if (round === 2) return "Demi-finale";
+    return "Finale";
+}
+
+export function generateBracketRound1(
+    tournamentId: string,
+    participants: Participant[],
+    size: number
+): TableMatch[] {
+    const pool = [...participants].sort(() => Math.random() - 0.5); // Random shuffle
+    const tableSizes = getBracketTableSizes(size);
+    const label = bracketRoundLabel(1);
+
+    const matches: TableMatch[] = [];
+    let cursor = 0;
+    for (let i = 0; i < tableSizes.length; i++) {
+        const tablePlayers = pool.slice(cursor, cursor + tableSizes[i]);
+        cursor += tableSizes[i];
+
+        matches.push({
+            id: crypto.randomUUID(),
+            tournamentId,
+            round: 1,
+            tableNumber: i + 1,
+            tableLabel: `${label} ${i + 1}`,
+            participantIds: tablePlayers.map(p => p.id),
+            results: {},
+            isCompleted: false,
+            isFinalist: false,
+        });
+    }
+
+    return matches;
+}
+
+// Ranks the players of a completed table best-to-worst by points scored.
+function rankTablePlayers(match: TableMatch): string[] {
+    const ids = match.participantIds.filter((id): id is string => id !== null);
+    return [...ids].sort((a, b) => (match.results[b] || 0) - (match.results[a] || 0));
+}
+
+// The top half (rounded up, minimum 1) of each table advances to the next round.
+function advancersForTable(match: TableMatch): string[] {
+    const ranked = rankTablePlayers(match);
+    const advanceCount = Math.max(1, Math.ceil(ranked.length / 2));
+    return ranked.slice(0, advanceCount);
+}
+
+// Interleaves advancers by placement tier (all 1st places, then all 2nd places, …)
+// across the previous round's tables so consecutive players in the pool mostly
+// come from different origin tables, minimizing immediate repeat matchups.
+function crossBracketAdvancers(previousRoundMatches: TableMatch[]): string[] {
+    const perTable = [...previousRoundMatches]
+        .sort((a, b) => a.tableNumber - b.tableNumber)
+        .map(advancersForTable);
+    const maxLen = Math.max(0, ...perTable.map(a => a.length));
+
+    const pool: string[] = [];
+    for (let tier = 0; tier < maxLen; tier++) {
+        for (const tablePlayers of perTable) {
+            if (tablePlayers[tier]) pool.push(tablePlayers[tier]);
+        }
+    }
+    return pool;
+}
+
+export function generateBracketNextRound(
+    tournamentId: string,
+    previousRoundMatches: TableMatch[],
+    nextRound: number
+): TableMatch[] {
+    const completed = previousRoundMatches.filter(m => m.isCompleted);
+    const pool = crossBracketAdvancers(completed);
+    const tableSizes = getBracketTableSizes(pool.length);
+    const label = bracketRoundLabel(nextRound);
+
+    const matches: TableMatch[] = [];
+    let cursor = 0;
+    for (let i = 0; i < tableSizes.length; i++) {
+        const tablePlayers = pool.slice(cursor, cursor + tableSizes[i]);
+        cursor += tableSizes[i];
+
+        matches.push({
+            id: crypto.randomUUID(),
+            tournamentId,
+            round: nextRound,
+            tableNumber: i + 1,
+            tableLabel: `${label} ${i + 1}`,
+            participantIds: tablePlayers,
+            results: {},
+            isCompleted: false,
+            isFinalist: false,
+        });
+    }
+
+    return matches;
+}
+
 // ─── Determine Qualified Players ────────────────────────────────────
 export function determineQualifiedPlayers(
     format: TournamentFormat,
@@ -340,6 +458,39 @@ export function determineQualifiedPlayers(
     participants: Participant[]
 ): string[] {
     const qualifiedCount = getQualifiedCount(size);
+
+    if (format === "bracket") {
+        // Rank players by how far they progressed through the tree: furthest
+        // round reached first, then points scored at their last table, then
+        // total cumulative score as a final tie-break.
+        const lastRound = new Map<string, number>();
+        const lastRoundPoints = new Map<string, number>();
+        for (const m of matches) {
+            if (!m.isCompleted) continue;
+            for (const pid of m.participantIds) {
+                if (!pid) continue;
+                const prevRound = lastRound.get(pid) ?? 0;
+                if (m.round >= prevRound) {
+                    lastRound.set(pid, m.round);
+                    lastRoundPoints.set(pid, m.results[pid] || 0);
+                }
+            }
+        }
+
+        const ranked = [...participants]
+            .filter(p => !p.dnf)
+            .sort((a, b) => {
+                const ra = lastRound.get(a.id) ?? 0;
+                const rb = lastRound.get(b.id) ?? 0;
+                if (rb !== ra) return rb - ra;
+                const pa = lastRoundPoints.get(a.id) ?? 0;
+                const pb = lastRoundPoints.get(b.id) ?? 0;
+                if (pb !== pa) return pb - pa;
+                return b.score - a.score;
+            });
+
+        return ranked.slice(0, qualifiedCount).map(p => p.id);
+    }
 
     if (format === "elimination") {
         // Qualified = winners of each finalist table in round 2

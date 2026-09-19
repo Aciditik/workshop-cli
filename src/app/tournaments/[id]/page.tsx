@@ -1,16 +1,21 @@
 "use client";
 
 import { use, useState, useRef, useEffect, KeyboardEvent } from "react";
+import Icon from "@mdi/react";
+import { mdiAccount, mdiTournament } from "@mdi/js";
 import { useRouter } from "next/navigation";
 import { useTournaments } from "@/lib/store";
 import { useAuth, getApiUrl } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SwissRounds } from "@/components/SwissRounds";
-import { Participant, Tournament } from "@/lib/types";
+import { BracketTreeView } from "@/components/BracketTreeView";
+import { Participant, Tournament, TournamentFormat } from "@/lib/types";
 import {
     generateEliminationRound2,
     generateSwissRound,
+    generateBracketRound1,
+    generateBracketNextRound,
     determineQualifiedPlayers,
     getFormatLabel,
     generateRound1,
@@ -18,7 +23,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { UserRoundSearch, Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2 } from "lucide-react";
+import { ListCheck, UserRoundSearch, Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
@@ -136,6 +141,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // Player list search + origin filter (sidebar "Liste de joueurs").
     const [playerListSearch, setPlayerListSearch] = useState("");
     const [playerListOriginFilter, setPlayerListOriginFilter] = useState("");
+
+    // Manual format choice for 29+ players when launching a brouillon tournament
+    // (swiss stage vs. table-based elimination tree). Defaults to "swiss" so
+    // tournaments already in brouillon before this feature existed behave
+    // exactly as before.
+    const [selectedFormat, setSelectedFormat] = useState<TournamentFormat>("swiss");
 
     const playerInputRef = useRef<HTMLInputElement>(null);
 
@@ -335,6 +346,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             const round1Matches = tournament.matches.filter(m => m.round === 1);
             console.log("Generating elimination Round 2 with", round1Matches.length, "Round 1 matches");
             newMatches = generateEliminationRound2(tournament.id, activePlayers.length, round1Matches);
+        } else if (format === "bracket") {
+            // Bracket tree rounds 2-3: half the players/tables advance from the previous round
+            const previousRoundMatches = tournament.matches.filter(m => m.round === currentRound);
+            console.log("Generating bracket round", nextRound, "from", previousRoundMatches.length, "previous round tables");
+            newMatches = generateBracketNextRound(tournament.id, previousRoundMatches, nextRound);
         } else {
             // Swiss rounds 2-3: sorted by score
             console.log("Generating Swiss round", nextRound, "with", activePlayers.length, "active participants");
@@ -810,9 +826,13 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const startTournament = () => {
         if (playerCount < 8) return;
 
-        const format = getFormat(playerCount);
+        // 29+ players: honor the organizer's manual choice (swiss vs. bracket).
+        // Below that threshold the format is always the fixed 2-round elimination.
+        const format = playerCount >= 29 ? selectedFormat : getFormat(playerCount);
         const maxRounds = getMaxRounds(playerCount);
-        const round1Matches = generateRound1(tournament.id, tournament.participants, playerCount);
+        const round1Matches = format === "bracket"
+            ? generateBracketRound1(tournament.id, tournament.participants, playerCount)
+            : generateRound1(tournament.id, tournament.participants, playerCount);
 
         updateTournament({
             ...tournament,
@@ -1129,7 +1149,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             Ajouter des joueurs
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 pb-4 border-b border-border">
                         {/* Add player form */}
                         <div className="space-y-2">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -1198,7 +1218,15 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 Ajouter le joueur
                             </Button>
                         </div>
-
+                    </CardContent>
+                    
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-gray-400 font-prototype">
+                            <ListCheck className="w-5 h-5" />
+                            Liste des joueurs
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                         {/* Player list with check-in toggle */}
                         {tournament.participants.length > 0 && (
                             <>
@@ -1285,6 +1313,45 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </p>
                         )}
 
+                        {/* Format choice — 29+ players: manual pick between swiss stage and bracket tree */}
+                        {playerCount >= 29 && (
+                            <div className="space-y-2 pt-2">
+                                <label className="text-sm font-prototype">Style de tournoi</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedFormat("swiss")}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+                                            selectedFormat === "swiss"
+                                                ? "border-primary bg-primary/10"
+                                                : "border-border hover:bg-accent/40"
+                                        }`}
+                                    >
+                                        <Users className="w-6 h-6 shrink-0 text-primary" />
+                                        <div>
+                                            <p className="font-prototype text-sm">Suisse</p>
+                                            <p className="text-xs font-prototype text-muted-foreground">3 rondes, classement par points cumulés</p>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedFormat("bracket")}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+                                            selectedFormat === "bracket"
+                                                ? "border-primary bg-primary/10"
+                                                : "border-border hover:bg-accent/40"
+                                        }`}
+                                    >
+                                        <Icon path={mdiTournament} size={1} className="shrink-0 text-primary" />
+                                        <div>
+                                            <p className="font-prototype text-sm">Élimination (arbre)</p>
+                                            <p className="text-xs font-prototype text-muted-foreground">Quarts · Demies · Finale, tables de 4 en priorité</p>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Start tournament button */}
                         <div className="pt-4 border-t">
                             <Button
@@ -1368,6 +1435,23 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 </Button>
                             ) : null}
                         </div>
+                        {format === "bracket" && tournament.matches.length > 0 && (
+                            <Card className="border-primary/20">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 font-prototype">
+                                        <Icon path={mdiTournament} size={0.8} />
+                                        Arbre d&apos;élimination
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <BracketTreeView
+                                        matches={tournament.matches}
+                                        participants={tournament.participants}
+                                        qualifiedIds={tournament.qualifiedIds}
+                                    />
+                                </CardContent>
+                            </Card>
+                        )}
                         <SwissRounds
                             matches={tournament.matches}
                             participants={tournament.participants}
@@ -1402,11 +1486,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         </p>
                                     )}
                                     {filteredSortedParticipants.map(({ p, index }) => {
-                                        const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
+                                        const totalPoints = (format === "swiss" || format === "bracket") ? calculateTotalPoints(p.id) : null;
                                         const ntScore = calculateNTScore(p.id);
                                         const tableDiff = calculateTableDifference(p.id);
                                         const qualifierT = getQualifierTournament(p);
-                                        const showStats = tournament.status !== "brouillon" && format === "swiss";
+                                        const showStats = tournament.status !== "brouillon" && (format === "swiss" || format === "bracket");
                                         return (
                                             <div
                                                 key={p.id}

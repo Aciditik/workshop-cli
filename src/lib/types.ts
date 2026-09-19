@@ -1,5 +1,9 @@
 export type TournamentStatus = "brouillon" | "en_cours" | "fini";
-export type TournamentFormat = "elimination" | "swiss";
+// "elimination": 2-round table elimination (8-28 players, fixed layouts)
+// "swiss": 3-round swiss stage, ranking by cumulative score (29+ players, default)
+// "bracket": 3-round table-based elimination tree (29+ players, opt-in) —
+// quarterfinals/semifinals/finals, tables halve in count and players each round.
+export type TournamentFormat = "elimination" | "swiss" | "bracket";
 
 export interface Participant {
     id: string;
