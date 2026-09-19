@@ -16,7 +16,8 @@ const ROUND_LABELS: Record<number, string> = {
 };
 
 // Visual tree for the "bracket" format: one column per round (Quarts → Demies
-// → Finale), each showing its tables with players ranked by points. Because
+// → Finale), each showing its tables with players ordered by their finishing
+// rank at the table (1er, 2e, …). Because
 // advancing players are crossed/interleaved across tables between rounds
 // (to avoid immediate rematches), a single table doesn't map to one specific
 // table in the next round — the arrow between columns conveys the overall
@@ -64,7 +65,9 @@ export function BracketTreeView({ matches, participants, qualifiedIds }: Bracket
                                                             {qualifiedSet.has(pid) && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />}
                                                             {p.firstname} {p.name}
                                                         </span>
-                                                        <span className="tabular-nums text-muted-foreground shrink-0">{m.results[pid] ?? "-"}</span>
+                                                        <span className="tabular-nums text-muted-foreground shrink-0">
+                                                            {m.isCompleted ? (i === 0 ? "1er" : `${i + 1}e`) : "-"}
+                                                        </span>
                                                     </div>
                                                 );
                                             })}

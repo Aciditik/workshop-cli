@@ -1486,11 +1486,11 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         </p>
                                     )}
                                     {filteredSortedParticipants.map(({ p, index }) => {
-                                        const totalPoints = (format === "swiss" || format === "bracket") ? calculateTotalPoints(p.id) : null;
+                                        const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
                                         const ntScore = calculateNTScore(p.id);
                                         const tableDiff = calculateTableDifference(p.id);
                                         const qualifierT = getQualifierTournament(p);
-                                        const showStats = tournament.status !== "brouillon" && (format === "swiss" || format === "bracket");
+                                        const showStats = tournament.status !== "brouillon" && format === "swiss";
                                         return (
                                             <div
                                                 key={p.id}
