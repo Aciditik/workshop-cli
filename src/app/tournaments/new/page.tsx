@@ -216,7 +216,7 @@ export default function NewTournament() {
                                 onChange={(e) => setSelectedOwnerId(e.target.value)}
                                 className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             >
-                                <option value="">Moi-même (admin)</option>
+                                <option value="">Admin</option>
                                 {organizers.map(o => (
                                     <option key={o.id} value={o.id}>
                                         {o.city ? `${o.name} (${o.city})` : o.name}

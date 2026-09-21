@@ -1055,7 +1055,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             variant="outline"
                             size="sm"
                             className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
-                            title="Modifier le tournoi (admin)"
+                            title="Modifier le tournoi"
                         >
                             <Settings className="w-4 h-4" />
                             Modifier le tournoi
@@ -1116,7 +1116,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             {tournament.status === "brouillon" && (
                 <Card className="border-orange-500/30 bg-orange-500/5">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-muted-foreground font-prototype">
+                        <CardTitle className="flex items-center gap-2 text-orange-400 font-prototype">
                             <UserRoundSearch className="w-5 h-5" />
                             Rechercher un joueur
                         </CardTitle>
@@ -1194,7 +1194,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             {isFinaleTournament && (
                                 <div className="space-y-1">
                                     <label className="text-xs font-prototype text-muted-foreground">
-                                        Tournoi qualificatif (optionnel)
+                                        Tournoi qualificatif
                                     </label>
                                     <select
                                         value={sourceTournamentId}
@@ -1221,7 +1221,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     </CardContent>
                     
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-gray-400 font-prototype">
+                        <CardTitle className="flex items-center gap-2 text-orange-400 font-prototype">
                             <ListCheck className="w-5 h-5" />
                             Liste des joueurs
                         </CardTitle>
@@ -1286,7 +1286,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         type="button"
                                                         onClick={(e) => { e.stopPropagation(); openEditParticipant(p); }}
                                                         className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="Modifier les infos du joueur (admin)"
+                                                        title="Modifier les infos du joueur"
                                                     >
                                                         <Pencil className="w-4 h-4" />
                                                     </button>
@@ -1344,8 +1344,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     >
                                         <Icon path={mdiTournament} size={1} className="shrink-0 text-primary" />
                                         <div>
-                                            <p className="font-prototype text-sm">Élimination (arbre)</p>
-                                            <p className="text-xs font-prototype text-muted-foreground">Quarts · Demies · Finale, tables de 4 en priorité</p>
+                                            <p className="font-prototype text-sm">Élimination, arbre de tournoi</p>
+                                            <p className="text-xs font-prototype text-muted-foreground">Quarts · Demies · Finale</p>
                                         </div>
                                     </button>
                                 </div>
