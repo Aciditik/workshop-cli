@@ -1344,8 +1344,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     >
                                         <Icon path={mdiTournament} size={1} className="shrink-0 text-primary" />
                                         <div>
-                                            <p className="font-prototype text-sm">Élimination, arbre de tournoi</p>
-                                            <p className="text-xs font-prototype text-muted-foreground">Quarts · Demies · Finale</p>
+                                            <p className="font-prototype text-sm">Élimination</p>
+                                            <p className="text-xs font-prototype text-muted-foreground">Quarts · Demies · Finale, arbre de tournoi</p>
                                         </div>
                                     </button>
                                 </div>
