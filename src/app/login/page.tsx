@@ -5,15 +5,12 @@ import { useAuth } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Image from "next/image";
-import { Trophy, LogIn, UserPlus } from "lucide-react";
+import { LogIn, UserRound } from "lucide-react";
 
 export default function LoginPage() {
-  const { login, register } = useAuth();
-  const [isRegister, setIsRegister] = useState(false);
+  const { login, loginAsGuest } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [city, setCity] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -23,11 +20,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (isRegister) {
-        await register(email, password, name, city || undefined);
-      } else {
-        await login(email, password);
-      }
+      await login(email, password);
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue");
     } finally {
@@ -52,62 +45,19 @@ export default function LoginPage() {
             CdF Terraforming Mars
           </h1>
           <p className="text-muted-foreground text-center">
-            {isRegister
-              ? "Créez votre compte organisateur"
-              : "Connectez-vous pour gérer vos tournois"}
+            Connectez-vous pour gérer vos tournois
           </p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
-              {isRegister ? (
-                <>
-                  <UserPlus className="w-5 h-5" />
-                  Inscription
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-5 h-5" />
-                  Connexion
-                </>
-              )}
+              <LogIn className="w-5 h-5" />
+              Connexion
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {isRegister && (
-                <>
-                  <div className="space-y-2">
-                    <label htmlFor="name" className="text-sm font-medium">
-                      Nom de la boutique / association
-                    </label>
-                    <input
-                      id="name"
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Votre nom"
-                      className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="city" className="text-sm font-medium">
-                      Ville
-                    </label>
-                    <input
-                      id="city"
-                      type="text"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      placeholder="Votre ville"
-                      className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    />
-                  </div>
-                </>
-              )}
-
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">
                   Email
@@ -148,11 +98,6 @@ export default function LoginPage() {
               <Button type="submit" className="w-full gap-2" size="lg" disabled={loading}>
                 {loading ? (
                   "Chargement..."
-                ) : isRegister ? (
-                  <>
-                    <UserPlus className="w-4 h-4" />
-                    S&apos;inscrire
-                  </>
                 ) : (
                   <>
                     <LogIn className="w-4 h-4" />
@@ -160,21 +105,16 @@ export default function LoginPage() {
                   </>
                 )}
               </Button>
-
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRegister(!isRegister);
-                    setError("");
-                  }}
-                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                >
-                  {isRegister
-                    ? "Déjà un compte ? Se connecter"
-                    : "Pas de compte ? S'inscrire"}
-                </button>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                size="lg"
+                onClick={loginAsGuest}
+              >
+                <UserRound className="w-4 h-4" />
+                Continuer en invité
+              </Button>
             </form>
           </CardContent>
         </Card>

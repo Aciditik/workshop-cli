@@ -1,7 +1,7 @@
 "use client";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3, Timer, HelpCircle, Phone } from "lucide-react";
+import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3, Timer, HelpCircle, Phone, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -22,6 +22,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       pathname !== "/chrono"
     ) {
       router.push("/login");
+    }
+    // Guests can only access the stats page.
+    if (!isLoading && user?.role === "guest" && pathname !== "/stats") {
+      router.push("/stats");
     }
   }, [isLoading, user, pathname, router]);
 
@@ -53,7 +57,9 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [organizerOpen, setOrganizerOpen] = useState(false);
   const isAdmin = user?.role === "admin";
+  const isGuest = user?.role === "guest";
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -100,14 +106,16 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
-          <Link
-            href="/"
-            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <LayoutDashboard className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-prototype">Tableau de bord</span>
-          </Link>
-          {isAdmin && (
+          {!isGuest && (
+            <Link
+              href="/"
+              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
+            >
+              <LayoutDashboard className="w-5 h-5 group-hover:text-primary transition-colors" />
+              <span className="font-prototype">Tableau de bord</span>
+            </Link>
+          )}
+          {(isAdmin || isGuest) && (
             <Link
               href="/stats"
               className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
@@ -116,15 +124,17 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               <span className="font-prototype">Statistiques</span>
             </Link>
           )}
-          <a
-            href="/chrono"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <Timer className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-prototype">Chronomètre</span>
-          </a>
+          {!isGuest && (
+            <a
+              href="/chrono"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
+            >
+              <Timer className="w-5 h-5 group-hover:text-primary transition-colors" />
+              <span className="font-prototype">Chronomètre</span>
+            </a>
+          )}
         </nav>
 
         <div className="p-4 space-y-3">
@@ -136,6 +146,16 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <HelpCircle className="w-5 h-5 group-hover:text-primary transition-colors" />
             <span className="font-prototype">Aide</span>
           </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setOrganizerOpen(true)}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group text-left"
+            >
+              <UserPlus className="w-5 h-5 group-hover:text-primary transition-colors" />
+              <span className="font-prototype">Ajouter un organisateur</span>
+            </button>
+          )}
           <div className="flex items-center gap-3 px-2 pt-3 border-t border-border/50">
             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-prototype shrink-0">
               {user?.name?.charAt(0).toUpperCase()}
@@ -146,7 +166,9 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 {user?.role === "admin" && (
                   <Shield className="w-3 h-3 text-yellow-500" />
                 )}
-                <p className="text-xs font-prototype text-muted-foreground capitalize">{user?.role}</p>
+                <p className="text-xs font-prototype text-muted-foreground capitalize">
+                  {user?.role === "guest" ? "Invité" : user?.role}
+                </p>
               </div>
             </div>
             <button
@@ -190,6 +212,9 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 
         <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8 relative">{children}</div>
       </main>
+
+      {/* Add organizer modal (admin only) */}
+      {organizerOpen && <AddOrganizerModal onClose={() => setOrganizerOpen(false)} />}
 
       {/* Help / contact modal */}
       {helpOpen && (
@@ -239,6 +264,149 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function AddOrganizerModal({ onClose }: { onClose: () => void }) {
+  const { createOrganizer } = useAuth();
+  const [name, setName] = useState("");
+  const [city, setCity] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await createOrganizer(email, password, name, city || undefined);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || "Une erreur est survenue");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          aria-label="Fermer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+            <UserPlus className="w-6 h-6 text-primary" />
+          </div>
+          <h2 className="text-xl font-prototype">Ajouter un organisateur</h2>
+        </div>
+
+        {success ? (
+          <div className="space-y-4">
+            <p className="text-sm font-prototype text-green-400 bg-green-500/10 border border-green-500/20 rounded-md p-3">
+              Compte organisateur créé avec succès.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full px-4 py-2 rounded-md bg-primary text-primary-foreground font-prototype text-sm hover:bg-primary/90 transition-colors"
+            >
+              Fermer
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="org-name" className="text-sm font-medium">
+                Nom de la boutique / association
+              </label>
+              <input
+                id="org-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nom"
+                className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="org-city" className="text-sm font-medium">
+                Ville
+              </label>
+              <input
+                id="org-city"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Ville"
+                className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="org-email" className="text-sm font-medium">
+                Email
+              </label>
+              <input
+                id="org-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@exemple.com"
+                className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="org-password" className="text-sm font-medium">
+                Mot de passe
+              </label>
+              <input
+                id="org-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                required
+                minLength={6}
+              />
+            </div>
+
+            {error && (
+              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-primary text-primary-foreground font-prototype text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <UserPlus className="w-4 h-4" />
+              {loading ? "Création..." : "Créer le compte"}
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

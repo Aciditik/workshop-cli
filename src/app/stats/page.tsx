@@ -30,7 +30,7 @@ type Entry = {
   isQualified: boolean;
 };
 
-type TournamentMeta = { id: string; name: string; eventDate: string; ownerId: string; ownerName: string };
+type TournamentMeta = { id: string; name: string; eventDate: string; status?: string; ownerId: string; ownerName: string };
 
 type StatsData = {
   entries: Entry[];
@@ -687,6 +687,7 @@ export default function StatsPage() {
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const isGuest = user?.role === "guest";
 
   // Dropdown metadata (tournaments, organizers) — fetched once, unfiltered.
   const [meta, setMeta] = useState<StatsData | null>(null);
@@ -714,7 +715,7 @@ export default function StatsPage() {
 
   // Guard + one-time metadata fetch for the filter dropdowns.
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isAdmin && !isGuest) {
       router.push("/");
       return;
     }
@@ -722,11 +723,11 @@ export default function StatsPage() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setMeta)
       .catch(() => {});
-  }, [isAdmin, router, apiUrl]);
+  }, [isAdmin, isGuest, router, apiUrl]);
 
   // Filtered data fetch — debounced (player search) + in-memory cache.
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isGuest) return;
     const params = new URLSearchParams();
     if (tournamentFilter) params.set("tournament", tournamentFilter);
     if (corporationFilter) params.set("corporation", corporationFilter);
@@ -767,7 +768,7 @@ export default function StatsPage() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [isAdmin, apiUrl, tournamentFilter, corporationFilter, organizerFilter, dateFrom, dateTo, playerSearch, qualifiedOnly]);
+  }, [isAdmin, isGuest, apiUrl, tournamentFilter, corporationFilter, organizerFilter, dateFrom, dateTo, playerSearch, qualifiedOnly]);
 
   function handleSortMetric(m: SortMetric) {
     if (sortMetric === m) {
@@ -778,20 +779,33 @@ export default function StatsPage() {
     }
   }
 
-  const sortedEntries = useMemo(() => {
+  // Guests only see data from finished tournaments.
+  const finishedTournamentIds = useMemo(
+    () => new Set((meta?.tournaments ?? data?.tournaments ?? []).filter((t) => t.status === "fini").map((t) => t.id)),
+    [meta, data]
+  );
+
+  const visibleEntries = useMemo(() => {
     if (!data) return [];
-    return [...data.entries].sort((a, b) =>
+    if (!isGuest) return data.entries;
+    return data.entries.filter((e) => finishedTournamentIds.has(e.tournamentId));
+  }, [data, isGuest, finishedTournamentIds]);
+
+  const sortedEntries = useMemo(() => {
+    return [...visibleEntries].sort((a, b) =>
       sortDir === "desc" ? b[sortMetric] - a[sortMetric] : a[sortMetric] - b[sortMetric]
     );
-  }, [data, sortMetric, sortDir]);
+  }, [visibleEntries, sortMetric, sortDir]);
 
   const tournamentOptions = useMemo(
     () =>
       (meta?.tournaments ?? data?.tournaments ?? [])
+        // Guests only see finished tournaments in the filter.
+        .filter((t) => !isGuest || t.status === "fini")
         .slice()
         .sort((a, b) => (b.eventDate || "").localeCompare(a.eventDate || ""))
         .map((t) => ({ value: t.id, label: t.name })),
-    [meta, data]
+    [meta, data, isGuest]
   );
   const organizerOptions = useMemo(
     () => (meta?.organizers ?? data?.organizers ?? []).map((o) => ({ value: o.id, label: o.name || "Sans nom" })),
@@ -839,14 +853,16 @@ export default function StatsPage() {
             Explorez les données de toutes les parties disputées.
           </p>
         </div>
-        <button
-          onClick={() => exportCsv(sortedEntries)}
-          disabled={sortedEntries.length === 0}
-          className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/30 hover:bg-muted/50 text-sm font-prototype transition-colors disabled:opacity-40"
-        >
-          <Download className="w-4 h-4" />
-          Export CSV
-        </button>
+        {!isGuest && (
+          <button
+            onClick={() => exportCsv(sortedEntries)}
+            disabled={sortedEntries.length === 0}
+            className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/30 hover:bg-muted/50 text-sm font-prototype transition-colors disabled:opacity-40"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </button>
+        )}
       </div>
 
       {/* Summary counters */}
@@ -868,94 +884,110 @@ export default function StatsPage() {
               <Users className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-prototype font-bold">{data?.entries.length ?? 0}</p>
+              <p className="text-2xl font-prototype font-bold">{visibleEntries.length}</p>
               <p className="text-xs text-muted-foreground font-prototype">Scorecards</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters — guests only get the tournament filter */}
       <Card>
         <CardContent className="p-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                value={playerSearch}
-                onChange={(e) => setPlayerSearch(e.target.value)}
-                placeholder="Rechercher un joueur..."
-                className="bg-background border border-border rounded-md pl-8 pr-3 py-1.5 text-sm font-prototype text-foreground focus:outline-none focus:ring-1 focus:ring-primary w-48"
+          {isGuest ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Select
+                value={tournamentFilter}
+                onChange={setTournamentFilter}
+                placeholder="Tous les tournois"
+                options={tournamentOptions}
               />
+              <span className="ml-auto text-xs text-muted-foreground font-prototype">
+                {refreshing ? "Chargement..." : `${sortedEntries.length} résultat${sortedEntries.length !== 1 ? "s" : ""}`}
+              </span>
             </div>
-            <Select
-              value={tournamentFilter}
-              onChange={setTournamentFilter}
-              placeholder="Tous les tournois"
-              options={tournamentOptions}
-            />
-            <Select
-              value={corporationFilter}
-              onChange={setCorporationFilter}
-              placeholder="Toutes les corporations"
-              options={corporationOptions}
-            />
-            <Select
-              value={organizerFilter}
-              onChange={setOrganizerFilter}
-              placeholder="Tous les organisateurs"
-              options={organizerOptions}
-            />
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={qualifiedOnly}
-                onChange={(e) => setQualifiedOnly(e.target.checked)}
-                className="rounded border-border accent-primary"
-              />
-              <span className="text-sm font-prototype text-muted-foreground">Qualifiés seulement</span>
-            </label>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs font-prototype text-muted-foreground">
-              Du
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="bg-background border border-border rounded-md px-2 py-1.5 text-sm font-prototype text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-xs font-prototype text-muted-foreground">
-              Au
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="bg-background border border-border rounded-md px-2 py-1.5 text-sm font-prototype text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </label>
-            {(dateFrom || dateTo || playerSearch || tournamentFilter || corporationFilter || organizerFilter || qualifiedOnly) && (
-              <button
-                onClick={() => {
-                  setTournamentFilter("");
-                  setCorporationFilter("");
-                  setOrganizerFilter("");
-                  setDateFrom("");
-                  setDateTo("");
-                  setPlayerSearch("");
-                  setQualifiedOnly(false);
-                }}
-                className="text-xs font-prototype text-muted-foreground hover:text-destructive transition-colors"
-              >
-                Réinitialiser
-              </button>
-            )}
-            <span className="ml-auto text-xs text-muted-foreground font-prototype">
-              {refreshing ? "Chargement..." : `${sortedEntries.length} résultat${sortedEntries.length !== 1 ? "s" : ""}`}
-            </span>
-          </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={playerSearch}
+                    onChange={(e) => setPlayerSearch(e.target.value)}
+                    placeholder="Rechercher un joueur..."
+                    className="bg-background border border-border rounded-md pl-8 pr-3 py-1.5 text-sm font-prototype text-foreground focus:outline-none focus:ring-1 focus:ring-primary w-48"
+                  />
+                </div>
+                <Select
+                  value={tournamentFilter}
+                  onChange={setTournamentFilter}
+                  placeholder="Tous les tournois"
+                  options={tournamentOptions}
+                />
+                <Select
+                  value={corporationFilter}
+                  onChange={setCorporationFilter}
+                  placeholder="Toutes les corporations"
+                  options={corporationOptions}
+                />
+                <Select
+                  value={organizerFilter}
+                  onChange={setOrganizerFilter}
+                  placeholder="Tous les organisateurs"
+                  options={organizerOptions}
+                />
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={qualifiedOnly}
+                    onChange={(e) => setQualifiedOnly(e.target.checked)}
+                    className="rounded border-border accent-primary"
+                  />
+                  <span className="text-sm font-prototype text-muted-foreground">Qualifiés seulement</span>
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-xs font-prototype text-muted-foreground">
+                  Du
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="bg-background border border-border rounded-md px-2 py-1.5 text-sm font-prototype text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-xs font-prototype text-muted-foreground">
+                  Au
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="bg-background border border-border rounded-md px-2 py-1.5 text-sm font-prototype text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </label>
+                {(dateFrom || dateTo || playerSearch || tournamentFilter || corporationFilter || organizerFilter || qualifiedOnly) && (
+                  <button
+                    onClick={() => {
+                      setTournamentFilter("");
+                      setCorporationFilter("");
+                      setOrganizerFilter("");
+                      setDateFrom("");
+                      setDateTo("");
+                      setPlayerSearch("");
+                      setQualifiedOnly(false);
+                    }}
+                    className="text-xs font-prototype text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    Réinitialiser
+                  </button>
+                )}
+                <span className="ml-auto text-xs text-muted-foreground font-prototype">
+                  {refreshing ? "Chargement..." : `${sortedEntries.length} résultat${sortedEntries.length !== 1 ? "s" : ""}`}
+                </span>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -996,7 +1028,7 @@ export default function StatsPage() {
       </Card>
 
       {selectedPlayer && data && (
-        <PlayerModal playerKey={selectedPlayer} entries={data.entries} onClose={() => setSelectedPlayer(null)} />
+        <PlayerModal playerKey={selectedPlayer} entries={visibleEntries} onClose={() => setSelectedPlayer(null)} />
       )}
     </div>
   );

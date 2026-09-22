@@ -10,7 +10,7 @@ export interface User {
   email: string;
   name: string;
   city?: string;
-  role: "organizer" | "admin";
+  role: "organizer" | "admin" | "guest";
 }
 
 interface AuthContextType {
@@ -18,9 +18,13 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, city?: string) => Promise<void>;
+  loginAsGuest: () => void;
+  createOrganizer: (email: string, password: string, name: string, city?: string) => Promise<void>;
   logout: () => void;
 }
+
+const GUEST_KEY = "cdf-guest";
+const GUEST_USER: User = { id: "guest", email: "", name: "Invité", role: "guest" };
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -35,6 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (storedToken) {
       setToken(storedToken);
       fetchMe(storedToken);
+    } else if (localStorage.getItem(GUEST_KEY)) {
+      setUser(GUEST_USER);
+      setIsLoading(false);
     } else {
       setIsLoading(false);
     }
@@ -79,34 +86,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/");
   };
 
-  const register = async (email: string, password: string, name: string, city?: string) => {
+  const loginAsGuest = () => {
+    localStorage.setItem(GUEST_KEY, "1");
+    setUser(GUEST_USER);
+    router.push("/stats");
+  };
+
+  // Admin-only: creates an organizer account without switching the current session.
+  const createOrganizer = async (email: string, password: string, name: string, city?: string) => {
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ email, password, name, city }),
     });
 
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.error || "Erreur d'inscription");
+      throw new Error(data.error || "Erreur lors de la création");
     }
-
-    const data = await res.json();
-    localStorage.setItem("token", data.token);
-    setToken(data.token);
-    setUser(data.user);
-    router.push("/");
   };
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem(GUEST_KEY);
     setToken(null);
     setUser(null);
     router.push("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, loginAsGuest, createOrganizer, logout }}>
       {children}
     </AuthContext.Provider>
   );
