@@ -4,6 +4,7 @@ import arcadian from "@/assets/corpos/Communautés_Arcadiennes.png";
 import astrodrill from "@/assets/corpos/Astrodrill.png";
 import cheungshing from "@/assets/corpos/Cheung_Shing_Mars.png";
 import credicor from "@/assets/corpos/credicor.png";
+import desertron from "@/assets/corpos/Desertron.png";
 import ecoline from "@/assets/corpos/ecoline.png";
 import ecotec from "@/assets/corpos/Ecotec.png";
 import greenpower from "@/assets/corpos/Green_Power.png";
@@ -43,6 +44,7 @@ export const CORPORATION_LOGOS: Record<string, StaticImageData> = {
     "AstroDrill": astrodrill,
     "Cheung Shing Mars": cheungshing,
     "Credicor": credicor,
+    "Desertron": desertron,
     "Ecoline": ecoline,
     "Ecotec": ecotec,
     "Green Power": greenpower,
