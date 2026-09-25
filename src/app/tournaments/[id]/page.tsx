@@ -1394,12 +1394,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
                                             </span>
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""}`} title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
+                                                <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
                                                 {p.dnf && (
                                                     <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
-                                                )}
-                                                {!p.dnf && qualifiedIds.has(p.id) && (
-                                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
                                                 )}
                                             </div>
                                             <span className="text-sm font-prototype text-orange-600 text-right tabular-nums">
@@ -1514,12 +1511,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""}`} title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
+                                                        <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
                                                         {p.dnf && (
                                                             <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
-                                                        )}
-                                                        {!p.dnf && qualifiedIds.has(p.id) && (
-                                                            <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 shrink-0" />
                                                         )}
                                                     </div>
                                                     {showStats && (

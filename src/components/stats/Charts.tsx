@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
 // Lightweight dependency-free charts for the stats page.
 // All components accept plain data arrays and render with divs/SVG.
+// Bars support both hover (desktop) and tap (mobile) to reveal their value.
 
 export function BarChart({
     data,
@@ -12,25 +15,44 @@ export function BarChart({
     height?: number;
     formatValue?: (v: number) => string;
 }) {
+    const [active, setActive] = useState<number | null>(null);
     if (data.length === 0) return <Empty />;
     const max = Math.max(...data.map((d) => d.value), 1);
     return (
-        <div className="flex items-end gap-1.5 overflow-x-auto pb-1" style={{ height }}>
-            {data.map((d, i) => (
-                <div key={i} className="flex flex-col items-center justify-end gap-1 min-w-[36px] flex-1 h-full group">
-                    <span className="text-[10px] font-prototype text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                        {formatValue(d.value)}
-                    </span>
-                    <div
-                        className="w-full max-w-10 bg-primary/80 group-hover:bg-primary rounded-t transition-colors"
-                        style={{ height: `${Math.max((d.value / max) * 100, 2)}%` }}
-                        title={`${d.label}: ${formatValue(d.value)}`}
-                    />
-                    <span className="text-[9px] font-prototype text-muted-foreground truncate w-full text-center" title={d.label}>
-                        {d.label}
-                    </span>
-                </div>
-            ))}
+        <div>
+            <div className="flex items-end gap-1.5 overflow-x-auto pb-1" style={{ height }}>
+                {data.map((d, i) => (
+                    <button
+                        key={i}
+                        type="button"
+                        onClick={() => setActive((a) => (a === i ? null : i))}
+                        className="flex flex-col items-center justify-end gap-1 min-w-[36px] flex-1 h-full group"
+                    >
+                        <span
+                            className={`text-[10px] font-prototype text-muted-foreground transition-opacity ${
+                                active === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            }`}
+                        >
+                            {formatValue(d.value)}
+                        </span>
+                        <div
+                            className={`w-full max-w-10 rounded-t transition-colors ${
+                                active === i ? "bg-primary" : "bg-primary/80 group-hover:bg-primary"
+                            }`}
+                            style={{ height: `${Math.max((d.value / max) * 100, 2)}%` }}
+                            title={`${d.label}: ${formatValue(d.value)}`}
+                        />
+                        <span className="text-[9px] font-prototype text-muted-foreground truncate w-full text-center" title={d.label}>
+                            {d.label}
+                        </span>
+                    </button>
+                ))}
+            </div>
+            {active !== null && (
+                <p className="text-xs font-prototype text-center mt-1.5">
+                    {data[active].label} : <span className="font-bold text-primary">{formatValue(data[active].value)}</span>
+                </p>
+            )}
         </div>
     );
 }
@@ -48,26 +70,30 @@ export function HBarChart({
     const max = Math.max(...data.map((d) => d.value), 1);
     return (
         <div className="space-y-1.5">
-            {data.map((d, i) => (
-                <div key={i} className={`flex items-center gap-2 ${d.dimmed ? "opacity-50" : ""}`}>
-                    <span className="w-32 sm:w-44 shrink-0 truncate text-xs font-prototype text-foreground" title={d.label}>
-                        {d.label}
-                    </span>
-                    <div className="flex-1 h-5 bg-muted/20 rounded overflow-hidden">
-                        <div
-                            className="h-full bg-primary/80 rounded flex items-center justify-end pr-1.5"
-                            style={{ width: `${Math.max((d.value / max) * 100, 3)}%` }}
-                        >
-                            <span className="text-[10px] font-prototype text-primary-foreground whitespace-nowrap">
+            {data.map((d, i) => {
+                const pct = Math.max((d.value / max) * 100, d.value > 0 ? 3 : 0);
+                return (
+                    <div key={i} className={`flex items-center gap-2 ${d.dimmed ? "opacity-50" : ""}`}>
+                        <span className="w-32 sm:w-44 shrink-0 truncate text-xs font-prototype text-foreground" title={d.label}>
+                            {d.label}
+                        </span>
+                        {/* Bar track: label is rendered outside the filled bar (not clipped)
+                            so short bars never cut off their value on small screens. */}
+                        <div className="flex-1 h-5 bg-muted/20 rounded relative">
+                            <div className="h-full bg-primary/80 rounded" style={{ width: `${pct}%` }} />
+                            <span
+                                className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none text-[10px] font-prototype font-semibold px-1 py-0.5 rounded bg-background border border-border shadow-sm whitespace-nowrap"
+                                style={{ left: `calc(${pct}% + 4px)` }}
+                            >
                                 {formatValue(d.value)}
                             </span>
                         </div>
+                        {d.sub && (
+                            <span className="w-14 shrink-0 text-right text-[10px] font-prototype text-muted-foreground">{d.sub}</span>
+                        )}
                     </div>
-                    {d.sub && (
-                        <span className="w-14 shrink-0 text-right text-[10px] font-prototype text-muted-foreground">{d.sub}</span>
-                    )}
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -81,6 +107,7 @@ export function Histogram({
     bins?: number;
     height?: number;
 }) {
+    const [active, setActive] = useState<number | null>(null);
     if (values.length === 0) return <Empty />;
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -92,26 +119,49 @@ export function Histogram({
         counts[idx]++;
     }
     const maxCount = Math.max(...counts, 1);
+    const binLabel = (i: number) => `${Math.round(min + i * bucketSize)}–${Math.round(min + (i + 1) * bucketSize)}`;
     return (
         <div>
             <div className="flex items-end gap-1" style={{ height }}>
                 {counts.map((c, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
-                        <span className="text-[10px] font-prototype text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                        key={i}
+                        type="button"
+                        onClick={() => setActive((a) => (a === i ? null : i))}
+                        className="flex-1 flex flex-col items-center justify-end h-full group"
+                    >
+                        <span
+                            className={`text-[10px] font-prototype text-muted-foreground transition-opacity ${
+                                active === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            }`}
+                        >
                             {c}
                         </span>
                         <div
-                            className="w-full bg-primary/80 group-hover:bg-primary rounded-t transition-colors"
+                            className={`w-full rounded-t transition-colors ${
+                                active === i ? "bg-primary" : "bg-primary/80 group-hover:bg-primary"
+                            }`}
                             style={{ height: `${Math.max((c / maxCount) * 100, c > 0 ? 3 : 0)}%` }}
-                            title={`${Math.round(min + i * bucketSize)}–${Math.round(min + (i + 1) * bucketSize)} pts : ${c}`}
+                            title={`${binLabel(i)} pts : ${c}`}
                         />
-                    </div>
+                    </button>
                 ))}
             </div>
-            <div className="flex justify-between text-[10px] font-prototype text-muted-foreground mt-1">
-                <span>{Math.round(min)} pts</span>
-                <span>{Math.round(max)} pts</span>
+            {/* Full scale shown permanently below (not just on hover) so the
+                bucket boundaries are visible on mobile without tapping. */}
+            <div className="flex text-[8px] font-prototype text-muted-foreground mt-1 gap-0.5">
+                {counts.map((_: number, i: number) => (
+                    <span key={i} className="flex-1 text-center truncate">
+                        {Math.round(min + i * bucketSize)}
+                    </span>
+                ))}
+                <span className="text-right shrink-0">{Math.round(max)}</span>
             </div>
+            {active !== null && (
+                <p className="text-xs font-prototype text-center mt-1.5">
+                    {binLabel(active)} pts : <span className="font-bold text-primary">{counts[active]} partie{counts[active] > 1 ? "s" : ""}</span>
+                </p>
+            )}
         </div>
     );
 }

@@ -5,6 +5,7 @@ import { Tournament } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Trophy, CheckCircle2, ChevronUp, ChevronDown, ArrowLeft, AlertTriangle } from "lucide-react";
+import { CORPORATIONS, CORPORATION_PLACEHOLDER } from "@/lib/corporations";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -44,7 +45,7 @@ const DEFAULT_SCORE: FormPlayerScore = {
 };
 
 function isCorporationValid(corp: string) {
-    return corp !== "" && corp !== "Choisissez votre corporation";
+    return corp !== "" && corp !== CORPORATION_PLACEHOLDER;
 }
 
 function isPlayerComplete(score: FormPlayerScore): boolean {
@@ -67,16 +68,7 @@ const CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
     { key: "forets", label: "Forêts" },
     { key: "villes", label: "Villes" },
     { key: "cartes", label: "Cartes" },
-    { key: "megacredits", label: "Tiebreaker" },
-];
-
-const CORPORATIONS = [
-    "Choisissez votre corporation",
-    "Arcadian Communities","AstroDrill", "Cheung Shing Mars", "Credicor", "Desertron", "Ecoline", "Ecotec", "Green Power",
-    "Guilde des Voleurs", "Guilde Ouvrière", "Helion", "Interplanetary Cinematics", "Inventrix", "Kuiper Cooperative", 
-    "Ludophiles d'Asnières et d'ailleurs","Mining Guild", "Nirgal Enterprise", "Palladin Shipping", "Phobolog", "Point Luna", "Recyclon", 
-    "Robinson Industries", "Sagitta", "Saturn Systems", "Soleil Vert", "Spire", "Teractor", "Tharsis Republic", "Thorgate", 
-    "Tycho Magnetics", "Union Pharmaceutique","United Nations Mars Initiative", "Valley Trust", "Vitor", "World Series Mars"
+    { key: "megacredits", label: "Megacredits" },
 ];
 
 export default function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, tableId: string }> }) {
@@ -187,7 +179,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
 
         playersWithSums.sort((a, b) => {
             if (b.total !== a.total) return b.total - a.total;
-            return b.megacredits - a.megacredits; // Tiebreaker
+            return b.megacredits - a.megacredits;
         });
 
         const placementPoints = activePlayers.length === 3 ? [5, 3, 2] : [5, 3, 2, 1];
@@ -313,6 +305,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                             value={playerScore.corporation}
                                             onChange={(e) => handleScoreChange(pId, "corporation", e.target.value)}
                                         >
+                                            <option value={CORPORATION_PLACEHOLDER} className="font-prototype">{CORPORATION_PLACEHOLDER}</option>
                                             {CORPORATIONS.map(c => (
                                                 <option key={c} value={c} className="font-prototype">{c}</option>
                                             ))}
@@ -423,6 +416,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                             value={playerScore.corporation}
                                             onChange={(e) => handleScoreChange(pId, "corporation", e.target.value)}
                                         >
+                                            <option value={CORPORATION_PLACEHOLDER}>{CORPORATION_PLACEHOLDER}</option>
                                             {CORPORATIONS.map(c => (
                                                 <option key={c} value={c}>{c}</option>
                                             ))}

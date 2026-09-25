@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { TableMatch, Participant, PlayerScore } from "@/lib/types";
+import { CORPORATIONS } from "@/lib/corporations";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QRCodeModal } from "@/components/QRCodeModal";
-import { Star, ChevronDown, ChevronRight, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronRight, GripVertical } from "lucide-react";
 
 interface SwissRoundsProps {
     matches: TableMatch[];
@@ -34,9 +35,6 @@ const SCORE_CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
     { key: "cartes", label: "Cartes" },
 ];
 
-// Recompute placement points from raw scorecards using the same rule as the
-// mobile scorecard page: sort by total (tiebreaker: megacredits), assign
-// [5,3,2,1] (or [5,3,2] for 3p), plus +1 bonus for non-winners within 5 pts.
 function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record<string, number> {
     const ids = Object.keys(scorecards);
     const totals = ids.map(id => {
@@ -90,6 +88,13 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
         setEditDraft(prev => ({
             ...prev,
             [pid]: { ...prev[pid], [key]: Math.max(0, value) },
+        }));
+    };
+
+    const updateDraftCorporation = (pid: string, value: string) => {
+        setEditDraft(prev => ({
+            ...prev,
+            [pid]: { ...prev[pid], corporation: value },
         }));
     };
 
@@ -230,6 +235,19 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                             <span className="font-prototype">{p.firstname} {p.name}</span>
                                             <span className="text-orange-400 font-prototype">{total} pts</span>
                                         </div>
+                                        <div className="px-2 pt-2">
+                                            <label className="text-xs text-muted-foreground font-prototype mb-1 block">Corporation</label>
+                                            <select
+                                                value={sc.corporation}
+                                                onChange={e => updateDraftCorporation(pId, e.target.value)}
+                                                className="w-full p-1.5 border border-border rounded bg-background text-foreground text-xs font-prototype focus:outline-none focus:ring-1 focus:ring-primary"
+                                            >
+                                                {sc.corporation === "" && <option value="">—</option>}
+                                                {CORPORATIONS.map(c => (
+                                                    <option key={c} value={c}>{c}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                         <div className="grid grid-cols-3 gap-2 p-2 text-xs">
                                             {SCORE_CATEGORIES.map(({ key, label }) => (
                                                 <div key={key} className="flex flex-col">
@@ -247,7 +265,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                             ))}
                                         </div>
                                         <div className="px-2 pb-2">
-                                            <label className="text-xs text-muted-foreground font-prototype mb-1 block">Tiebreaker (MC)</label>
+                                            <label className="text-xs text-muted-foreground font-prototype mb-1 block">Mégacrédits (MC)</label>
                                             <input
                                                 type="number"
                                                 inputMode="numeric"
@@ -312,7 +330,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                         </div>
                                         {sc.megacredits > 0 && (
                                             <div className="px-3 py-1 text-xs font-prototype text-muted-foreground">
-                                                Tiebreaker: <span className="font-prototype text-foreground">{sc.megacredits}</span>
+                                                Mégacrédits: <span className="font-prototype text-foreground">{sc.megacredits}</span>
                                             </div>
                                         )}
                                     </div>
@@ -390,10 +408,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                                     {canDrag && p && (
                                                         <GripVertical className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                                                     )}
-                                                    <span className="font-prototype">{p ? `${p.firstname} ${p.name}` : "Place vide"}</span>
-                                                    {p && qualifiedSet.has(p.id) && (
-                                                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-                                                    )}
+                                                    <span className={`font-prototype ${p && qualifiedSet.has(p.id) ? "text-yellow-400" : ""}`}>{p ? `${p.firstname} ${p.name}` : "Place vide"}</span>
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     {match.isCompleted && nt > 0 && (

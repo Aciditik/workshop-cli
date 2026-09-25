@@ -1,7 +1,7 @@
 "use client";
 
 import { TableMatch, Participant } from "@/lib/types";
-import { Star, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 interface BracketTreeViewProps {
     matches: TableMatch[];
@@ -61,8 +61,7 @@ export function BracketTreeView({ matches, participants, qualifiedIds }: Bracket
                                                 if (!p) return null;
                                                 return (
                                                     <div key={pid} className="flex items-center justify-between text-xs font-prototype gap-1">
-                                                        <span className={`truncate flex items-center gap-1 ${i === 0 && m.isCompleted ? "font-semibold" : ""}`}>
-                                                            {qualifiedSet.has(pid) && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />}
+                                                        <span className={`truncate flex items-center gap-1 ${i === 0 && m.isCompleted ? "font-semibold" : ""} ${qualifiedSet.has(pid) ? "text-yellow-400" : ""}`}>
                                                             {p.firstname} {p.name}
                                                         </span>
                                                         <span className="tabular-nums text-muted-foreground shrink-0">

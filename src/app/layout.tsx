@@ -7,8 +7,8 @@ import { prototype } from "@/lib/fonts";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Tournament Manager Pro",
-  description: "Manage your tournaments with style",
+  title: "CdF Terraforming Mars",
+  description: "Gestion de tournois CdF Terraforming Mars",
 };
 
 export default function RootLayout({

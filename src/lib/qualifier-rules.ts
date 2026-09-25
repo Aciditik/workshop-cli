@@ -400,22 +400,49 @@ function advancersForTable(match: TableMatch): string[] {
     return ranked.slice(0, advanceCount);
 }
 
-// Interleaves advancers by placement tier (all 1st places, then all 2nd places, …)
-// across the previous round's tables so consecutive players in the pool mostly
-// come from different origin tables, minimizing immediate repeat matchups.
-function crossBracketAdvancers(previousRoundMatches: TableMatch[]): string[] {
-    const perTable = [...previousRoundMatches]
-        .sort((a, b) => a.tableNumber - b.tableNumber)
-        .map(advancersForTable);
-    const maxLen = Math.max(0, ...perTable.map(a => a.length));
-
-    const pool: string[] = [];
-    for (let tier = 0; tier < maxLen; tier++) {
-        for (const tablePlayers of perTable) {
-            if (tablePlayers[tier]) pool.push(tablePlayers[tier]);
-        }
+// Groups the previous round's origin tables into adjacent sibling pairs
+// (table 1 with 2, table 3 with 4, …). A leftover unpaired table (odd table
+// count) forms a pair of just itself.
+function pairAdjacentTables(matches: TableMatch[]): TableMatch[][] {
+    const sorted = [...matches].sort((a, b) => a.tableNumber - b.tableNumber);
+    const pairs: TableMatch[][] = [];
+    for (let i = 0; i < sorted.length; i += 2) {
+        pairs.push(i + 1 < sorted.length ? [sorted[i], sorted[i + 1]] : [sorted[i]]);
     }
-    return pool;
+    return pairs;
+}
+
+// Real elimination-tree seeding for the next bracket round. Origin tables are
+// grouped into sibling pairs; each pair's winners (1st places) join the SAME
+// next-round table, while their runners-up (2nd places, 3rd places, …) are
+// sent to the "mirror" pair on the opposite side of the table order. This
+// keeps a genuine bracket structure — e.g. for 8 tables A-H seeding round 2:
+// table1 = 1A,1B,2G,2H · table2 = 1C,1D,2E,2F · table3 = 1E,1F,2C,2D ·
+// table4 = 1G,1H,2A,2B — instead of flatly grouping "all 1st places" then
+// "all 2nd places" (Swiss-style seeding), which clusters every winner
+// together and defeats the purpose of an elimination tree.
+function seedNextBracketRound(previousRoundMatches: TableMatch[]): string[][] {
+    const completed = previousRoundMatches.filter(m => m.isCompleted);
+    const pairs = pairAdjacentTables(completed);
+    const pairCount = pairs.length;
+    const advancersByTable = new Map<number, string[]>();
+    for (const m of completed) advancersByTable.set(m.tableNumber, advancersForTable(m));
+
+    const nextTables: string[][] = Array.from({ length: pairCount }, () => []);
+    pairs.forEach((pair, pairIndex) => {
+        const mirrorIndex = pairCount - 1 - pairIndex;
+        const maxTiers = Math.max(0, ...pair.map(t => advancersByTable.get(t.tableNumber)?.length ?? 0));
+        for (let tier = 0; tier < maxTiers; tier++) {
+            // Even tiers (1st, 3rd, …) stay with their home pair; odd tiers
+            // (2nd, 4th, …) backfill the mirrored pair instead.
+            const targetIndex = tier % 2 === 0 ? pairIndex : mirrorIndex;
+            for (const t of pair) {
+                const advancers = advancersByTable.get(t.tableNumber) ?? [];
+                if (advancers[tier]) nextTables[targetIndex].push(advancers[tier]);
+            }
+        }
+    });
+    return nextTables;
 }
 
 export function generateBracketNextRound(
@@ -423,31 +450,20 @@ export function generateBracketNextRound(
     previousRoundMatches: TableMatch[],
     nextRound: number
 ): TableMatch[] {
-    const completed = previousRoundMatches.filter(m => m.isCompleted);
-    const pool = crossBracketAdvancers(completed);
-    const tableSizes = getBracketTableSizes(pool.length);
+    const nextTables = seedNextBracketRound(previousRoundMatches);
     const label = bracketRoundLabel(nextRound);
 
-    const matches: TableMatch[] = [];
-    let cursor = 0;
-    for (let i = 0; i < tableSizes.length; i++) {
-        const tablePlayers = pool.slice(cursor, cursor + tableSizes[i]);
-        cursor += tableSizes[i];
-
-        matches.push({
-            id: crypto.randomUUID(),
-            tournamentId,
-            round: nextRound,
-            tableNumber: i + 1,
-            tableLabel: `${label} ${i + 1}`,
-            participantIds: tablePlayers,
-            results: {},
-            isCompleted: false,
-            isFinalist: false,
-        });
-    }
-
-    return matches;
+    return nextTables.map((tablePlayers, i) => ({
+        id: crypto.randomUUID(),
+        tournamentId,
+        round: nextRound,
+        tableNumber: i + 1,
+        tableLabel: `${label} ${i + 1}`,
+        participantIds: tablePlayers,
+        results: {},
+        isCompleted: false,
+        isFinalist: false,
+    }));
 }
 
 // ─── Determine Qualified Players ────────────────────────────────────
