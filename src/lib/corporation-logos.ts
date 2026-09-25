@@ -13,6 +13,7 @@ import helion from "@/assets/corpos/helion.png";
 import interplanetarycinematics from "@/assets/corpos/Cinématiques_Interplanétaires.png";
 import inventrix from "@/assets/corpos/inventrix.png";
 import kuiper from "@/assets/corpos/Kuiper_Cooperative.png";
+import ludophile from "@/assets/corpos/Ludophiles.png";
 import miningguild from "@/assets/corpos/miningguild.png";
 import nirgal from "@/assets/corpos/Nirgal_Entreprises.png";
 import palladin from "@/assets/corpos/Palladin_Shipping.png";
@@ -51,6 +52,7 @@ export const CORPORATION_LOGOS: Record<string, StaticImageData> = {
     "Cinématiques Interplanétaires": interplanetarycinematics,
     "Inventrix": inventrix,
     "Kuiper Cooperative": kuiper,
+    "Ludophiles d'Asnières et d'ailleurs": ludophile,
     "Mining Guild": miningguild,
     "Nirgal Enterprise": nirgal,
     "Palladin Shipping": palladin,
