@@ -4,10 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { BarChart3, Trophy, Users, ChevronUp, ChevronDown, ChevronsUpDown, Download, Search, X, Medal } from "lucide-react";
+import { BarChart3, Trophy, Users, ChevronUp, ChevronDown, ChevronsUpDown, Download, Search, X, Medal, Map as MapIcon } from "lucide-react";
 import { BarChart, HBarChart, Histogram, LineChart } from "@/components/stats/Charts";
 import { CORPORATIONS, canonicalCorporation } from "@/lib/corporations";
 import { CorpLabel } from "@/components/CorpLabel";
+import { BOARDS } from "@/lib/boards";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ type Entry = {
   megacredits: number;
   totalScore: number;
   isQualified: boolean;
+  board: string;
 };
 
 type TournamentMeta = { id: string; name: string; eventDate: string; status?: string; ownerId: string; ownerName: string };
@@ -39,12 +41,13 @@ type StatsData = {
   tournaments: TournamentMeta[];
   corporations: string[];
   organizers: { id: string; name: string }[];
+  boards: string[];
   totalMatches: number;
 };
 
 type SortMetric = "totalScore" | "nt" | "objectifs" | "recompenses" | "forets" | "villes" | "cartes";
 type SortDir = "desc" | "asc";
-type View = "leaderboard" | "players" | "corporations" | "charts" | "compare";
+type View = "leaderboard" | "players" | "corporations" | "boards" | "charts" | "compare";
 
 const CATEGORY_KEYS = ["nt", "objectifs", "recompenses", "forets", "villes", "cartes"] as const;
 type CategoryKey = (typeof CATEGORY_KEYS)[number];
@@ -85,9 +88,9 @@ function shortTournamentName(name: string, eventDate?: string): string {
 }
 
 function exportCsv(entries: Entry[]) {
-  const header = ["Joueur", "Tournoi", "Date", "Corporation", "Rang table", "NT", "Objectifs", "Récompenses", "Forêts", "Villes", "Cartes", "Total", "Qualifié"];
+  const header = ["Joueur", "Tournoi", "Date", "Corporation", "Plateau", "Rang table", "NT", "Objectifs", "Récompenses", "Forêts", "Villes", "Cartes", "Total", "Qualifié"];
   const rows = entries.map((e) => [
-    fullName(e), e.tournamentName, e.eventDate, e.corporation, e.rank,
+    fullName(e), e.tournamentName, e.eventDate, e.corporation, e.board, e.rank,
     e.nt, e.objectifs, e.recompenses, e.forets, e.villes, e.cartes, e.totalScore,
     e.isQualified ? "Oui" : "Non",
   ]);
@@ -483,6 +486,140 @@ function CorporationsView({ entries }: { entries: Entry[] }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Boards view (average scores per Terraforming Mars map) ──────────────────
+
+type BoardStats = {
+  board: string;
+  count: number;        // scorecard entries recorded on this board
+  tables: number;       // distinct matches played on this board
+  avgScore: number;
+  avgByCategory: Record<CategoryKey, number>;
+};
+
+type BoardSortMetric = "count" | "avgScore" | CategoryKey;
+
+const UNSET_BOARD = "Non défini";
+
+function computeBoardStats(entries: Entry[]): BoardStats[] {
+  const map = new Map<string, { matchIds: Set<string>; scores: number[]; cat: Record<CategoryKey, number> }>();
+  for (const e of entries) {
+    const key = e.board || UNSET_BOARD;
+    let c = map.get(key);
+    if (!c) {
+      c = { matchIds: new Set(), scores: [], cat: { nt: 0, objectifs: 0, recompenses: 0, forets: 0, villes: 0, cartes: 0 } };
+      map.set(key, c);
+    }
+    c.matchIds.add(e.matchId);
+    c.scores.push(e.totalScore);
+    for (const k of CATEGORY_KEYS) c.cat[k] += e[k];
+  }
+  // Every known board gets a row (0 games if never picked), plus any board
+  // name found in the data that isn't in the canonical list (safety).
+  const names = new Set<string>([...BOARDS, ...map.keys()]);
+  return [...names].map((board) => {
+    const c = map.get(board);
+    const n = c?.scores.length ?? 0;
+    return {
+      board,
+      count: n,
+      tables: c?.matchIds.size ?? 0,
+      avgScore: n ? Math.round(c!.scores.reduce((a, b) => a + b, 0) / n) : 0,
+      avgByCategory: Object.fromEntries(
+        CATEGORY_KEYS.map((k) => [k, n ? Math.round((c!.cat[k] / n) * 10) / 10 : 0])
+      ) as Record<CategoryKey, number>,
+    };
+  });
+}
+
+const BOARD_SORT_LABELS: Record<BoardSortMetric, string> = {
+  count: "Parties",
+  avgScore: "Score moyen",
+  nt: "NT",
+  objectifs: "Objectifs",
+  recompenses: "Récomp.",
+  forets: "Forêts",
+  villes: "Villes",
+  cartes: "Cartes",
+};
+
+function BoardsView({ entries }: { entries: Entry[] }) {
+  const [sortMetric, setSortMetric] = useState<BoardSortMetric>("count");
+  const allRows = useMemo(() => computeBoardStats(entries), [entries]);
+
+  const metricValue = (row: BoardStats) =>
+    sortMetric === "count" ? row.count : sortMetric === "avgScore" ? row.avgScore : row.avgByCategory[sortMetric];
+
+  const rows = useMemo(
+    () => [...allRows].sort((a, b) => {
+      const diff = metricValue(b) - metricValue(a);
+      return diff !== 0 ? diff : a.board.localeCompare(b.board, "fr");
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allRows, sortMetric]
+  );
+
+  const metricMax = Math.max(...rows.map((r) => metricValue(r)), 1);
+  const sortOptions: BoardSortMetric[] = ["count", "avgScore", ...CATEGORY_KEYS];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {sortOptions.map((m) => (
+          <SortButton
+            key={m}
+            label={BOARD_SORT_LABELS[m]}
+            active={sortMetric === m}
+            dir="desc"
+            onClick={() => setSortMetric(m)}
+          />
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <div key={row.board} className="p-3 rounded-lg bg-muted/20">
+            <div className="flex items-center justify-between gap-4 mb-1.5">
+              <span className="font-prototype text-sm font-semibold truncate flex items-center gap-1.5">
+                <MapIcon className="w-4 h-4 text-primary shrink-0" />
+                {row.board}
+              </span>
+              <div className="flex items-center gap-4 shrink-0 text-right">
+                <div className="hidden sm:block">
+                  <p className="text-xs text-muted-foreground font-prototype">Tables</p>
+                  <p className="font-prototype text-sm font-bold">{row.tables}</p>
+                </div>
+                <div className="hidden sm:block">
+                  <p className="text-xs text-muted-foreground font-prototype">Score moy.</p>
+                  <p className="font-prototype text-sm font-bold text-primary">{row.avgScore}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-prototype">{BOARD_SORT_LABELS[sortMetric]}</p>
+                  <p className="font-prototype text-sm font-bold">{metricValue(row)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
+              <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max((metricValue(row) / metricMax) * 100, metricValue(row) ? 3 : 0)}%` }} />
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-2">
+              {CATEGORY_KEYS.map((k) => (
+                <div key={k} className="text-center p-1.5 rounded bg-background/50">
+                  <p className="text-[10px] font-prototype text-muted-foreground">{CATEGORY_LABELS[k]}</p>
+                  <p className="font-prototype text-sm font-bold">{row.avgByCategory[k]}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground font-prototype mt-1.5">
+              {row.count} scorecard{row.count > 1 ? "s" : ""} sur {row.tables} table{row.tables > 1 ? "s" : ""}
+              {row.board === UNSET_BOARD && " · parties jouées avant l'ajout du choix de plateau"}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -986,6 +1123,7 @@ export default function StatsPage() {
   // Filters (all pushed to the API as query params)
   const [tournamentFilter, setTournamentFilter] = useState("");
   const [corporationFilter, setCorporationFilter] = useState("");
+  const [boardFilter, setBoardFilter] = useState("");
   const [organizerFilter, setOrganizerFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -1018,6 +1156,7 @@ export default function StatsPage() {
     const params = new URLSearchParams();
     if (tournamentFilter) params.set("tournament", tournamentFilter);
     if (corporationFilter) params.set("corporation", corporationFilter);
+    if (boardFilter) params.set("board", boardFilter);
     if (organizerFilter) params.set("organizer", organizerFilter);
     if (dateFrom) params.set("from", dateFrom);
     if (dateTo) params.set("to", dateTo);
@@ -1055,7 +1194,7 @@ export default function StatsPage() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [isAdmin, isGuest, apiUrl, tournamentFilter, corporationFilter, organizerFilter, dateFrom, dateTo, playerSearch, qualifiedOnly]);
+  }, [isAdmin, isGuest, apiUrl, tournamentFilter, corporationFilter, boardFilter, organizerFilter, dateFrom, dateTo, playerSearch, qualifiedOnly]);
 
   function handleSortMetric(m: SortMetric) {
     if (sortMetric === m) {
@@ -1110,6 +1249,11 @@ export default function StatsPage() {
       .sort((a, b) => a.localeCompare(b, "fr"));
     return all.map((c) => ({ value: c, label: c }));
   }, [data]);
+  const boardOptions = useMemo(() => {
+    const fromData = data?.boards ?? meta?.boards ?? [];
+    const all = [...new Set([...BOARDS, ...fromData])].sort((a, b) => a.localeCompare(b, "fr"));
+    return all.map((b) => ({ value: b, label: b }));
+  }, [data, meta]);
 
   if (loading && !data) {
     return (
@@ -1134,6 +1278,7 @@ export default function StatsPage() {
     { key: "leaderboard", label: "Classement" },
     { key: "players", label: "Joueurs" },
     { key: "corporations", label: "Corporations" },
+    { key: "boards", label: "Plateaux" },
     { key: "charts", label: "Graphiques" },
     { key: "compare", label: "Comparer" },
   ];
@@ -1226,6 +1371,12 @@ export default function StatsPage() {
                   options={corporationOptions}
                 />
                 <Select
+                  value={boardFilter}
+                  onChange={setBoardFilter}
+                  placeholder="Tous les plateaux"
+                  options={boardOptions}
+                />
+                <Select
                   value={organizerFilter}
                   onChange={setOrganizerFilter}
                   placeholder="Tous les organisateurs"
@@ -1260,11 +1411,12 @@ export default function StatsPage() {
                     className="bg-background border border-border rounded-md px-2 py-1.5 text-sm font-prototype text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </label>
-                {(dateFrom || dateTo || playerSearch || tournamentFilter || corporationFilter || organizerFilter || qualifiedOnly) && (
+                {(dateFrom || dateTo || playerSearch || tournamentFilter || corporationFilter || boardFilter || organizerFilter || qualifiedOnly) && (
                   <button
                     onClick={() => {
                       setTournamentFilter("");
                       setCorporationFilter("");
+                      setBoardFilter("");
                       setOrganizerFilter("");
                       setDateFrom("");
                       setDateTo("");
@@ -1316,6 +1468,7 @@ export default function StatsPage() {
           )}
           {view === "players" && <PlayersView entries={sortedEntries} onPlayerClick={setSelectedPlayer} />}
           {view === "corporations" && <CorporationsView entries={sortedEntries} />}
+          {view === "boards" && <BoardsView entries={sortedEntries} />}
           {view === "charts" && <ChartsView entries={sortedEntries} />}
           {view === "compare" && <CompareView entries={sortedEntries} />}
         </CardContent>
