@@ -502,12 +502,11 @@ type BoardStats = {
 
 type BoardSortMetric = "count" | "avgScore" | CategoryKey;
 
-const UNSET_BOARD = "Non défini";
-
 function computeBoardStats(entries: Entry[]): BoardStats[] {
   const map = new Map<string, { matchIds: Set<string>; scores: number[]; cat: Record<CategoryKey, number> }>();
   for (const e of entries) {
-    const key = e.board || UNSET_BOARD;
+    if (!e.board) continue; // No board recorded (played before the feature) — skip.
+    const key = e.board;
     let c = map.get(key);
     if (!c) {
       c = { matchIds: new Set(), scores: [], cat: { nt: 0, objectifs: 0, recompenses: 0, forets: 0, villes: 0, cartes: 0 } };
@@ -615,7 +614,6 @@ function BoardsView({ entries }: { entries: Entry[] }) {
             </div>
             <p className="text-xs text-muted-foreground font-prototype mt-1.5">
               {row.count} scorecard{row.count > 1 ? "s" : ""} sur {row.tables} table{row.tables > 1 ? "s" : ""}
-              {row.board === UNSET_BOARD && " · parties jouées avant l'ajout du choix de plateau"}
             </p>
           </div>
         ))}
