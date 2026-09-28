@@ -103,7 +103,7 @@ export default function NewTournament() {
             eventDate,
             createdAt: new Date().toISOString(),
             status: "brouillon",
-            format: "swiss",
+            format: size >= 29 ? selectedFormat : getFormat(size),
             participants,
             matches: [],
             size: participants.length,

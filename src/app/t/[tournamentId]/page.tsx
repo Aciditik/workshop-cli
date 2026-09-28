@@ -3,7 +3,7 @@
 import { use, useState, useEffect } from "react";
 import { Tournament } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
-import { Users, Search, X } from "lucide-react";
+import { Users, Search, X, Map as MapIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -120,6 +120,12 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                     <h1 className="text-3xl font-prototype tracking-tight">{tournament.name}</h1>
                     {currentRound > 0 && (
                         <p className="text-muted-foreground font-prototype">Round {currentRound} — Choisissez votre table</p>
+                    )}
+                    {currentRound > 0 && tournament.roundBoards?.[currentRound] && (
+                        <p className="flex items-center justify-center gap-1.5 text-sm font-prototype text-primary">
+                            <MapIcon className="w-4 h-4" />
+                            Plateau : {tournament.roundBoards[currentRound]}
+                        </p>
                     )}
                 </div>
 

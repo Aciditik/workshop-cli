@@ -56,5 +56,6 @@ export interface Tournament {
     maxRounds: number; // 2 for elimination, 3 for swiss
     qualifiedCount: number; // Number of qualified players
     qualifiedIds?: string[]; // IDs of qualified players (set when tournament completes)
+    roundBoards?: Record<number, string>; // Maps round number -> board name chosen by the organizer
     ownerId?: string; // Owner user ID (set by admin when creating on behalf of organizer)
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { TableMatch, Participant } from "@/lib/types";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Map as MapIcon } from "lucide-react";
 
 interface BracketTreeViewProps {
     matches: TableMatch[];
     participants: Participant[];
     qualifiedIds?: string[];
+    roundBoards?: Record<number, string>;
 }
 
 const ROUND_LABELS: Record<number, string> = {
@@ -22,7 +23,7 @@ const ROUND_LABELS: Record<number, string> = {
 // (to avoid immediate rematches), a single table doesn't map to one specific
 // table in the next round — the arrow between columns conveys the overall
 // progression instead of a literal per-table bracket line.
-export function BracketTreeView({ matches, participants, qualifiedIds }: BracketTreeViewProps) {
+export function BracketTreeView({ matches, participants, qualifiedIds, roundBoards }: BracketTreeViewProps) {
     const qualifiedSet = new Set(qualifiedIds || []);
     const getParticipant = (id: string | null) => (id ? participants.find(p => p.id === id) : null);
 
@@ -42,6 +43,12 @@ export function BracketTreeView({ matches, participants, qualifiedIds }: Bracket
                                 <h4 className="text-sm font-prototype text-center text-muted-foreground uppercase tracking-wide">
                                     {ROUND_LABELS[round] || `Ronde ${round}`}
                                 </h4>
+                                {roundBoards?.[round] && (
+                                    <p className="flex items-center justify-center gap-1 text-[10px] font-prototype text-muted-foreground">
+                                        <MapIcon className="w-3 h-3" />
+                                        {roundBoards[round]}
+                                    </p>
+                                )}
                                 {roundMatches.map(m => {
                                     const ids = m.participantIds.filter((id): id is string => id !== null);
                                     const ranked = [...ids].sort((a, b) => (m.results[b] || 0) - (m.results[a] || 0));

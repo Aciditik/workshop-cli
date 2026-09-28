@@ -6,7 +6,7 @@ import { CORPORATIONS } from "@/lib/corporations";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QRCodeModal } from "@/components/QRCodeModal";
-import { ChevronDown, ChevronRight, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronRight, GripVertical, Map as MapIcon } from "lucide-react";
 
 interface SwissRoundsProps {
     matches: TableMatch[];
@@ -23,6 +23,7 @@ interface SwissRoundsProps {
     maxRounds?: number;
     qualifiedIds?: string[];
     isAdmin?: boolean;
+    roundBoards?: Record<number, string>;
 }
 
 // Category keys used to compute a player's raw NT total.
@@ -54,7 +55,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -149,6 +150,12 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 {isExpanded ? <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" /> : <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
                                 <span className="font-prototype">Ronde {round}</span>
                                 {round === currentRound && <span className="bg-primary/20 text-primary text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider font-prototype">Active</span>}
+                                {roundBoards?.[round] && (
+                                    <span className="flex items-center gap-1 bg-muted text-muted-foreground text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full font-prototype">
+                                        <MapIcon className="w-3 h-3" />
+                                        {roundBoards[round]}
+                                    </span>
+                                )}
                                 <span className="text-xs sm:text-sm font-prototype text-muted-foreground">
                                     {completedCount}/{totalCount}
                                 </span>

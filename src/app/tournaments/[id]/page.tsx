@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SwissRounds } from "@/components/SwissRounds";
 import { BracketTreeView } from "@/components/BracketTreeView";
+import { BoardSelectModal } from "@/components/BoardSelectModal";
 import { Participant, Tournament, TournamentFormat } from "@/lib/types";
 import {
     generateEliminationRound2,
@@ -25,6 +26,17 @@ import {
 } from "@/lib/qualifier-rules";
 import { ListCheck, UserRoundSearch, Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users } from "lucide-react";
 import Link from "next/link";
+
+// Human-readable label for the round about to be generated, used as the
+// board-selection modal title (bracket format uses Quart/Demi/Finale).
+function roundLabel(format: TournamentFormat, round: number): string {
+    if (format === "bracket") {
+        if (round === 1) return "Quart de finale";
+        if (round === 2) return "Demi-finale";
+        return "Finale";
+    }
+    return `Ronde ${round}`;
+}
 
 export default function TournamentView({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -264,6 +276,21 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const tournament = isLoaded ? getTournament(id) : null;
 
+    // Board-selection modal: shown before generating a round (round 1 launch,
+    // or "Générer Ronde X"). `pendingRound` is the round number about to be
+    // created; null means the modal is closed.
+    const [pendingRound, setPendingRound] = useState<number | null>(null);
+
+    // Sync the local format choice from the persisted tournament.format once
+    // it loads, so a previously-saved choice (bracket) isn't silently reset
+    // back to the "swiss" default on reload.
+    useEffect(() => {
+        if (!tournament || tournament.status !== "brouillon") return;
+        if (tournament.format === "swiss" || tournament.format === "bracket") {
+            setSelectedFormat(tournament.format);
+        }
+    }, [tournament?.id, tournament?.format, tournament?.status]);
+
     // Auto-refresh while the tournament is in progress so newly-submitted
     // scorecards from other devices show up without a manual reload.
     const tournamentStatus = tournament?.status;
@@ -326,7 +353,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const currentRound = tournament.currentRound || 0;
 
-    const generateNextRound = () => {
+    const generateNextRound = (board: string) => {
         console.log("=== GENERATING NEXT ROUND ===");
         console.log("Current round:", currentRound);
         console.log("Format:", format);
@@ -369,7 +396,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             ...tournament,
             status: "en_cours",
             currentRound: nextRound,
-            matches: [...tournament.matches, ...newMatches]
+            matches: [...tournament.matches, ...newMatches],
+            roundBoards: { ...(tournament.roundBoards || {}), [nextRound]: board },
         });
         
         console.log("=== ROUND GENERATION SENT ===");
@@ -823,7 +851,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         if (e.key === "Enter") { e.preventDefault(); addPlayer(); }
     };
 
-    const startTournament = () => {
+    const startTournament = (board: string) => {
         if (playerCount < 8) return;
 
         // 29+ players: honor the organizer's manual choice (swiss vs. bracket).
@@ -842,6 +870,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             qualifiedCount: getQualifiedCount(playerCount),
             currentRound: 1,
             matches: round1Matches,
+            roundBoards: { ...(tournament.roundBoards || {}), 1: board },
         });
     };
 
@@ -1044,7 +1073,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             {dnfCount > 0 && (
                                 <> • <span className="text-orange-500">{activeCount} actif{activeCount > 1 ? "s" : ""} ({dnfCount} DNF)</span></>
                             )}
-                            {" • "}{getFormatLabel(activeCount)} • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}
+                            {" • "}{getFormatLabel(activeCount, tournament.status === "brouillon" ? selectedFormat : format)} • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}
                         </p>
                     </div>
                 </div>
@@ -1320,7 +1349,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => setSelectedFormat("swiss")}
+                                        onClick={() => { setSelectedFormat("swiss"); updateTournament({ ...tournament, format: "swiss" }); }}
                                         className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
                                             selectedFormat === "swiss"
                                                 ? "border-primary bg-primary/10"
@@ -1335,7 +1364,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setSelectedFormat("bracket")}
+                                        onClick={() => { setSelectedFormat("bracket"); updateTournament({ ...tournament, format: "bracket" }); }}
                                         className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
                                             selectedFormat === "bracket"
                                                 ? "border-primary bg-primary/10"
@@ -1355,7 +1384,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         {/* Start tournament button */}
                         <div className="pt-4 border-t">
                             <Button
-                                onClick={startTournament}
+                                onClick={() => setPendingRound(1)}
                                 disabled={playerCount < 8}
                                 className="w-full gap-2 font-prototype"
                                 size="lg"
@@ -1426,7 +1455,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     Tournoi Terminé !
                                 </div>
                             ) : canGenerateNextRound() ? (
-                                <Button onClick={generateNextRound} className="gap-2 font-prototype" variant="secondary">
+                                <Button onClick={() => setPendingRound(currentRound + 1)} className="gap-2 font-prototype" variant="secondary">
                                     <Play className="w-4 h-4 fill-foreground" />
                                     Générer Ronde {currentRound + 1}
                                 </Button>
@@ -1445,6 +1474,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         matches={tournament.matches}
                                         participants={tournament.participants}
                                         qualifiedIds={tournament.qualifiedIds}
+                                        roundBoards={tournament.roundBoards}
                                     />
                                 </CardContent>
                             </Card>
@@ -1464,6 +1494,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             eventDate={tournament.eventDate}
                             maxRounds={maxRounds}
                             qualifiedIds={tournament.qualifiedIds}
+                            roundBoards={tournament.roundBoards}
                         />
                     </div>
 
@@ -1948,6 +1979,22 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     </div>
                 </div>
             )}
+
+            {/* Board selection — required before generating any round */}
+            <BoardSelectModal
+                open={pendingRound !== null}
+                onOpenChange={(open) => { if (!open) setPendingRound(null); }}
+                roundLabel={pendingRound ? roundLabel(pendingRound === 1 ? (playerCount >= 29 ? selectedFormat : getFormat(playerCount)) : format, pendingRound) : ""}
+                defaultBoard={pendingRound ? tournament.roundBoards?.[pendingRound] : undefined}
+                onConfirm={(board) => {
+                    if (pendingRound === 1 && tournament.status === "brouillon") {
+                        startTournament(board);
+                    } else if (pendingRound !== null) {
+                        generateNextRound(board);
+                    }
+                    setPendingRound(null);
+                }}
+            />
         </div>
     );
 }
