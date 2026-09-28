@@ -1,7 +1,7 @@
 import { StaticImageData } from "next/image";
 
 import arcadian from "@/assets/corpos/Communautés_Arcadiennes.png";
-import astrodrill from "@/assets/corpos/Astrodrill.png";
+import astrodrill from "@/assets/corpos/AstroDrill.png";
 import cheungshing from "@/assets/corpos/Cheung_Shing_Mars.png";
 import credicor from "@/assets/corpos/credicor.png";
 import desertron from "@/assets/corpos/Desertron.png";
