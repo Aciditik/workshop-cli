@@ -6,7 +6,8 @@ import { CORPORATIONS } from "@/lib/corporations";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QRCodeModal } from "@/components/QRCodeModal";
-import { ChevronDown, ChevronRight, GripVertical, Map as MapIcon } from "lucide-react";
+import { BoardSelectModal } from "@/components/BoardSelectModal";
+import { ChevronDown, ChevronRight, GripVertical, Map as MapIcon, Pencil } from "lucide-react";
 
 interface SwissRoundsProps {
     matches: TableMatch[];
@@ -24,6 +25,7 @@ interface SwissRoundsProps {
     qualifiedIds?: string[];
     isAdmin?: boolean;
     roundBoards?: Record<number, string>;
+    onEditRoundBoard?: (round: number, board: string) => void;
 }
 
 // Category keys used to compute a player's raw NT total.
@@ -55,7 +57,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -66,6 +68,8 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
     // Inline edit mode for pending-review scorecards.
     const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
     const [editDraft, setEditDraft] = useState<Record<string, PlayerScore>>({});
+    // Admin: round whose board is being re-picked (null = closed).
+    const [editingBoardRound, setEditingBoardRound] = useState<number | null>(null);
 
     const startEditing = (match: TableMatch) => {
         const draft: Record<string, PlayerScore> = {};
@@ -156,6 +160,16 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                         {roundBoards[round]}
                                     </span>
                                 )}
+                                {isAdmin && onEditRoundBoard && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setEditingBoardRound(round); }}
+                                        className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                                        title={roundBoards?.[round] ? "Modifier le plateau" : "Choisir le plateau"}
+                                    >
+                                        {roundBoards?.[round] ? <Pencil className="w-3.5 h-3.5" /> : <MapIcon className="w-3.5 h-3.5" />}
+                                    </button>
+                                )}
                                 <span className="text-xs sm:text-sm font-prototype text-muted-foreground">
                                     {completedCount}/{totalCount}
                                 </span>
@@ -184,6 +198,19 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                     </div>
                 );
             })}
+
+            {/* Admin board re-pick for an existing round */}
+            <BoardSelectModal
+                open={editingBoardRound !== null}
+                onOpenChange={(open) => { if (!open) setEditingBoardRound(null); }}
+                roundLabel={editingBoardRound ? `Ronde ${editingBoardRound}` : ""}
+                defaultBoard={editingBoardRound ? roundBoards?.[editingBoardRound] : undefined}
+                confirmLabel="Enregistrer le plateau"
+                onConfirm={(board) => {
+                    if (editingBoardRound !== null) onEditRoundBoard?.(editingBoardRound, board);
+                    setEditingBoardRound(null);
+                }}
+            />
         </div>
     );
 

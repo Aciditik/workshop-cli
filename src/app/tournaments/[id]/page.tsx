@@ -1495,6 +1495,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             maxRounds={maxRounds}
                             qualifiedIds={tournament.qualifiedIds}
                             roundBoards={tournament.roundBoards}
+                            onEditRoundBoard={(round, board) => updateTournament({
+                                ...tournament,
+                                roundBoards: { ...(tournament.roundBoards || {}), [round]: board },
+                            })}
                         />
                     </div>
 

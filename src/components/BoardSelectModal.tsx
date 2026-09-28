@@ -11,13 +11,14 @@ interface BoardSelectModalProps {
     onOpenChange: (open: boolean) => void;
     roundLabel: string;
     defaultBoard?: string;
+    confirmLabel?: string;
     onConfirm: (board: string) => void;
 }
 
 // Modal shown before generating a round (round 1, 2, 3, or quarts/demies/finale
 // for the bracket format) so the organizer picks which Terraforming Mars board
 // all tables will play on for that round.
-export function BoardSelectModal({ open, onOpenChange, roundLabel, defaultBoard, onConfirm }: BoardSelectModalProps) {
+export function BoardSelectModal({ open, onOpenChange, roundLabel, defaultBoard, confirmLabel, onConfirm }: BoardSelectModalProps) {
     const [selected, setSelected] = useState<string>(defaultBoard || BOARDS[0]);
     // Reset the selection whenever the modal transitions to open, without an
     // effect (adjusting state during render per React's recommended pattern).
@@ -60,7 +61,7 @@ export function BoardSelectModal({ open, onOpenChange, roundLabel, defaultBoard,
                         onClick={() => { onConfirm(selected); onOpenChange(false); }}
                         className="w-full gap-2 font-prototype"
                     >
-                        Confirmer et lancer la ronde
+                        {confirmLabel || "Confirmer et lancer la ronde"}
                     </Button>
                 </div>
             </DialogContent>
