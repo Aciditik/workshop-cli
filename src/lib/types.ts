@@ -9,6 +9,7 @@ export interface Participant {
     id: string;
     firstname: string;
     name: string;
+    pseudo?: string; // Optional in-game nickname, shown instead of firstname+name when toggled on
     email: string;
     phone: string;
     score: number; // Accrued points

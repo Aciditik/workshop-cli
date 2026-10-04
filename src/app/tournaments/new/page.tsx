@@ -21,9 +21,10 @@ export default function NewTournament() {
     const [logoUrl, setLogoUrl] = useState("");
     const [logoFileName, setLogoFileName] = useState("");
     const [eventDate, setEventDate] = useState("");
-    const [players, setPlayers] = useState<Array<{firstname: string; name: string; email: string; phone: string}>>([]);
+    const [players, setPlayers] = useState<Array<{firstname: string; name: string; pseudo: string; email: string; phone: string}>>([]);
     const [firstnameInput, setFirstnameInput] = useState("");
     const [playerInput, setPlayerInput] = useState("");
+    const [pseudoInput, setPseudoInput] = useState("");
     const [emailInput, setEmailInput] = useState("");
     const [phoneInput, setPhoneInput] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
@@ -64,12 +65,14 @@ export default function NewTournament() {
     const addPlayer = () => {
         const firstname = firstnameInput.trim();
         const name = playerInput.trim();
+        const pseudo = pseudoInput.trim();
         const email = emailInput.trim();
         const phone = phoneInput.trim();
         if (!firstname || !name || !email || !phone) return;
-        setPlayers(prev => [...prev, { firstname, name, email, phone }]);
+        setPlayers(prev => [...prev, { firstname, name, pseudo, email, phone }]);
         setFirstnameInput("");
         setPlayerInput("");
+        setPseudoInput("");
         setEmailInput("");
         setPhoneInput("");
         inputRef.current?.focus();
@@ -91,6 +94,7 @@ export default function NewTournament() {
             id: crypto.randomUUID(),
             firstname: p.firstname,
             name: p.name,
+            pseudo: p.pseudo || undefined,
             email: p.email,
             phone: p.phone,
             score: 0,
@@ -124,6 +128,7 @@ export default function NewTournament() {
             id: crypto.randomUUID(),
             firstname: p.firstname,
             name: p.name,
+            pseudo: p.pseudo || undefined,
             email: p.email,
             phone: p.phone,
             score: 0,
@@ -297,6 +302,14 @@ export default function NewTournament() {
                                 required
                                 className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             />
+                            <input
+                                type="text"
+                                value={pseudoInput}
+                                onChange={(e) => setPseudoInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Pseudo (optionnel)"
+                                className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            />
                         </div>
                         <Button type="button" onClick={addPlayer} className="gap-1 w-full md:w-auto font-prototype">
                             <Plus className="w-4 h-4" /> Ajouter le joueur
@@ -312,7 +325,7 @@ export default function NewTournament() {
                                         <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-prototype text-muted-foreground shrink-0">
                                             {index + 1}
                                         </span>
-                                        <span className="font-prototype">{player.firstname} {player.name}</span>
+                                        <span className="font-prototype">{player.firstname} {player.name}{player.pseudo && <span className="text-muted-foreground"> ({player.pseudo})</span>}</span>
                                     </div>
                                     <button
                                         type="button"

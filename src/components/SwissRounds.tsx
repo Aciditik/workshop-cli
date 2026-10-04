@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TableMatch, Participant, PlayerScore } from "@/lib/types";
 import { CORPORATIONS } from "@/lib/corporations";
+import { playerDisplayName } from "@/lib/playerName";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QRCodeModal } from "@/components/QRCodeModal";
@@ -26,6 +27,7 @@ interface SwissRoundsProps {
     isAdmin?: boolean;
     roundBoards?: Record<number, string>;
     onEditRoundBoard?: (round: number, board: string) => void;
+    usePseudo?: boolean;
 }
 
 // Category keys used to compute a player's raw NT total.
@@ -57,7 +59,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -266,7 +268,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 return (
                                     <div key={pId} className="rounded-md border border-orange-500/30 bg-orange-500/5 overflow-hidden">
                                         <div className="flex items-center justify-between px-3 py-2 bg-orange-500/10 font-prototype text-sm">
-                                            <span className="font-prototype">{p.firstname} {p.name}</span>
+                                            <span className="font-prototype">{playerDisplayName(p, usePseudo)}</span>
                                             <span className="text-orange-400 font-prototype">{total} pts</span>
                                         </div>
                                         <div className="px-2 pt-2">
@@ -339,7 +341,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 return (
                                     <div key={pId} className="rounded-md border border-yellow-500/30 bg-yellow-500/5 overflow-hidden">
                                         <div className="flex items-center justify-between px-3 py-2 bg-yellow-500/10 font-prototype text-sm">
-                                            <span className="font-prototype">{p.firstname} {p.name}</span>
+                                            <span className="font-prototype">{playerDisplayName(p, usePseudo)}</span>
                                             <span className="text-yellow-400 font-prototype">{total} pts {/*→ <span className="text-primary">+{pts} placement</span>*/}</span>
                                         </div>
                                         {sc.corporation && (
@@ -442,7 +444,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                                     {canDrag && p && (
                                                         <GripVertical className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                                                     )}
-                                                    <span className={`font-prototype ${p && qualifiedSet.has(p.id) ? "text-yellow-400" : ""}`}>{p ? `${p.firstname} ${p.name}` : "Place vide"}</span>
+                                                    <span className={`font-prototype ${p && qualifiedSet.has(p.id) ? "text-yellow-400" : ""}`}>{p ? playerDisplayName(p, usePseudo) : "Place vide"}</span>
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     {match.isCompleted && nt > 0 && (

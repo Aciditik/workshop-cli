@@ -1,6 +1,7 @@
 "use client";
 
 import { TableMatch, Participant } from "@/lib/types";
+import { playerDisplayName } from "@/lib/playerName";
 import { ArrowRight, Map as MapIcon } from "lucide-react";
 
 interface BracketTreeViewProps {
@@ -8,6 +9,7 @@ interface BracketTreeViewProps {
     participants: Participant[];
     qualifiedIds?: string[];
     roundBoards?: Record<number, string>;
+    usePseudo?: boolean;
 }
 
 const ROUND_LABELS: Record<number, string> = {
@@ -23,7 +25,7 @@ const ROUND_LABELS: Record<number, string> = {
 // (to avoid immediate rematches), a single table doesn't map to one specific
 // table in the next round — the arrow between columns conveys the overall
 // progression instead of a literal per-table bracket line.
-export function BracketTreeView({ matches, participants, qualifiedIds, roundBoards }: BracketTreeViewProps) {
+export function BracketTreeView({ matches, participants, qualifiedIds, roundBoards, usePseudo = false }: BracketTreeViewProps) {
     const qualifiedSet = new Set(qualifiedIds || []);
     const getParticipant = (id: string | null) => (id ? participants.find(p => p.id === id) : null);
 
@@ -69,7 +71,7 @@ export function BracketTreeView({ matches, participants, qualifiedIds, roundBoar
                                                 return (
                                                     <div key={pid} className="flex items-center justify-between text-xs font-prototype gap-1">
                                                         <span className={`truncate flex items-center gap-1 ${i === 0 && m.isCompleted ? "font-semibold" : ""} ${qualifiedSet.has(pid) ? "text-yellow-400" : ""}`}>
-                                                            {p.firstname} {p.name}
+                                                            {playerDisplayName(p, usePseudo)}
                                                         </span>
                                                         <span className="tabular-nums text-muted-foreground shrink-0">
                                                             {m.isCompleted ? (i === 0 ? "1er" : `${i + 1}e`) : "-"}

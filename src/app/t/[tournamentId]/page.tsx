@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect } from "react";
 import { Tournament } from "@/lib/types";
+import { playerDisplayName } from "@/lib/playerName";
 import { Card } from "@/components/ui/Card";
 import { Users, Search, X, Map as MapIcon } from "lucide-react";
 import Image from "next/image";
@@ -12,6 +13,8 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
+    // Local view preference (not persisted, resets to off on reload).
+    const [showPseudos, setShowPseudos] = useState(false);
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -45,7 +48,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
         const p = tournament.participants.find(pp => pp.id === id);
         if (!p) return false;
         const full = `${p.firstname} ${p.name}`.toLowerCase();
-        return full.includes(normalizedSearch);
+        return full.includes(normalizedSearch) || (p.pseudo || "").toLowerCase().includes(normalizedSearch);
     };
 
     const matchContainsSearched = (match: { participantIds: (string | null)[] }) =>
@@ -65,7 +68,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
     // Suggestions while typing: list of matching participants (up to 6)
     const searchSuggestions = normalizedSearch
         ? tournament.participants
-              .filter(p => `${p.firstname} ${p.name}`.toLowerCase().includes(normalizedSearch))
+              .filter(p => `${p.firstname} ${p.name}`.toLowerCase().includes(normalizedSearch) || (p.pseudo || "").toLowerCase().includes(normalizedSearch))
               .slice(0, 6)
         : [];
 
@@ -74,7 +77,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
             .filter((id): id is string => id !== null)
             .map(id => {
                 const p = tournament.participants.find(pp => pp.id === id);
-                return { id, label: p ? `${p.firstname} ${p.name}` : "Unknown" };
+                return { id, label: playerDisplayName(p, showPseudos) };
             });
         return (
             <>
@@ -126,6 +129,17 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                             <MapIcon className="w-4 h-4" />
                             Plateau : {tournament.roundBoards[currentRound]}
                         </p>
+                    )}
+                    {tournament.participants.some(p => p.pseudo) && (
+                        <label className="flex items-center justify-center gap-1.5 text-xs font-prototype text-muted-foreground cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={showPseudos}
+                                onChange={(e) => setShowPseudos(e.target.checked)}
+                                className="rounded border-border accent-primary"
+                            />
+                            Afficher les pseudos
+                        </label>
                     )}
                 </div>
 

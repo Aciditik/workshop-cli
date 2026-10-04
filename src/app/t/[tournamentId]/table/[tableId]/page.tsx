@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect } from "react";
 import { Tournament } from "@/lib/types";
+import { playerDisplayName } from "@/lib/playerName";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Trophy, CheckCircle2, ChevronUp, ChevronDown, ArrowLeft, AlertTriangle } from "lucide-react";
@@ -80,6 +81,8 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
     const [submitted, setSubmitted] = useState(false);
     const [showRecap, setShowRecap] = useState(false);
     const [showValidation, setShowValidation] = useState(false);
+    // Local view preference (not persisted, resets to off on reload).
+    const [showPseudos, setShowPseudos] = useState(false);
 
     // Form state: mapping participantId -> score obj (null = not yet entered)
     const [scores, setScores] = useState<Record<string, FormPlayerScore>>({});
@@ -280,6 +283,17 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                     </div>
                     <h1 className="text-2xl sm:text-3xl font-prototype text-foreground tracking-tight">Table {match.tableNumber} - Tableau des scores</h1>
                     <p className="text-muted-foreground font-prototype text-sm sm:text-base">{tournament.name} - Round {match.round}</p>
+                    {activePlayers.some(pId => getParticipant(pId)?.pseudo) && (
+                        <label className="flex items-center justify-center gap-1.5 text-xs font-prototype text-muted-foreground cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={showPseudos}
+                                onChange={(e) => setShowPseudos(e.target.checked)}
+                                className="rounded border-border accent-primary"
+                            />
+                            Afficher les pseudos
+                        </label>
+                    )}
                 </div>
 
                 {/* MOBILE LAYOUT: one block per CATEGORY (line by line: all players'
@@ -298,7 +312,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                 return (
                                     <div key={pId}>
                                         <label className="text-xs text-muted-foreground font-prototype block mb-1">
-                                            Joueur #{i + 1} — {p ? `${p.firstname} ${p.name}` : "Unknown"}
+                                            Joueur #{i + 1} — {playerDisplayName(p, showPseudos)}
                                         </label>
                                         <select
                                             className={`w-full p-2 border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary ${isInvalid ? "border-destructive ring-1 ring-destructive" : "border-border"}`}
@@ -330,7 +344,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                     return (
                                         <div key={pId}>
                                             <label className="text-xs text-muted-foreground font-prototype block mb-1 truncate">
-                                                #{i + 1} {p ? p.firstname : ""}
+                                                #{i + 1} {p ? (showPseudos && p.pseudo ? p.pseudo : p.firstname) : ""}
                                             </label>
                                             <input
                                                 type="number"
@@ -363,7 +377,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                             {rank?.rank === 1 && <span className="text-yellow-500 text-lg drop-shadow-md">🥇</span>}
                                             {rank?.rank === 2 && <span className="text-gray-300 text-lg drop-shadow-md">🥈</span>}
                                             {rank?.rank === 3 && <span className="text-orange-500 text-lg drop-shadow-md">🥉</span>}
-                                            <span className="font-prototype truncate text-sm">#{i + 1} {p ? `${p.firstname} ${p.name}` : "Unknown"}</span>
+                                            <span className="font-prototype truncate text-sm">#{i + 1} {playerDisplayName(p, showPseudos)}</span>
                                         </div>
                                         <div className="flex items-center gap-3 shrink-0">
                                             {rank && <span className="text-xs font-prototype text-muted-foreground">{rank.displayRank}</span>}
@@ -396,7 +410,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                             </div>
                             {activePlayers.map(pId => (
                                 <div key={pId} className="flex-1 min-w-[150px] p-4 bg-card text-card-foreground border-r border-border border-b border-border flex items-center justify-center font-prototype">
-                                    {(() => { const p = getParticipant(pId); return p ? `${p.firstname} ${p.name}` : "Unknown"; })()}
+                                    {playerDisplayName(getParticipant(pId), showPseudos)}
                                 </div>
                             ))}
                         </div>
@@ -555,7 +569,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                                         <span className="font-prototype text-sm">{r?.displayRank || "-"}</span>
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <div className="font-prototype truncate">{p ? `${p.firstname} ${p.name}` : "Unknown"}</div>
+                                                        <div className="font-prototype truncate">{playerDisplayName(p, showPseudos)}</div>
                                                         <div className="text-xs text-muted-foreground font-prototype truncate">
                                                             {scores[pId]?.corporation || "— Corporation non choisie —"}
                                                         </div>

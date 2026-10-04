@@ -12,6 +12,7 @@ import { SwissRounds } from "@/components/SwissRounds";
 import { BracketTreeView } from "@/components/BracketTreeView";
 import { BoardSelectModal } from "@/components/BoardSelectModal";
 import { Participant, Tournament, TournamentFormat } from "@/lib/types";
+import { playerDisplayName } from "@/lib/playerName";
 import {
     generateEliminationRound2,
     generateSwissRound,
@@ -87,8 +88,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const [playerFirstname, setPlayerFirstname] = useState("");
     const [playerName, setPlayerName] = useState("");
+    const [playerPseudo, setPlayerPseudo] = useState("");
     const [playerEmail, setPlayerEmail] = useState("");
     const [playerPhone, setPlayerPhone] = useState("");
+    // Local view preference (not persisted, resets to off on reload): show
+    // each player's pseudo instead of firstname+name wherever names appear.
+    const [showPseudos, setShowPseudos] = useState(false);
     // Finale only: when manually adding a player, organizer can pick the
     // qualifier tournament they came from. The mapping participantId -> sourceTournamentId
     // is persisted in localStorage so we can show that tournament's logo next to the player.
@@ -173,6 +178,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const [editParticipant, setEditParticipant] = useState<Participant | null>(null);
     const [editFirstname, setEditFirstname] = useState("");
     const [editName, setEditName] = useState("");
+    const [editPseudo, setEditPseudo] = useState("");
     const [editEmail, setEditEmail] = useState("");
     const [editPhone, setEditPhone] = useState("");
     // Finale only: qualifier tournament for the player being edited.
@@ -182,6 +188,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         setEditParticipant(p);
         setEditFirstname(p.firstname);
         setEditName(p.name);
+        setEditPseudo(p.pseudo || "");
         setEditEmail(p.email);
         setEditPhone(p.phone);
         setEditSourceTournamentId(p.sourceTournamentId || finaleSourceMap[p.id] || "");
@@ -195,6 +202,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         if (!editParticipant || !tournament) return;
         const firstname = editFirstname.trim();
         const name = editName.trim();
+        const pseudo = editPseudo.trim();
         const email = editEmail.trim();
         const phone = editPhone.trim();
         if (!firstname || !name || !email || !phone) return;
@@ -206,6 +214,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     ...p,
                     firstname,
                     name,
+                    pseudo: pseudo || undefined,
                     email,
                     phone,
                     // Finale-only: persist (or clear) the qualifier tournament
@@ -543,6 +552,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const addPlayer = () => {
         const firstname = playerFirstname.trim();
         const name = playerName.trim();
+        const pseudo = playerPseudo.trim();
         const email = playerEmail.trim();
         const phone = playerPhone.trim();
         if (!firstname || !name || !email || !phone || tournament.status !== "brouillon") return;
@@ -552,6 +562,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             id: crypto.randomUUID(),
             firstname,
             name,
+            pseudo: pseudo || undefined,
             email,
             phone,
             score: 0,
@@ -568,6 +579,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
         setPlayerFirstname("");
         setPlayerName("");
+        setPlayerPseudo("");
         setPlayerEmail("");
         setPlayerPhone("");
         setSourceTournamentId("");
@@ -1036,7 +1048,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         .map((p, index) => ({ p, index }))
         .filter(({ p }) => {
             const search = playerListSearch.trim().toLowerCase();
-            const matchesSearch = !search || `${p.firstname} ${p.name}`.toLowerCase().includes(search);
+            const matchesSearch = !search || `${p.firstname} ${p.name}`.toLowerCase().includes(search) || (p.pseudo || "").toLowerCase().includes(search);
             const matchesOrigin = !playerListOriginFilter || getQualifierTournament(p)?.id === playerListOriginFilter;
             return matchesSearch && matchesOrigin;
         });
@@ -1120,7 +1132,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     <div key={qId} className="flex items-center gap-3 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10">
                                         <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                                         <div>
-                                            <p className="font-prototype">{p?.firstname} {p?.name || "Inconnu"}</p>
+                                            <p className="font-prototype">{playerDisplayName(p, showPseudos)}</p>
                                             <p className="text-xs font-prototype text-muted-foreground">Qualifié #{idx + 1}</p>
                                         </div>
                                     </div>
@@ -1219,6 +1231,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     required
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
+                                <input
+                                    type="text"
+                                    value={playerPseudo}
+                                    onChange={(e) => setPlayerPseudo(e.target.value)}
+                                    onKeyDown={handlePlayerKeyDown}
+                                    placeholder="Pseudo (optionnel)"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
                             </div>
                             {isFinaleTournament && (
                                 <div className="space-y-1">
@@ -1250,9 +1270,20 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     </CardContent>
                     
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-orange-400 font-prototype">
-                            <ListCheck className="w-5 h-5" />
-                            Liste des joueurs
+                        <CardTitle className="flex items-center justify-between gap-2 text-orange-400 font-prototype flex-wrap">
+                            <span className="flex items-center gap-2">
+                                <ListCheck className="w-5 h-5" />
+                                Liste des joueurs
+                            </span>
+                            <label className="flex items-center gap-1.5 text-xs font-prototype text-muted-foreground cursor-pointer select-none normal-case">
+                                <input
+                                    type="checkbox"
+                                    checked={showPseudos}
+                                    onChange={(e) => setShowPseudos(e.target.checked)}
+                                    className="rounded border-border accent-primary"
+                                />
+                                Afficher les pseudos
+                            </label>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -1273,7 +1304,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         .map((p, index) => ({ p, index }))
                                         .filter(({ p }) => {
                                             const search = playerListSearch.trim().toLowerCase();
-                                            const matchesSearch = !search || `${p.firstname} ${p.name}`.toLowerCase().includes(search);
+                                            const matchesSearch = !search || `${p.firstname} ${p.name}`.toLowerCase().includes(search) || (p.pseudo || "").toLowerCase().includes(search);
                                             const matchesOrigin = !playerListOriginFilter || getQualifierTournament(p)?.id === playerListOriginFilter;
                                             return matchesSearch && matchesOrigin;
                                         })
@@ -1307,7 +1338,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                                     />
                                                 )}
-                                                <span className={`font-prototype truncate ${isCheckedIn ? "" : "text-muted-foreground"}`}>{p.firstname} {p.name}</span>
+                                                <span className={`font-prototype truncate ${isCheckedIn ? "" : "text-muted-foreground"}`}>{playerDisplayName(p, showPseudos)}</span>
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
                                                 {isAdmin && (
@@ -1423,7 +1454,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
                                             </span>
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
+                                                <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{playerDisplayName(p, showPseudos)}</span>
                                                 {p.dnf && (
                                                     <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
                                                 )}
@@ -1475,6 +1506,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         participants={tournament.participants}
                                         qualifiedIds={tournament.qualifiedIds}
                                         roundBoards={tournament.roundBoards}
+                                        usePseudo={showPseudos}
                                     />
                                 </CardContent>
                             </Card>
@@ -1495,6 +1527,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             maxRounds={maxRounds}
                             qualifiedIds={tournament.qualifiedIds}
                             roundBoards={tournament.roundBoards}
+                            usePseudo={showPseudos}
                             onEditRoundBoard={(round, board) => updateTournament({
                                 ...tournament,
                                 roundBoards: { ...(tournament.roundBoards || {}), [round]: board },
@@ -1546,7 +1579,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{p.firstname} {p.name}</span>
+                                                        <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{playerDisplayName(p, showPseudos)}</span>
                                                         {p.dnf && (
                                                             <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
                                                         )}
@@ -1614,7 +1647,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         </div>
                         <div className="p-5 space-y-3 text-sm font-prototype">
                             <p>
-                                <strong>{dnfConfirm.firstname} {dnfConfirm.name}</strong> abandonne le tournoi (DNF).
+                                <strong>{playerDisplayName(dnfConfirm, showPseudos)}</strong> abandonne le tournoi (DNF).
                             </p>
                             {(() => {
                                 const activeAfter = tournament.participants.filter(p => !p.dnf && p.id !== dnfConfirm.id);
@@ -1682,6 +1715,13 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     onChange={(e) => setEditName(e.target.value)}
                                     placeholder="Nom *"
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                                <input
+                                    type="text"
+                                    value={editPseudo}
+                                    onChange={(e) => setEditPseudo(e.target.value)}
+                                    placeholder="Pseudo (optionnel)"
+                                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:col-span-2"
                                 />
                                 <input
                                     type="email"
@@ -1930,7 +1970,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 {idx + 1}
                                             </span>
                                             <div className="min-w-0">
-                                                <div className="font-prototype truncate">{p?.firstname} {p?.name || "Inconnu"}</div>
+                                                <div className="font-prototype truncate">{playerDisplayName(p, showPseudos)}</div>
                                                 {p?.email && <div className="text-xs text-muted-foreground font-prototype truncate">{p.email}</div>}
                                             </div>
                                         </div>

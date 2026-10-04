@@ -935,7 +935,7 @@ function CompareView({ entries }: { entries: Entry[] }) {
                       {activeIdx + 1}
                     </span>
                   )}
-                  <CorpLabel name={c} size={22} className="max-w-full" />
+                  <CorpLabel name={c} size={44} className="max-w-full" />
                 </button>
               );
             })}
