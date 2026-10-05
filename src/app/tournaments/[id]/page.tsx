@@ -607,8 +607,13 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     // Admin-only DNF: mark a player as dropped mid-tournament.
     // Their completed match stats are preserved; they are removed from
-    // uncompleted matches only. Total inscrit count stays the same; format
-    // is recalculated from the number of active (non-DNF) players.
+    // uncompleted matches only. Total inscrit count stays the same.
+    // Format and maxRounds are NOT recalculated here: they're fixed once the
+    // tournament starts (round generation for elimination/swiss/bracket all
+    // depend on them staying constant), and getFormat() doesn't even know
+    // about "bracket" — recalculating it used to silently flip bracket
+    // tournaments to swiss after a DNF. Only qualifiedCount scales down with
+    // the shrinking active pool.
     const markDnf = (participantId: string) => {
         const canManage = isAdmin || tournament.ownerId === user?.id;
         if (tournament.status !== "en_cours" || !canManage) return;
@@ -625,8 +630,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         );
 
         const newActiveCount = activeAfter.length;
-        const newFormat = getFormat(newActiveCount);
-        const newMaxRounds = Math.max(getMaxRounds(newActiveCount), currentRound);
         const newQualifiedCount = getQualifiedCount(newActiveCount);
 
         // Remove player only from matches that are neither validated nor being
@@ -650,8 +653,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         updateTournament({
             ...tournament,
             participants: updatedParticipants,
-            format: newFormat,
-            maxRounds: newMaxRounds,
             qualifiedCount: newQualifiedCount,
             matches: updatedMatches,
         });
@@ -1673,7 +1674,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 return (
                                     <div className="rounded-lg border border-border bg-background/50 p-3 space-y-1 text-xs text-muted-foreground">
                                         <p>• Le joueur reste inscrit (<strong className="text-foreground">{tournament.participants.length} inscrits</strong>) mais est marqué <strong className="text-orange-500">DNF</strong>.</p>
-                                        <p>• Le format passe à <strong className="text-foreground">{n} joueurs actifs</strong> ({getFormatLabel(n)}).</p>
+                                        <p>• <strong className="text-foreground">{n} joueurs actifs</strong> restants — le format du tournoi ne change pas.</p>
                                         <p>• Ses scores des rondes déjà jouées sont <strong className="text-foreground">conservés</strong>.</p>
                                         <p>• Il est retiré des tables non encore validées.</p>
                                     </div>
