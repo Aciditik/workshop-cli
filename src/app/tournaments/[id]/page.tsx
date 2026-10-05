@@ -91,9 +91,16 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const [playerPseudo, setPlayerPseudo] = useState("");
     const [playerEmail, setPlayerEmail] = useState("");
     const [playerPhone, setPlayerPhone] = useState("");
-    // Local view preference (not persisted, resets to off on reload): show
+    // View preference, persisted in localStorage (survives reloads): show
     // each player's pseudo instead of firstname+name wherever names appear.
-    const [showPseudos, setShowPseudos] = useState(false);
+    const [showPseudos, setShowPseudosState] = useState(false);
+    useEffect(() => {
+        try { setShowPseudosState(localStorage.getItem("cdf:showPseudos") === "1"); } catch { /* ignore */ }
+    }, []);
+    const setShowPseudos = (value: boolean) => {
+        setShowPseudosState(value);
+        try { localStorage.setItem("cdf:showPseudos", value ? "1" : "0"); } catch { /* ignore */ }
+    };
     // Finale only: when manually adding a player, organizer can pick the
     // qualifier tournament they came from. The mapping participantId -> sourceTournamentId
     // is persisted in localStorage so we can show that tournament's logo next to the player.
@@ -1538,9 +1545,20 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     <div>
                         <Card className="sticky top-8 border-primary/20">
                             <CardHeader className="bg-primary/5 border-b border-border">
-                                <CardTitle className="flex items-center gap-2 font-prototype">
-                                    <Trophy className="w-5 h-5 text-primary" />
-                                    Liste de joueurs
+                                <CardTitle className="flex items-center justify-between gap-2 font-prototype flex-wrap">
+                                    <span className="flex items-center gap-2">
+                                        <Trophy className="w-5 h-5 text-primary" />
+                                        Liste de joueurs
+                                    </span>
+                                    <label className="flex items-center gap-1.5 text-xs font-prototype text-muted-foreground cursor-pointer select-none normal-case">
+                                        <input
+                                            type="checkbox"
+                                            checked={showPseudos}
+                                            onChange={(e) => setShowPseudos(e.target.checked)}
+                                            className="rounded border-border accent-primary"
+                                        />
+                                        Afficher les pseudos
+                                    </label>
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
