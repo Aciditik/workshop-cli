@@ -608,12 +608,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // Admin-only DNF: mark a player as dropped mid-tournament.
     // Their completed match stats are preserved; they are removed from
     // uncompleted matches only. Total inscrit count stays the same.
-    // Format and maxRounds are NOT recalculated here: they're fixed once the
-    // tournament starts (round generation for elimination/swiss/bracket all
-    // depend on them staying constant), and getFormat() doesn't even know
-    // about "bracket" — recalculating it used to silently flip bracket
-    // tournaments to swiss after a DNF. Only qualifiedCount scales down with
-    // the shrinking active pool.
+    // Format, maxRounds AND qualifiedCount are NOT recalculated here: they're
+    // all fixed once the tournament starts. A DNF shouldn't shrink the number
+    // of qualifying spots (e.g. 32 players -> 4 qualified stays 4 qualified
+    // even after a drop to 31 active) any more than it should change the
+    // format — recalculating either from the shrinking active-player count
+    // used to silently corrupt both after a DNF.
     const markDnf = (participantId: string) => {
         const canManage = isAdmin || tournament.ownerId === user?.id;
         if (tournament.status !== "en_cours" || !canManage) return;
@@ -628,9 +628,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const updatedParticipants = tournament.participants.map(p =>
             p.id === participantId ? { ...p, dnf: true } : p
         );
-
-        const newActiveCount = activeAfter.length;
-        const newQualifiedCount = getQualifiedCount(newActiveCount);
 
         // Remove player only from matches that are neither validated nor being
         // validated (completed/pending-review round data stays intact).
@@ -653,7 +650,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         updateTournament({
             ...tournament,
             participants: updatedParticipants,
-            qualifiedCount: newQualifiedCount,
             matches: updatedMatches,
         });
     };
