@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { BarChart3, Trophy, Users, ChevronUp, ChevronDown, ChevronsUpDown, Download, Search, X, Medal, Map as MapIcon } from "lucide-react";
+import { BarChart3, Trophy, Users, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, Download, Search, X, Medal, Map as MapIcon } from "lucide-react";
 import { BarChart, HBarChart, Histogram, LineChart } from "@/components/stats/Charts";
 import { CORPORATIONS, canonicalCorporation } from "@/lib/corporations";
 import { CorpLabel } from "@/components/CorpLabel";
@@ -1284,11 +1284,20 @@ export default function StatsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-prototype tracking-tight mb-2">Statistiques</h1>
-          <p className="text-muted-foreground font-prototype text-base">
-            Explorez les données de toutes les parties disputées.
-          </p>
+        <div className="flex items-start gap-2">
+          <button
+            onClick={() => router.back()}
+            className="md:hidden mt-1 p-2 -ml-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            aria-label="Retour"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-prototype tracking-tight mb-2">Statistiques</h1>
+            <p className="text-muted-foreground font-prototype text-base">
+              Explorez les données de toutes les parties disputées.
+            </p>
+          </div>
         </div>
         {!isGuest && (
           <button

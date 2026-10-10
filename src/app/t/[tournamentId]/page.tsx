@@ -3,8 +3,9 @@
 import { use, useState, useEffect } from "react";
 import { Tournament } from "@/lib/types";
 import { playerDisplayName } from "@/lib/playerName";
+import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/Card";
-import { Users, Search, X, Map as MapIcon } from "lucide-react";
+import { Users, Search, X, Map as MapIcon, BarChart3 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -15,6 +16,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
     const [search, setSearch] = useState("");
     // Local view preference (not persisted, resets to off on reload).
     const [showPseudos, setShowPseudos] = useState(false);
+    const { loginAsGuest } = useAuth();
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -141,6 +143,14 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                             Afficher les pseudos
                         </label>
                     )}
+                    <button
+                        type="button"
+                        onClick={loginAsGuest}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card/50 hover:bg-accent/50 text-sm font-prototype text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <BarChart3 className="w-4 h-4" />
+                        Voir les statistiques
+                    </button>
                 </div>
 
                 {tournament.status === "fini" && (
