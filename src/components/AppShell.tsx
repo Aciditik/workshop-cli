@@ -23,8 +23,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     ) {
       router.push("/login");
     }
-    // Guests can only access the stats page.
-    if (!isLoading && user?.role === "guest" && pathname !== "/stats") {
+    // Guests can only access the stats page — except the public pages above
+    // (e.g. /t/... tournament landing), which are open to everyone regardless
+    // of role and must not be fought by this redirect (e.g. navigating back
+    // from /stats to /t/... with a guest session would otherwise bounce
+    // straight back to /stats).
+    if (
+      !isLoading &&
+      user?.role === "guest" &&
+      pathname !== "/stats" &&
+      !pathname.startsWith("/t/") &&
+      pathname !== "/chrono" &&
+      pathname !== "/login"
+    ) {
       router.push("/stats");
     }
   }, [isLoading, user, pathname, router]);
