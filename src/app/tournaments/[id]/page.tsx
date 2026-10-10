@@ -25,7 +25,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { ListCheck, UserRoundSearch, Trophy, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users } from "lucide-react";
+import { ListCheck, UserRoundSearch, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 
 // Human-readable label for the round about to be generated, used as the
@@ -296,6 +296,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // or "Générer Ronde X"). `pendingRound` is the round number about to be
     // created; null means the modal is closed.
     const [pendingRound, setPendingRound] = useState<number | null>(null);
+
+    // Main content tab: "Rondes & Tables" vs. "Classement" (swiss/elimination only).
+    const [mainView, setMainView] = useState<"rounds" | "classement">("rounds");
 
     // Sync the local format choice from the persisted tournament.format once
     // it loads, so a previously-saved choice (bracket) isn't silently reset
@@ -1433,212 +1436,186 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 </Card>
             )}
 
-            {/* Classement section above the rounds — elimination format only, at end of tournament */}
-            {format === "elimination" && tournament.status === "fini" && (
-                <div className="space-y-4 mb-8">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-2xl font-prototype flex items-center gap-2">
-                            <Award className="w-6 h-6 text-primary" />
-                            Classement
-                        </h3>
-                    </div>
-                    <Card className="border-primary/20">
-                        <CardContent className="p-0">
-                            <div className="divide-y divide-border">
-                                {sortedParticipants.map((p, index) => {
-                                    const ntScore = calculateNTScore(p.id);
-                                    const tableDiff = calculateTableDifference(p.id);
-                                    return (
-                                        <div key={p.id} className={`px-4 py-3 grid grid-cols-[1.5rem_1fr_5rem_6rem] items-center gap-3 hover:bg-accent/30 transition-colors ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
-                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${p.dnf ? "bg-muted text-muted-foreground" :
-                                                index === 0 ? "bg-yellow-500" :
-                                                index === 1 ? "bg-slate-300" :
-                                                    index === 2 ? "bg-amber-600" : "bg-muted text-muted-foreground"
-                                                }`}>
-                                                {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
-                                            </span>
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{playerDisplayName(p, showPseudos)}</span>
-                                                {p.dnf && (
-                                                    <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
-                                                )}
-                                            </div>
-                                            <span className="text-sm font-prototype text-orange-600 text-right tabular-nums">
-                                                {tableDiff > 0 ? `Diff ${tableDiff}` : ""}
-                                            </span>
-                                            <span className="text-sm font-prototype text-blue-600 text-right tabular-nums">
-                                                {ntScore > 0 ? `${ntScore} NT` : ""}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
+            <div className="space-y-4">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setMainView("rounds")}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-lg sm:text-2xl transition-colors ${
+                                        mainView === "rounds" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                    }`}
+                                >
+                                    <ListOrdered className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                                    Rondes & Tables
+                                </button>
+                                {(format === "swiss" || format === "elimination") && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setMainView("classement")}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-lg sm:text-2xl transition-colors ${
+                                            mainView === "classement" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        <Award className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                                        Classement
+                                    </button>
+                                )}
                             </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-2xl font-prototype flex items-center gap-2">
-                                <ListOrdered className="w-6 h-6 text-primary" />
-                                Rondes & Tables
-                            </h3>
-                            {tournament.status === "fini" ? (
-                                <div className="text-green-500 font-prototype bg-green-500/10 px-4 py-2 rounded-lg">
-                                    Tournoi Terminé !
-                                </div>
-                            ) : canGenerateNextRound() ? (
-                                <Button onClick={() => setPendingRound(currentRound + 1)} className="gap-2 font-prototype" variant="secondary">
-                                    <Play className="w-4 h-4 fill-foreground" />
-                                    Générer Ronde {currentRound + 1}
-                                </Button>
-                            ) : null}
-                        </div>
-                        {format === "bracket" && tournament.matches.length > 0 && (
-                            <Card className="border-primary/20">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 font-prototype">
-                                        <Icon path={mdiTournament} size={0.8} />
-                                        Arbre d&apos;élimination
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <BracketTreeView
-                                        matches={tournament.matches}
-                                        participants={tournament.participants}
-                                        qualifiedIds={tournament.qualifiedIds}
-                                        roundBoards={tournament.roundBoards}
-                                        usePseudo={showPseudos}
+                            <div className="flex items-center gap-3">
+                                <label className="flex items-center gap-1.5 text-xs font-prototype text-muted-foreground cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={showPseudos}
+                                        onChange={(e) => setShowPseudos(e.target.checked)}
+                                        className="rounded border-border accent-primary"
                                     />
+                                    Afficher les pseudos
+                                </label>
+                                {mainView === "rounds" && (
+                                    tournament.status === "fini" ? (
+                                        <div className="text-green-500 font-prototype bg-green-500/10 px-4 py-2 rounded-lg">
+                                            Tournoi Terminé !
+                                        </div>
+                                    ) : canGenerateNextRound() ? (
+                                        <Button onClick={() => setPendingRound(currentRound + 1)} className="gap-2 font-prototype" variant="secondary">
+                                            <Play className="w-4 h-4 fill-foreground" />
+                                            Générer Ronde {currentRound + 1}
+                                        </Button>
+                                    ) : null
+                                )}
+                            </div>
+                        </div>
+
+                        {mainView === "rounds" && (
+                            <>
+                                {format === "bracket" && tournament.matches.length > 0 && (
+                                    <Card className="border-primary/20">
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center gap-2 font-prototype">
+                                                <Icon path={mdiTournament} size={0.8} />
+                                                Arbre d&apos;élimination
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <BracketTreeView
+                                                matches={tournament.matches}
+                                                participants={tournament.participants}
+                                                qualifiedIds={tournament.qualifiedIds}
+                                                roundBoards={tournament.roundBoards}
+                                                usePseudo={showPseudos}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                <SwissRounds
+                                    matches={tournament.matches}
+                                    participants={tournament.participants}
+                                    onSubmitResults={submitMatchResults}
+                                    onDeclineResults={declineMatchResults}
+                                    onEditScorecards={editMatchScorecards}
+                                    onSwapPlayers={handleSwapPlayers}
+                                    isAdmin={isAdmin}
+                                    currentRound={tournament.currentRound || 0}
+                                    tournamentId={tournament.id}
+                                    tournamentName={tournament.name}
+                                    tournamentLogoUrl={tournament.logoUrl}
+                                    eventDate={tournament.eventDate}
+                                    maxRounds={maxRounds}
+                                    qualifiedIds={tournament.qualifiedIds}
+                                    roundBoards={tournament.roundBoards}
+                                    usePseudo={showPseudos}
+                                    onEditRoundBoard={(round, board) => updateTournament({
+                                        ...tournament,
+                                        roundBoards: { ...(tournament.roundBoards || {}), [round]: board },
+                                    })}
+                                />
+                            </>
+                        )}
+
+                        {mainView === "classement" && (format === "swiss" || format === "elimination") && (
+                            <Card className="border-primary/20">
+                                <CardContent className="p-0">
+                                    <div className="divide-y divide-border">
+                                        {filteredSortedParticipants.length === 0 && (
+                                            <p className="text-sm font-prototype text-muted-foreground text-center py-4">
+                                                Aucun joueur ne correspond à la recherche.
+                                            </p>
+                                        )}
+                                        {filteredSortedParticipants.map(({ p, index }) => {
+                                            const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
+                                            const ntScore = calculateNTScore(p.id);
+                                            const tableDiff = calculateTableDifference(p.id);
+                                            const qualifierT = getQualifierTournament(p);
+                                            const showStats = tournament.status !== "brouillon" && format === "swiss";
+                                            return (
+                                                <div
+                                                    key={p.id}
+                                                    className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
+                                                >
+                                                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
+                                                        index === 0 ? "bg-yellow-500 text-black" :
+                                                        index === 1 ? "bg-slate-300 text-black" :
+                                                            index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"
+                                                        }`}>
+                                                        {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
+                                                    </span>
+                                                    {qualifierT?.logoUrl && (
+                                                        <img
+                                                            src={qualifierT.logoUrl}
+                                                            alt={qualifierT.name}
+                                                            title={`Qualifié via ${qualifierT.name}`}
+                                                            className="w-7 h-7 object-contain shrink-0"
+                                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                        />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{playerDisplayName(p, showPseudos)}</span>
+                                                            {p.dnf && (
+                                                                <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
+                                                            )}
+                                                        </div>
+                                                        {showStats && (
+                                                            <div className="text-xs font-prototype tabular-nums mt-0.5 flex items-center gap-2">
+                                                                <span className="text-orange-600">Diff {tableDiff}</span>
+                                                                <span className="text-muted-foreground">·</span>
+                                                                <span className="text-blue-600">{ntScore} NT</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        {showStats && totalPoints !== null && (
+                                                            <span className="font-prototype text-base text-primary tabular-nums px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                                                                {totalPoints}<span className="text-xs text-muted-foreground ml-0.5">pts</span>
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openEditParticipant(p)}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Modifier les infos du joueur"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </button>
+                                                        {(isAdmin || tournament.ownerId === user?.id) && tournament.status === "en_cours" && !p.dnf && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setDnfConfirm(p)}
+                                                                className="p-1 rounded-md text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                                title="Marquer DNF — abandonne le tournoi"
+                                                            >
+                                                                <Ban className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </CardContent>
                             </Card>
                         )}
-                        <SwissRounds
-                            matches={tournament.matches}
-                            participants={tournament.participants}
-                            onSubmitResults={submitMatchResults}
-                            onDeclineResults={declineMatchResults}
-                            onEditScorecards={editMatchScorecards}
-                            onSwapPlayers={handleSwapPlayers}
-                            isAdmin={isAdmin}
-                            currentRound={tournament.currentRound || 0}
-                            tournamentId={tournament.id}
-                            tournamentName={tournament.name}
-                            tournamentLogoUrl={tournament.logoUrl}
-                            eventDate={tournament.eventDate}
-                            maxRounds={maxRounds}
-                            qualifiedIds={tournament.qualifiedIds}
-                            roundBoards={tournament.roundBoards}
-                            usePseudo={showPseudos}
-                            onEditRoundBoard={(round, board) => updateTournament({
-                                ...tournament,
-                                roundBoards: { ...(tournament.roundBoards || {}), [round]: board },
-                            })}
-                        />
-                    </div>
-
-                    <div>
-                        <Card className="sticky top-8 border-primary/20">
-                            <CardHeader className="bg-primary/5 border-b border-border">
-                                <CardTitle className="flex items-center justify-between gap-2 font-prototype flex-wrap">
-                                    <span className="flex items-center gap-2">
-                                        <Trophy className="w-5 h-5 text-primary" />
-                                        Liste de joueurs
-                                    </span>
-                                    <label className="flex items-center gap-1.5 text-xs font-prototype text-muted-foreground cursor-pointer select-none normal-case">
-                                        <input
-                                            type="checkbox"
-                                            checked={showPseudos}
-                                            onChange={(e) => setShowPseudos(e.target.checked)}
-                                            className="rounded border-border accent-primary"
-                                        />
-                                        Afficher les pseudos
-                                    </label>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="divide-y divide-border">
-                                    {filteredSortedParticipants.length === 0 && (
-                                        <p className="text-sm font-prototype text-muted-foreground text-center py-4">
-                                            Aucun joueur ne correspond à la recherche.
-                                        </p>
-                                    )}
-                                    {filteredSortedParticipants.map(({ p, index }) => {
-                                        const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
-                                        const ntScore = calculateNTScore(p.id);
-                                        const tableDiff = calculateTableDifference(p.id);
-                                        const qualifierT = getQualifierTournament(p);
-                                        const showStats = tournament.status !== "brouillon" && format === "swiss";
-                                        return (
-                                            <div
-                                                key={p.id}
-                                                className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
-                                            >
-                                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
-                                                    index === 0 ? "bg-yellow-500 text-black" :
-                                                    index === 1 ? "bg-slate-300 text-black" :
-                                                        index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"
-                                                    }`}>
-                                                    {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
-                                                </span>
-                                                {qualifierT?.logoUrl && (
-                                                    <img
-                                                        src={qualifierT.logoUrl}
-                                                        alt={qualifierT.name}
-                                                        title={`Qualifié via ${qualifierT.name}`}
-                                                        className="w-7 h-7 object-contain shrink-0"
-                                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                    />
-                                                )}
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{playerDisplayName(p, showPseudos)}</span>
-                                                        {p.dnf && (
-                                                            <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
-                                                        )}
-                                                    </div>
-                                                    {showStats && (
-                                                        <div className="text-xs font-prototype tabular-nums mt-0.5 flex items-center gap-2">
-                                                            <span className="text-orange-600">Diff {tableDiff}</span>
-                                                            <span className="text-muted-foreground">·</span>
-                                                            <span className="text-blue-600">{ntScore} NT</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    {showStats && totalPoints !== null && (
-                                                        <span className="font-prototype text-base text-primary tabular-nums px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
-                                                            {totalPoints}<span className="text-xs text-muted-foreground ml-0.5">pts</span>
-                                                        </span>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openEditParticipant(p)}
-                                                        className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="Modifier les infos du joueur"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </button>
-                                                    {(isAdmin || tournament.ownerId === user?.id) && tournament.status === "en_cours" && !p.dnf && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDnfConfirm(p)}
-                                                            className="p-1 rounded-md text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                            title="Marquer DNF — abandonne le tournoi"
-                                                        >
-                                                            <Ban className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
                 </div>
 
             {/* Admin: Confirm DNF mid-tournament */}
