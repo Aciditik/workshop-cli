@@ -1064,16 +1064,66 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // Bracket classement: furthest round reached, then points at the last
     // table played, then cumulative score — same ranking used to determine
     // qualifiers, recomputed live from tournament.matches so it updates as
-    // soon as a table is validated. DNF players are appended at the bottom.
+    // soon as a table is validated. DNF players are appended at the bottom,
+    // grouped with the eliminated players.
     const bracketRanked = format === "bracket" ? rankBracketPlayers(tournament.matches, tournament.participants) : [];
     const bracketDisplayList = [
-        ...bracketRanked.map(r => ({ p: r.participant, lastRound: r.lastRound, lastRoundPoints: r.lastRoundPoints })),
-        ...tournament.participants.filter(p => p.dnf).map(p => ({ p, lastRound: 0, lastRoundPoints: 0 })),
+        ...bracketRanked.map(r => ({ p: r.participant, lastRound: r.lastRound, status: r.status })),
+        ...tournament.participants.filter(p => p.dnf).map(p => ({ p, lastRound: 0, status: "eliminated" as const })),
     ].map((row, index) => ({ ...row, index }))
         .filter(({ p }) => {
             const search = playerListSearch.trim().toLowerCase();
             return !search || `${p.firstname} ${p.name}`.toLowerCase().includes(search) || (p.pseudo || "").toLowerCase().includes(search);
         });
+    const bracketAdvancing = bracketDisplayList.filter(r => r.status === "advancing");
+    const bracketPending = bracketDisplayList.filter(r => r.status === "pending");
+    const bracketEliminated = bracketDisplayList.filter(r => r.status === "eliminated");
+
+    const renderBracketRow = ({ p, index, lastRound }: { p: Participant; index: number; lastRound: number }) => (
+        <div
+            key={p.id}
+            className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
+        >
+            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
+                index === 0 ? "bg-yellow-500 text-black" :
+                index === 1 ? "bg-slate-300 text-black" :
+                    index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"
+                }`}>
+                {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
+            </span>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                    <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{playerDisplayName(p, showPseudos)}</span>
+                    {p.dnf && (
+                        <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
+                    )}
+                </div>
+                <div className="text-xs font-prototype text-muted-foreground mt-0.5">
+                    {lastRound > 0 ? `Dernier tour : ${roundLabel(format, lastRound)}` : "Pas encore joué"}
+                </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+                <button
+                    type="button"
+                    onClick={() => openEditParticipant(p)}
+                    className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                    title="Modifier les infos du joueur"
+                >
+                    <Pencil className="w-4 h-4" />
+                </button>
+                {(isAdmin || tournament.ownerId === user?.id) && tournament.status === "en_cours" && !p.dnf && (
+                    <button
+                        type="button"
+                        onClick={() => setDnfConfirm(p)}
+                        className="p-1 rounded-md text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Marquer DNF — abandonne le tournoi"
+                    >
+                        <Ban className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
+        </div>
+    );
 
     return (
         <div className="space-y-8">
@@ -1633,67 +1683,56 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         )}
 
                         {mainView === "classement" && format === "bracket" && (
-                            <Card className="border-primary/20">
-                                <CardContent className="p-0">
-                                    <div className="divide-y divide-border">
-                                        {bracketDisplayList.length === 0 && (
-                                            <p className="text-sm font-prototype text-muted-foreground text-center py-4">
-                                                Aucun joueur ne correspond à la recherche.
-                                            </p>
-                                        )}
-                                        {bracketDisplayList.map(({ p, index, lastRound, lastRoundPoints }) => (
-                                            <div
-                                                key={p.id}
-                                                className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
-                                            >
-                                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
-                                                    index === 0 ? "bg-yellow-500 text-black" :
-                                                    index === 1 ? "bg-slate-300 text-black" :
-                                                        index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"
-                                                    }`}>
-                                                    {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
-                                                </span>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{playerDisplayName(p, showPseudos)}</span>
-                                                        {p.dnf && (
-                                                            <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-xs font-prototype text-muted-foreground mt-0.5">
-                                                        {lastRound > 0 ? `Dernier tour : ${roundLabel(format, lastRound)}` : "Pas encore joué"}
-                                                    </div>
+                            <div className="space-y-6">
+                                {bracketDisplayList.length === 0 && (
+                                    <p className="text-sm font-prototype text-muted-foreground text-center py-4">
+                                        Aucun joueur ne correspond à la recherche.
+                                    </p>
+                                )}
+                                {bracketAdvancing.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-prototype text-green-500 flex items-center gap-2">
+                                            <Award className="w-4 h-4" />
+                                            Qualifiés pour la ronde suivante ({bracketAdvancing.length})
+                                        </h4>
+                                        <Card className="border-green-500/20">
+                                            <CardContent className="p-0">
+                                                <div className="divide-y divide-border">
+                                                    {bracketAdvancing.map(row => renderBracketRow(row))}
                                                 </div>
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    {lastRound > 0 && (
-                                                        <span className="font-prototype text-base text-primary tabular-nums px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
-                                                            {lastRoundPoints}<span className="text-xs text-muted-foreground ml-0.5">pts</span>
-                                                        </span>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openEditParticipant(p)}
-                                                        className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="Modifier les infos du joueur"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </button>
-                                                    {(isAdmin || tournament.ownerId === user?.id) && tournament.status === "en_cours" && !p.dnf && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDnfConfirm(p)}
-                                                            className="p-1 rounded-md text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors opacity-0 group-hover:opacity-100"
-                                                            title="Marquer DNF — abandonne le tournoi"
-                                                        >
-                                                            <Ban className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            </CardContent>
+                                        </Card>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                )}
+                                {bracketPending.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-prototype text-muted-foreground">
+                                            En attente de résultats ({bracketPending.length})
+                                        </h4>
+                                        <Card className="border-primary/20">
+                                            <CardContent className="p-0">
+                                                <div className="divide-y divide-border">
+                                                    {bracketPending.map(row => renderBracketRow(row))}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )}
+                                {bracketEliminated.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-prototype text-muted-foreground">
+                                            Éliminés ({bracketEliminated.length})
+                                        </h4>
+                                        <Card className="border-border opacity-80">
+                                            <CardContent className="p-0">
+                                                <div className="divide-y divide-border">
+                                                    {bracketEliminated.map(row => renderBracketRow(row))}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )}
+                            </div>
                         )}
                 </div>
 

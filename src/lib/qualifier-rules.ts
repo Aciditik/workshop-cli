@@ -466,16 +466,25 @@ export function generateBracketNextRound(
     }));
 }
 
+// "advancing": qualified for (or already playing/won) the next round.
+// "eliminated": finished outside the advancing half of their last table and
+// wasn't seeded into a later round.
+// "pending": hasn't completed a table yet — no verdict either way.
+export type BracketPlayerStatus = "advancing" | "eliminated" | "pending";
+
 // ─── Bracket Ranking ─────────────────────────────────────────────────
 // Ranks (active, non-DNF) players by how far they progressed through the
 // elimination tree: furthest round reached first, then points scored at
 // their last table, then total cumulative score as a final tie-break.
+// Also tags each player's status (see BracketPlayerStatus) so the UI can
+// separate "qualified for the next round" from "eliminated" without
+// exposing raw points, which aren't meaningful outside their own table.
 // Shared by determineQualifiedPlayers (bracket) and the live "Classement"
 // view, which can call this at any point mid-tournament, not just at the end.
 export function rankBracketPlayers(
     matches: TableMatch[],
     participants: Participant[]
-): { participant: Participant; lastRound: number; lastRoundPoints: number }[] {
+): { participant: Participant; lastRound: number; lastRoundPoints: number; status: BracketPlayerStatus }[] {
     const lastRound = new Map<string, number>();
     const lastRoundPoints = new Map<string, number>();
     for (const m of matches) {
@@ -490,13 +499,37 @@ export function rankBracketPlayers(
         }
     }
 
+    // Highest round number that has been generated at all (completed or not).
+    const maxGeneratedRound = matches.reduce((max, m) => Math.max(max, m.round), 0);
+
+    // Fallback for when the next round hasn't been generated yet: which
+    // players placed in the advancing (top) half of their last completed table.
+    const advancingHalf = new Set<string>();
+    for (const m of matches) {
+        if (!m.isCompleted) continue;
+        advancersForTable(m).forEach(pid => advancingHalf.add(pid));
+    }
+
+    const seededForward = (pid: string, afterRound: number) =>
+        matches.some(m => m.round > afterRound && m.participantIds.includes(pid));
+
     return [...participants]
         .filter(p => !p.dnf)
-        .map(p => ({
-            participant: p,
-            lastRound: lastRound.get(p.id) ?? 0,
-            lastRoundPoints: lastRoundPoints.get(p.id) ?? 0,
-        }))
+        .map(p => {
+            const lr = lastRound.get(p.id) ?? 0;
+            const lrp = lastRoundPoints.get(p.id) ?? 0;
+            let status: BracketPlayerStatus;
+            if (lr === 0) {
+                status = "pending";
+            } else if (lr < maxGeneratedRound) {
+                // A later round already exists — advancement is known for sure.
+                status = seededForward(p.id, lr) ? "advancing" : "eliminated";
+            } else {
+                // No later round generated yet — preview via the table's top half.
+                status = advancingHalf.has(p.id) ? "advancing" : "eliminated";
+            }
+            return { participant: p, lastRound: lr, lastRoundPoints: lrp, status };
+        })
         .sort((a, b) => {
             if (b.lastRound !== a.lastRound) return b.lastRound - a.lastRound;
             if (b.lastRoundPoints !== a.lastRoundPoints) return b.lastRoundPoints - a.lastRoundPoints;
