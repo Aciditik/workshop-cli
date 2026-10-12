@@ -466,6 +466,44 @@ export function generateBracketNextRound(
     }));
 }
 
+// ─── Bracket Ranking ─────────────────────────────────────────────────
+// Ranks (active, non-DNF) players by how far they progressed through the
+// elimination tree: furthest round reached first, then points scored at
+// their last table, then total cumulative score as a final tie-break.
+// Shared by determineQualifiedPlayers (bracket) and the live "Classement"
+// view, which can call this at any point mid-tournament, not just at the end.
+export function rankBracketPlayers(
+    matches: TableMatch[],
+    participants: Participant[]
+): { participant: Participant; lastRound: number; lastRoundPoints: number }[] {
+    const lastRound = new Map<string, number>();
+    const lastRoundPoints = new Map<string, number>();
+    for (const m of matches) {
+        if (!m.isCompleted) continue;
+        for (const pid of m.participantIds) {
+            if (!pid) continue;
+            const prevRound = lastRound.get(pid) ?? 0;
+            if (m.round >= prevRound) {
+                lastRound.set(pid, m.round);
+                lastRoundPoints.set(pid, m.results[pid] || 0);
+            }
+        }
+    }
+
+    return [...participants]
+        .filter(p => !p.dnf)
+        .map(p => ({
+            participant: p,
+            lastRound: lastRound.get(p.id) ?? 0,
+            lastRoundPoints: lastRoundPoints.get(p.id) ?? 0,
+        }))
+        .sort((a, b) => {
+            if (b.lastRound !== a.lastRound) return b.lastRound - a.lastRound;
+            if (b.lastRoundPoints !== a.lastRoundPoints) return b.lastRoundPoints - a.lastRoundPoints;
+            return b.participant.score - a.participant.score;
+        });
+}
+
 // ─── Determine Qualified Players ────────────────────────────────────
 export function determineQualifiedPlayers(
     format: TournamentFormat,
@@ -476,36 +514,8 @@ export function determineQualifiedPlayers(
     const qualifiedCount = getQualifiedCount(size);
 
     if (format === "bracket") {
-        // Rank players by how far they progressed through the tree: furthest
-        // round reached first, then points scored at their last table, then
-        // total cumulative score as a final tie-break.
-        const lastRound = new Map<string, number>();
-        const lastRoundPoints = new Map<string, number>();
-        for (const m of matches) {
-            if (!m.isCompleted) continue;
-            for (const pid of m.participantIds) {
-                if (!pid) continue;
-                const prevRound = lastRound.get(pid) ?? 0;
-                if (m.round >= prevRound) {
-                    lastRound.set(pid, m.round);
-                    lastRoundPoints.set(pid, m.results[pid] || 0);
-                }
-            }
-        }
-
-        const ranked = [...participants]
-            .filter(p => !p.dnf)
-            .sort((a, b) => {
-                const ra = lastRound.get(a.id) ?? 0;
-                const rb = lastRound.get(b.id) ?? 0;
-                if (rb !== ra) return rb - ra;
-                const pa = lastRoundPoints.get(a.id) ?? 0;
-                const pb = lastRoundPoints.get(b.id) ?? 0;
-                if (pb !== pa) return pb - pa;
-                return b.score - a.score;
-            });
-
-        return ranked.slice(0, qualifiedCount).map(p => p.id);
+        const ranked = rankBracketPlayers(matches, participants);
+        return ranked.slice(0, qualifiedCount).map(r => r.participant.id);
     }
 
     if (format === "elimination") {
