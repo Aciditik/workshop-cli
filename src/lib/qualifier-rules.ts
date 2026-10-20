@@ -1,5 +1,18 @@
 import { TableMatch, Participant, TournamentFormat } from "./types";
 
+// Raw scorecard total (NT + Objectifs + Récompenses + Forêts + Villes +
+// Cartes) for a player at a given table. This is the "real" score used to
+// compare performance ACROSS tables — unlike placement points (5/3/2/1),
+// which only rank players within their own table and aren't comparable in
+// magnitude between two different tables (e.g. a "2nd place" worth 3pts at
+// one table can have scored far more than a "1st place" worth 5pts at
+// another).
+export function matchScoreTotal(match: TableMatch, participantId: string): number {
+    const sc = match.scorecards?.[participantId];
+    if (!sc) return 0;
+    return (sc.nt || 0) + (sc.objectifs || 0) + (sc.recompenses || 0) + (sc.forets || 0) + (sc.villes || 0) + (sc.cartes || 0);
+}
+
 // ─── Format Detection ──────────────────────────────────────────────
 export function getFormat(size: number): TournamentFormat {
     if (size <= 28) return "elimination";
@@ -474,13 +487,15 @@ export type BracketPlayerStatus = "advancing" | "eliminated" | "pending";
 
 // ─── Bracket Ranking ─────────────────────────────────────────────────
 // Ranks (active, non-DNF) players by how far they progressed through the
-// elimination tree: furthest round reached first, then points scored at
-// their last table, then total cumulative score as a final tie-break.
-// Also tags each player's status (see BracketPlayerStatus) so the UI can
-// separate "qualified for the next round" from "eliminated" without
-// exposing raw points, which aren't meaningful outside their own table.
-// Shared by determineQualifiedPlayers (bracket) and the live "Classement"
-// view, which can call this at any point mid-tournament, not just at the end.
+// elimination tree: furthest round reached first, then raw score total at
+// their last table, then total cumulative score as a final tie-break. Raw
+// score (not placement points) is used because points like "2nd place"
+// aren't comparable in magnitude between two different tables — see
+// matchScoreTotal(). Also tags each player's status (see
+// BracketPlayerStatus) so the UI can separate "qualified for the next
+// round" from "eliminated". Shared by determineQualifiedPlayers (bracket)
+// and the live "Classement" view, which can call this at any point
+// mid-tournament, not just at the end.
 export function rankBracketPlayers(
     matches: TableMatch[],
     participants: Participant[]
@@ -494,7 +509,7 @@ export function rankBracketPlayers(
             const prevRound = lastRound.get(pid) ?? 0;
             if (m.round >= prevRound) {
                 lastRound.set(pid, m.round);
-                lastRoundPoints.set(pid, m.results[pid] || 0);
+                lastRoundPoints.set(pid, matchScoreTotal(m, pid));
             }
         }
     }
@@ -539,11 +554,19 @@ export function rankBracketPlayers(
 
 // Splits `qualifiedCount` qualifying spots evenly across a set of completed
 // final-round tables instead of ranking all finalists globally — a global
-// ranking can let one final table sweep most of the spots just because its
-// players happened to score more raw points, even though each final table is
-// an independent playoff. Each table contributes floor(qualifiedCount /
-// numTables) qualifiers (its own top finishers); any remainder (when it
-// doesn't divide evenly) goes to the best-placed runner-up(s) across tables.
+// ranking by placement points can let one final table sweep most of the
+// spots just because its players happened to score more points, even though
+// each final table is an independent playoff. Each table contributes
+// floor(qualifiedCount / numTables) qualifiers (its own top finishers, by
+// placement at that table); any remainder (when it doesn't divide evenly)
+// goes to the best-placed runner-up(s) across tables.
+//
+// The returned list is then ordered by raw score total (matchScoreTotal) at
+// each player's final table, descending — NOT by which table they came from
+// or their placement rank — so e.g. a "2nd place" who actually scored more
+// than another table's "1st place" is correctly ranked #1 overall. Ties
+// (equal raw score) fall back to table placement rank, then cumulative
+// tournament score.
 // Shared by determineQualifiedPlayers and the live "Classement" view, which
 // can preview this before the tournament is marked "fini".
 export function splitQualifiersAcrossFinalTables(
@@ -559,8 +582,12 @@ export function splitQualifiersAcrossFinalTables(
 
     const qualifiedIds: string[] = [];
     const runnersUp: { id: string; rank: number }[] = [];
+    const tableByPid = new Map<string, TableMatch>();
+    const rankByPid = new Map<string, number>();
     for (const m of finalTables) {
         rankTablePlayers(m).forEach((pid, rank) => {
+            tableByPid.set(pid, m);
+            rankByPid.set(pid, rank);
             if (rank < base) qualifiedIds.push(pid);
             else runnersUp.push({ id: pid, rank });
         });
@@ -569,7 +596,70 @@ export function splitQualifiersAcrossFinalTables(
         runnersUp.sort((a, b) => a.rank - b.rank || scoreOf(b.id) - scoreOf(a.id));
         qualifiedIds.push(...runnersUp.slice(0, remainder).map(r => r.id));
     }
-    return qualifiedIds.slice(0, qualifiedCount);
+
+    const totalOf = (id: string) => {
+        const m = tableByPid.get(id);
+        return m ? matchScoreTotal(m, id) : 0;
+    };
+    return qualifiedIds
+        .slice(0, qualifiedCount)
+        .sort((a, b) =>
+            totalOf(b) - totalOf(a)
+            || (rankByPid.get(a) ?? 0) - (rankByPid.get(b) ?? 0)
+            || scoreOf(b) - scoreOf(a)
+        );
+}
+
+// ─── Swiss Ranking ───────────────────────────────────────────────────
+// Official rule (also used by the live Classement view): cumulative
+// placement points, descending → table difference vs. each table's winner,
+// ascending → total NT-equivalent score, descending. DNF players always
+// sort last. Exported so determineQualifiedPlayers and the UI share one
+// implementation instead of two that can silently drift apart.
+export function calculateSwissTotalPoints(matches: TableMatch[], participantId: string): number {
+    let total = 0;
+    for (const m of matches) {
+        if (m.isCompleted && m.results[participantId]) total += m.results[participantId];
+    }
+    return total;
+}
+
+export function calculateSwissNTScore(matches: TableMatch[], participantId: string): number {
+    let total = 0;
+    for (const m of matches) {
+        if (m.isCompleted && m.scorecards?.[participantId]) total += matchScoreTotal(m, participantId);
+    }
+    return total;
+}
+
+export function calculateSwissTableDifference(matches: TableMatch[], participantId: string): number {
+    let totalDiff = 0;
+    let counted = 0;
+    for (const m of matches) {
+        if (!m.isCompleted || !m.scorecards?.[participantId]) continue;
+        const sortedByResults = Object.entries(m.results || {})
+            .sort(([, a], [, b]) => b - a)
+            .map(([pid]) => pid);
+        const winnerId = sortedByResults[0];
+        if (winnerId && m.scorecards[winnerId]) {
+            totalDiff += matchScoreTotal(m, winnerId) - matchScoreTotal(m, participantId);
+            counted++;
+        }
+    }
+    return counted > 0 ? totalDiff : 0;
+}
+
+export function rankSwissPlayers(matches: TableMatch[], participants: Participant[]): Participant[] {
+    return [...participants].sort((a, b) => {
+        if (!!a.dnf !== !!b.dnf) return a.dnf ? 1 : -1;
+        const pointsA = calculateSwissTotalPoints(matches, a.id);
+        const pointsB = calculateSwissTotalPoints(matches, b.id);
+        if (pointsB !== pointsA) return pointsB - pointsA;
+        const diffA = calculateSwissTableDifference(matches, a.id);
+        const diffB = calculateSwissTableDifference(matches, b.id);
+        if (diffA !== diffB) return diffA - diffB;
+        return calculateSwissNTScore(matches, b.id) - calculateSwissNTScore(matches, a.id);
+    });
 }
 
 // ─── Determine Qualified Players ────────────────────────────────────
@@ -622,8 +712,11 @@ export function determineQualifiedPlayers(
 
         return qualifiedIds.slice(0, qualifiedCount);
     } else {
-        // Swiss: top N active players by total score after all rounds
-        const sorted = [...participants].filter(p => !p.dnf).sort((a, b) => b.score - a.score);
-        return sorted.slice(0, qualifiedCount).map(p => p.id);
+        // Swiss: same ranking rule as the live Classement (points → table
+        // diff → NT), not raw participant.score, which has no tie-break at
+        // all and could misorder (or even misrank) players tied on points —
+        // e.g. picking a worse-diff player over a better-diff one.
+        const ranked = rankSwissPlayers(matches, participants).filter(p => !p.dnf);
+        return ranked.slice(0, qualifiedCount).map(p => p.id);
     }
 }

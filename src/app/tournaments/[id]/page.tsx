@@ -21,6 +21,10 @@ import {
     determineQualifiedPlayers,
     rankBracketPlayers,
     splitQualifiersAcrossFinalTables,
+    rankSwissPlayers,
+    calculateSwissTotalPoints,
+    calculateSwissNTScore,
+    calculateSwissTableDifference,
     getFormatLabel,
     generateRound1,
     getFormat,
@@ -897,7 +901,24 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const exportTopPlayers = () => {
         const exportCount = qualifiedCount * 2 + 1;
-        const topPlayers = sortedParticipants.slice(0, exportCount);
+        // Bracket: the swiss-style points/diff/NT ranking (sortedParticipants)
+        // doesn't reflect who actually made it furthest in the elimination
+        // tree — it previously produced exports where the 2nd row wasn't even
+        // a real qualifier. Use the real qualifiedIds (correctly ordered)
+        // first, then fill remaining export slots with the next best-ranked
+        // bracket finishers.
+        const topPlayers = format === "bracket"
+            ? (() => {
+                const qualifiedFirst = (tournament.qualifiedIds || [])
+                    .map(id => tournament.participants.find(p => p.id === id))
+                    .filter((p): p is Participant => !!p);
+                const qualifiedIdSet = new Set(qualifiedFirst.map(p => p.id));
+                const rest = rankBracketPlayers(tournament.matches, tournament.participants)
+                    .map(r => r.participant)
+                    .filter(p => !qualifiedIdSet.has(p.id));
+                return [...qualifiedFirst, ...rest].slice(0, exportCount);
+            })()
+            : sortedParticipants.slice(0, exportCount);
         const csvHeader = "Prénom,Nom,Email,Téléphone";
         const csvRows = topPlayers.map(p => `${p.firstname || ""},${p.name},${p.email || ""},${p.phone || ""}`);
         const csvContent = [csvHeader, ...csvRows].join("\n");
@@ -974,82 +995,16 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         ).sort((a, b) => a.name.localeCompare(b.name))
         : [];
 
-    // Calculate total placement points for each participant (5,3,2,1 system)
-    const calculateTotalPoints = (participantId: string): number => {
-        let total = 0;
-        tournament.matches.forEach(m => {
-            if (m.isCompleted && m.results[participantId]) {
-                total += m.results[participantId];
-            }
-        });
-        return total;
-    };
-
-    // Calculate NT score from scorecards for each participant
-    const calculateNTScore = (participantId: string): number => {
-        let ntTotal = 0;
-        tournament.matches.forEach(m => {
-            if (m.isCompleted && m.scorecards && m.scorecards[participantId]) {
-                const scorecard = m.scorecards[participantId] as any;
-                ntTotal += (scorecard.nt || 0) + (scorecard.objectifs || 0) + (scorecard.recompenses || 0) + (scorecard.forets || 0) + (scorecard.villes || 0) + (scorecard.cartes || 0);
-            }
-        });
-        return ntTotal;
-    };
-
-    // Calculate difference from table winner for each participant
-    const calculateTableDifference = (participantId: string): number => {
-        let totalDifference = 0;
-        let matchesCounted = 0;
-
-        tournament.matches.forEach(m => {
-            if (m.isCompleted && m.scorecards && m.scorecards[participantId]) {
-                // Find the NT score of the winner (1st place) at this table
-                const tableScores: { [key: string]: number } = {};
-                Object.entries(m.scorecards).forEach(([pid, scorecard]: [string, any]) => {
-                    if (scorecard) {
-                        const nt = (scorecard.nt || 0) + (scorecard.objectifs || 0) + (scorecard.recompenses || 0) + (scorecard.forets || 0) + (scorecard.villes || 0) + (scorecard.cartes || 0);
-                        tableScores[pid] = nt;
-                    }
-                });
-
-                // Sort by results to find the winner
-                const sortedByResults = Object.entries(m.results || {})
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([pid]) => pid);
-
-                if (sortedByResults.length > 0 && tableScores[sortedByResults[0]]) {
-                    const winnerNT = tableScores[sortedByResults[0]];
-                    const playerNT = tableScores[participantId];
-                    totalDifference += winnerNT - playerNT;
-                    matchesCounted++;
-                }
-            }
-        });
-
-        return matchesCounted > 0 ? totalDifference : 0;
-    };
-
-    // Sort participants:
-    //   1) Placement points (5/3/2/1 with +1 boost) — descending
-    //   2) Table difference vs. table winner — ascending (smaller is better)
-    //   3) Total NT points won across the tournament — descending
-    const sortedParticipants = [...tournament.participants].sort((a, b) => {
-        // DNF players are always pushed to the bottom of the classement.
-        if (!!a.dnf !== !!b.dnf) return a.dnf ? 1 : -1;
-
-        const pointsA = calculateTotalPoints(a.id);
-        const pointsB = calculateTotalPoints(b.id);
-        if (pointsB !== pointsA) return pointsB - pointsA;
-
-        const diffA = calculateTableDifference(a.id);
-        const diffB = calculateTableDifference(b.id);
-        if (diffA !== diffB) return diffA - diffB;
-
-        const ntA = calculateNTScore(a.id);
-        const ntB = calculateNTScore(b.id);
-        return ntB - ntA;
-    });
+    // Swiss ranking (points → table diff → NT), shared with
+    // determineQualifiedPlayers via qualifier-rules.ts so the Classement and
+    // the actual qualifiedIds never drift apart.
+    const calculateTotalPoints = (participantId: string): number =>
+        calculateSwissTotalPoints(tournament.matches, participantId);
+    const calculateNTScore = (participantId: string): number =>
+        calculateSwissNTScore(tournament.matches, participantId);
+    const calculateTableDifference = (participantId: string): number =>
+        calculateSwissTableDifference(tournament.matches, participantId);
+    const sortedParticipants = rankSwissPlayers(tournament.matches, tournament.participants);
 
     // Player list filtered by search text (name/firstname) and, for the Finale,
     // by origin qualifier tournament.
