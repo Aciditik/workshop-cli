@@ -388,7 +388,7 @@ export function generateBracketRound1(
 }
 
 // Ranks the players of a completed table best-to-worst by points scored.
-function rankTablePlayers(match: TableMatch): string[] {
+export function rankTablePlayers(match: TableMatch): string[] {
     const ids = match.participantIds.filter((id): id is string => id !== null);
     return [...ids].sort((a, b) => (match.results[b] || 0) - (match.results[a] || 0));
 }
@@ -547,6 +547,40 @@ export function determineQualifiedPlayers(
     const qualifiedCount = getQualifiedCount(size);
 
     if (format === "bracket") {
+        // Split qualifying spots evenly across the final round's tables
+        // instead of ranking all finalists globally — a global ranking can
+        // let one final table sweep 3 of the 4 spots just because its
+        // players happened to score more raw points, even though each
+        // final table is an independent playoff. Each table contributes
+        // floor(qualifiedCount / numTables) qualifiers (its own top
+        // finishers); any remainder (when it doesn't divide evenly) goes to
+        // the best-placed runner-up(s) across tables.
+        const finalRound = matches.reduce((max, m) => Math.max(max, m.round), 0);
+        const finalTables = matches.filter(m => m.round === finalRound && m.isCompleted);
+
+        if (finalTables.length > 0) {
+            const numTables = finalTables.length;
+            const base = Math.floor(qualifiedCount / numTables);
+            const remainder = qualifiedCount - base * numTables;
+            const scoreOf = (id: string) => participants.find(p => p.id === id)?.score ?? 0;
+
+            const qualifiedIds: string[] = [];
+            const runnersUp: { id: string; rank: number }[] = [];
+            for (const m of finalTables) {
+                rankTablePlayers(m).forEach((pid, rank) => {
+                    if (rank < base) qualifiedIds.push(pid);
+                    else runnersUp.push({ id: pid, rank });
+                });
+            }
+            if (remainder > 0) {
+                runnersUp.sort((a, b) => a.rank - b.rank || scoreOf(b.id) - scoreOf(a.id));
+                qualifiedIds.push(...runnersUp.slice(0, remainder).map(r => r.id));
+            }
+            return qualifiedIds.slice(0, qualifiedCount);
+        }
+
+        // Fallback (shouldn't normally happen — this is only called once the
+        // final round is fully completed): rank all finalists globally.
         const ranked = rankBracketPlayers(matches, participants);
         return ranked.slice(0, qualifiedCount).map(r => r.participant.id);
     }
