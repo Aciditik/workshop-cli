@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3, Timer, HelpCircle, Phone, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -75,6 +75,28 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
+  }, [pathname]);
+
+  // Main content is a custom overflow-y-auto container, not the window, so
+  // the browser's native scroll restoration on back-navigation doesn't apply
+  // to it. Persist/restore its scroll position per route (sessionStorage) so
+  // going back to e.g. the dashboard lands where you left it instead of
+  // snapping to the top.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const key = `scrollPos:${pathname}`;
+    const raf = requestAnimationFrame(() => {
+      const saved = sessionStorage.getItem(key);
+      el.scrollTop = saved ? parseInt(saved, 10) : 0;
+    });
+    const onScroll = () => { sessionStorage.setItem(key, String(el.scrollTop)); };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [pathname]);
 
   return (
@@ -194,7 +216,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative z-0 w-full">
+      <main ref={mainRef} className="flex-1 overflow-y-auto relative z-0 w-full">
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-overlay"></div>
 
         {/* Mobile top bar */}

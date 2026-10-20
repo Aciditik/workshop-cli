@@ -20,6 +20,7 @@ import {
     generateBracketNextRound,
     determineQualifiedPlayers,
     rankBracketPlayers,
+    splitQualifiersAcrossFinalTables,
     getFormatLabel,
     generateRound1,
     getFormat,
@@ -1067,8 +1068,32 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // soon as a table is validated. DNF players are appended at the bottom,
     // grouped with the eliminated players.
     const bracketRanked = format === "bracket" ? rankBracketPlayers(tournament.matches, tournament.participants) : [];
+    // Once the final round has been generated, "advancing" means qualifying
+    // for the CdF Finale (qualifiedCount spots), not "advancing to the next
+    // local round" (there isn't one) — the generic top-half-of-table
+    // heuristic in rankBracketPlayers would otherwise label everyone still
+    // alive as "advancing", wildly overcounting the real qualifiedCount.
+    const bracketFinalRound = tournament.matches.reduce((max, m) => Math.max(max, m.round), 0);
+    const atBracketFinalRound = format === "bracket" && bracketFinalRound > 0 && bracketFinalRound >= maxRounds;
+    const bracketFinaleQualifiedIds = atBracketFinalRound
+        ? new Set(
+            tournament.status === "fini" && tournament.qualifiedIds
+                ? tournament.qualifiedIds
+                : splitQualifiersAcrossFinalTables(
+                    tournament.matches.filter(m => m.round === bracketFinalRound && m.isCompleted),
+                    qualifiedCount,
+                    tournament.participants
+                )
+        )
+        : null;
     const bracketDisplayList = [
-        ...bracketRanked.map(r => ({ p: r.participant, lastRound: r.lastRound, status: r.status })),
+        ...bracketRanked.map(r => ({
+            p: r.participant,
+            lastRound: r.lastRound,
+            status: bracketFinaleQualifiedIds
+                ? (r.lastRound === 0 ? "pending" as const : bracketFinaleQualifiedIds.has(r.participant.id) ? "advancing" as const : "eliminated" as const)
+                : r.status,
+        })),
         ...tournament.participants.filter(p => p.dnf).map(p => ({ p, lastRound: 0, status: "eliminated" as const })),
     ].map((row, index) => ({ ...row, index }))
         .filter(({ p }) => {
@@ -1693,7 +1718,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     <div className="space-y-2">
                                         <h4 className="text-sm font-prototype text-green-500 flex items-center gap-2">
                                             <Award className="w-4 h-4" />
-                                            Qualifiés pour la ronde suivante ({bracketAdvancing.length})
+                                            {atBracketFinalRound
+                                                ? `Qualifiés pour la finale (${qualifiedCount})`
+                                                : `Qualifiés pour la ronde suivante (${bracketAdvancing.length})`}
                                         </h4>
                                         <Card className="border-green-500/20">
                                             <CardContent className="p-0">
@@ -1721,7 +1748,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 {bracketEliminated.length > 0 && (
                                     <div className="space-y-2">
                                         <h4 className="text-sm font-prototype text-muted-foreground">
-                                            Éliminés ({bracketEliminated.length})
+                                            {atBracketFinalRound ? "Non qualifiés" : "Éliminés"} ({bracketEliminated.length})
                                         </h4>
                                         <Card className="border-border opacity-80">
                                             <CardContent className="p-0">

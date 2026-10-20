@@ -537,6 +537,41 @@ export function rankBracketPlayers(
         });
 }
 
+// Splits `qualifiedCount` qualifying spots evenly across a set of completed
+// final-round tables instead of ranking all finalists globally — a global
+// ranking can let one final table sweep most of the spots just because its
+// players happened to score more raw points, even though each final table is
+// an independent playoff. Each table contributes floor(qualifiedCount /
+// numTables) qualifiers (its own top finishers); any remainder (when it
+// doesn't divide evenly) goes to the best-placed runner-up(s) across tables.
+// Shared by determineQualifiedPlayers and the live "Classement" view, which
+// can preview this before the tournament is marked "fini".
+export function splitQualifiersAcrossFinalTables(
+    finalTables: TableMatch[],
+    qualifiedCount: number,
+    participants: Participant[]
+): string[] {
+    if (finalTables.length === 0) return [];
+    const numTables = finalTables.length;
+    const base = Math.floor(qualifiedCount / numTables);
+    const remainder = qualifiedCount - base * numTables;
+    const scoreOf = (id: string) => participants.find(p => p.id === id)?.score ?? 0;
+
+    const qualifiedIds: string[] = [];
+    const runnersUp: { id: string; rank: number }[] = [];
+    for (const m of finalTables) {
+        rankTablePlayers(m).forEach((pid, rank) => {
+            if (rank < base) qualifiedIds.push(pid);
+            else runnersUp.push({ id: pid, rank });
+        });
+    }
+    if (remainder > 0) {
+        runnersUp.sort((a, b) => a.rank - b.rank || scoreOf(b.id) - scoreOf(a.id));
+        qualifiedIds.push(...runnersUp.slice(0, remainder).map(r => r.id));
+    }
+    return qualifiedIds.slice(0, qualifiedCount);
+}
+
 // ─── Determine Qualified Players ────────────────────────────────────
 export function determineQualifiedPlayers(
     format: TournamentFormat,
@@ -547,36 +582,11 @@ export function determineQualifiedPlayers(
     const qualifiedCount = getQualifiedCount(size);
 
     if (format === "bracket") {
-        // Split qualifying spots evenly across the final round's tables
-        // instead of ranking all finalists globally — a global ranking can
-        // let one final table sweep 3 of the 4 spots just because its
-        // players happened to score more raw points, even though each
-        // final table is an independent playoff. Each table contributes
-        // floor(qualifiedCount / numTables) qualifiers (its own top
-        // finishers); any remainder (when it doesn't divide evenly) goes to
-        // the best-placed runner-up(s) across tables.
         const finalRound = matches.reduce((max, m) => Math.max(max, m.round), 0);
         const finalTables = matches.filter(m => m.round === finalRound && m.isCompleted);
 
         if (finalTables.length > 0) {
-            const numTables = finalTables.length;
-            const base = Math.floor(qualifiedCount / numTables);
-            const remainder = qualifiedCount - base * numTables;
-            const scoreOf = (id: string) => participants.find(p => p.id === id)?.score ?? 0;
-
-            const qualifiedIds: string[] = [];
-            const runnersUp: { id: string; rank: number }[] = [];
-            for (const m of finalTables) {
-                rankTablePlayers(m).forEach((pid, rank) => {
-                    if (rank < base) qualifiedIds.push(pid);
-                    else runnersUp.push({ id: pid, rank });
-                });
-            }
-            if (remainder > 0) {
-                runnersUp.sort((a, b) => a.rank - b.rank || scoreOf(b.id) - scoreOf(a.id));
-                qualifiedIds.push(...runnersUp.slice(0, remainder).map(r => r.id));
-            }
-            return qualifiedIds.slice(0, qualifiedCount);
+            return splitQualifiersAcrossFinalTables(finalTables, qualifiedCount, participants);
         }
 
         // Fallback (shouldn't normally happen — this is only called once the
