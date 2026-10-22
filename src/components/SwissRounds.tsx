@@ -181,7 +181,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 </span>
                             </h3>
                             <div className="flex items-center gap-2 shrink-0">
-                                {round === currentRound && (
+                                {round === currentRound && !readOnly && (
                                     <div onClick={(e) => e.stopPropagation()}>
                                         <QRCodeModal
                                             tournamentId={tournamentId}
