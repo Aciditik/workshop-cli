@@ -500,6 +500,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             email: p.email,
             phone: p.phone,
             score: 0,
+            // Keep the qualifier-tournament origin so a duplicated Finale
+            // still shows which qualifier each finalist came from.
+            sourceTournamentId: p.sourceTournamentId || undefined,
         }));
         const newTournament: Tournament = {
             id: crypto.randomUUID(),

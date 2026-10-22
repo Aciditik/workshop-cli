@@ -28,6 +28,10 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
     const [loading, setLoading] = useState(true);
     const [showPseudos, setShowPseudos] = useState(false);
     const [mainView, setMainView] = useState<"rounds" | "classement">("rounds");
+    // Finale only: sourceTournamentId → {name, logoUrl} of each qualifier
+    // tournament, so the classement can show each finalist's origin logo
+    // like the admin view does.
+    const [sourceTournaments, setSourceTournaments] = useState<Record<string, { name: string; logoUrl?: string }>>({});
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -50,6 +54,37 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
         const interval = setInterval(load, 10000);
         return () => { cancelled = true; clearInterval(interval); };
     }, [tournamentId]);
+
+    // Finale only: fetch the qualifier tournaments' logos once (not part of
+    // the polling above — source assignments don't change mid-tournament).
+    useEffect(() => {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+        const sourceIds = [...new Set(
+            (tournament?.participants || [])
+                .map(p => p.sourceTournamentId)
+                .filter((id): id is string => !!id)
+        )];
+        const missing = sourceIds.filter(id => !sourceTournaments[id]);
+        if (missing.length === 0) return;
+        let cancelled = false;
+        Promise.all(missing.map(async (sid) => {
+            try {
+                const r = await fetch(`${apiUrl}/api/public/tournaments/${sid}`);
+                if (r.ok) {
+                    const t = await r.json();
+                    return [sid, { name: t.name as string, logoUrl: t.logoUrl as string | undefined }] as const;
+                }
+            } catch { /* ignore individual failures */ }
+            return null;
+        })).then(results => {
+            if (cancelled) return;
+            setSourceTournaments(prev => ({
+                ...prev,
+                ...Object.fromEntries(results.filter((r): r is NonNullable<typeof r> => r !== null)),
+            }));
+        });
+        return () => { cancelled = true; };
+    }, [tournament, sourceTournaments]);
 
     if (loading) return <div className="p-8 text-center animate-pulse font-prototype">Chargement du tournoi...</div>;
     if (!tournament) return <div className="p-8 text-center text-red-500 font-prototype">Tournoi introuvable.</div>;
@@ -206,6 +241,15 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                                                 index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"}`}>
                                                 {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
                                             </span>
+                                            {p.sourceTournamentId && sourceTournaments[p.sourceTournamentId]?.logoUrl && (
+                                                <img
+                                                    src={sourceTournaments[p.sourceTournamentId].logoUrl}
+                                                    alt={sourceTournaments[p.sourceTournamentId].name}
+                                                    title={`Qualifié via ${sourceTournaments[p.sourceTournamentId].name}`}
+                                                    className="w-7 h-7 object-contain shrink-0"
+                                                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                                />
+                                            )}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5">
                                                     <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`}>{playerDisplayName(p, showPseudos)}</span>
