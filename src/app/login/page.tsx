@@ -110,7 +110,7 @@ export default function LoginPage() {
                 variant="outline"
                 className="w-full gap-2"
                 size="lg"
-                onClick={loginAsGuest}
+                onClick={() => loginAsGuest()}
               >
                 <UserRound className="w-4 h-4" />
                 Continuer en invité

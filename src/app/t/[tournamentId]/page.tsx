@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Users, Search, X, Map as MapIcon, BarChart3, ListOrdered } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function TournamentLanding({ params }: { params: Promise<{ tournamentId: string }> }) {
     const { tournamentId } = use(params);
@@ -17,9 +18,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
     // Local view preference (not persisted, resets to off on reload).
     const [showPseudos, setShowPseudos] = useState(false);
     const { user, loginAsGuest } = useAuth();
-    // Guests (invité) are spectators only — the score-entry pages are for
-    // players, so table links and the score CTA are disabled for them.
-    const isGuest = user?.role === "guest";
+    const router = useRouter();
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -150,9 +149,7 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                         {tournament.status !== "brouillon" && (
                             <Link
                                 href={`/t/${tournamentId}/suivre`}
-                                className={isGuest
-                                    ? "inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-prototype hover:bg-primary/90 transition-colors"
-                                    : "inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card/50 hover:bg-accent/50 text-sm font-prototype text-muted-foreground hover:text-foreground transition-colors"}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card/50 hover:bg-accent/50 text-sm font-prototype text-muted-foreground hover:text-foreground transition-colors"
                             >
                                 <ListOrdered className="w-4 h-4" />
                                 Suivre le tournoi
@@ -160,7 +157,13 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                         )}
                         <button
                             type="button"
-                            onClick={loginAsGuest}
+                            onClick={() => {
+                                const dest = `/stats?tournament=${tournamentId}`;
+                                // Already signed in as organizer/admin → keep the
+                                // session and just filter stats to this tournament.
+                                if (user && user.role !== "guest") router.push(dest);
+                                else loginAsGuest(dest);
+                            }}
                             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card/50 hover:bg-accent/50 text-sm font-prototype text-muted-foreground hover:text-foreground transition-colors"
                         >
                             <BarChart3 className="w-4 h-4" />
@@ -224,41 +227,31 @@ export default function TournamentLanding({ params }: { params: Promise<{ tourna
                                     </Card>
                                 )}
 
-                                {activeMatches.map(match => {
-                                    const inner = (
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-primary/20 text-primary font-prototype rounded-lg w-10 h-10 flex items-center justify-center text-lg">
-                                                    {match.tableNumber}
+                                {activeMatches.map(match => (
+                                    <Link
+                                        key={match.id}
+                                        href={`/t/${tournamentId}/table/${match.id}`}
+                                        className="block"
+                                    >
+                                        <Card className={`p-4 transition-all cursor-pointer ${matchContainsSearched(match) ? "border-primary bg-primary/10 ring-2 ring-primary/40" : "border-primary/30 hover:border-primary hover:bg-primary/5"}`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-primary/20 text-primary font-prototype rounded-lg w-10 h-10 flex items-center justify-center text-lg">
+                                                        {match.tableNumber}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-prototype text-sm">Table {match.tableNumber}</p>
+                                                        <p className="text-xs text-muted-foreground flex items-center gap-1 font-prototype">
+                                                            <Users className="w-3 h-3" />
+                                                            {renderParticipantNames(match.participantIds)}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-prototype text-sm">Table {match.tableNumber}</p>
-                                                    <p className="text-xs text-muted-foreground flex items-center gap-1 font-prototype">
-                                                        <Users className="w-3 h-3" />
-                                                        {renderParticipantNames(match.participantIds)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {!isGuest && (
                                                 <span className="text-primary text-sm font-prototype">→ Entrer vos scores</span>
-                                            )}
-                                        </div>
-                                    );
-                                    const cardClass = `p-4 transition-all ${isGuest ? "" : "cursor-pointer"} ${matchContainsSearched(match)
-                                        ? "border-primary bg-primary/10 ring-2 ring-primary/40"
-                                        : isGuest ? "border-primary/30" : "border-primary/30 hover:border-primary hover:bg-primary/5"}`;
-                                    return isGuest ? (
-                                        <Card key={match.id} className={cardClass}>{inner}</Card>
-                                    ) : (
-                                        <Link
-                                            key={match.id}
-                                            href={`/t/${tournamentId}/table/${match.id}`}
-                                            className="block"
-                                        >
-                                            <Card className={cardClass}>{inner}</Card>
-                                        </Link>
-                                    );
-                                })}
+                                            </div>
+                                        </Card>
+                                    </Link>
+                                ))}
 
                                 {submittedMatches.length > 0 && (
                                     <>

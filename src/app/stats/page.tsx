@@ -1136,6 +1136,13 @@ export default function StatsPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Preselect a tournament when arriving from a public tournament page
+  // ("Voir les statistiques" links to /stats?tournament=<id>).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tournament");
+    if (t) setTournamentFilter(t);
+  }, []);
+
   // Guard + one-time metadata fetch for the filter dropdowns.
   useEffect(() => {
     if (!isAdmin && !isGuest) {
@@ -1229,12 +1236,14 @@ export default function StatsPage() {
   const tournamentOptions = useMemo(
     () =>
       (meta?.tournaments ?? data?.tournaments ?? [])
-        // Guests only see finished tournaments in the filter.
-        .filter((t) => !isGuest || t.status === "fini")
+        // Guests only see finished tournaments in the filter — but keep the
+        // currently-selected one (e.g. arrived via ?tournament=<en_cours id>)
+        // so the dropdown doesn't display an orphan value.
+        .filter((t) => !isGuest || t.status === "fini" || t.id === tournamentFilter)
         .slice()
         .sort((a, b) => (b.eventDate || "").localeCompare(a.eventDate || ""))
         .map((t) => ({ value: t.id, label: shortTournamentName(t.name, t.eventDate) })),
-    [meta, data, isGuest]
+    [meta, data, isGuest, tournamentFilter]
   );
   const organizerOptions = useMemo(
     () => (meta?.organizers ?? data?.organizers ?? []).map((o) => ({ value: o.id, label: o.name || "Sans nom" })),
@@ -1285,8 +1294,6 @@ export default function StatsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-2">
-          {/* Back arrow — mobile convenience for admin/organizer only;
-              guests navigate via the sidebar (Tableau de bord/Statistiques). */}
           {!isGuest && (
             <button
               onClick={() => router.back()}

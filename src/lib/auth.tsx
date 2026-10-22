@@ -18,7 +18,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginAsGuest: () => void;
+  loginAsGuest: (redirectTo?: string) => void;
   createOrganizer: (email: string, password: string, name: string, city?: string) => Promise<void>;
   logout: () => void;
 }
@@ -86,10 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/");
   };
 
-  const loginAsGuest = () => {
+  const loginAsGuest = (redirectTo?: string) => {
     localStorage.setItem(GUEST_KEY, "1");
     setUser(GUEST_USER);
-    router.push("/stats");
+    router.push(redirectTo ?? "/stats");
   };
 
   // Admin-only: creates an organizer account without switching the current session.

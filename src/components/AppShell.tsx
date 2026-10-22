@@ -42,7 +42,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [isLoading, user, pathname, router]);
 
   // Public pages (login, public tournament view /t/..., chrono standalone window)
-  if (pathname === "/login" || pathname.startsWith("/t/") || pathname === "/chrono") {
+  // Guest dashboard gets the same bare, black-background public-page look as
+  // /t/* — no sidebar, no app chrome (they only navigate between the
+  // tournament list and /stats anyway).
+  if (
+    pathname === "/login" ||
+    pathname.startsWith("/t/") ||
+    pathname === "/chrono" ||
+    (pathname === "/" && user?.role === "guest")
+  ) {
     return <>{children}</>;
   }
 
