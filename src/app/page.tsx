@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTournaments } from "@/lib/store";
-import { useAuth } from "@/lib/auth";
+import { useAuth, getApiUrl } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
@@ -9,26 +10,118 @@ import { Trophy, Calendar, Users, ChevronRight, Trash2 } from "lucide-react";
 
 const isFinaleTournament = (name: string) => /finale/i.test(name);
 
+type PublicTournamentItem = {
+  id: string;
+  name: string;
+  eventDate: string;
+  status: string;
+  ownerName?: string;
+};
+
 export default function Dashboard() {
   const { tournaments, isLoaded, deleteTournament } = useTournaments();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const isGuest = user?.role === "guest";
+
+  // Guest home: the authenticated /api/tournaments list is ownership-filtered
+  // (and guests have no JWT anyway), so browse via the public stats metadata
+  // endpoint instead — read-only links to the public /t/* pages.
+  const [publicTournaments, setPublicTournaments] = useState<PublicTournamentItem[]>([]);
+  const [publicLoaded, setPublicLoaded] = useState(false);
+  useEffect(() => {
+    if (!isGuest) return;
+    let cancelled = false;
+    fetch(`${getApiUrl()}/api/public/stats?meta=1`)
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setPublicTournaments(data.tournaments || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setPublicLoaded(true); });
+    return () => { cancelled = true; };
+  }, [isGuest]);
 
   // Finale tournaments always pinned first; the rest sorted by event date (newest first).
-  const sortedTournaments = [...tournaments].sort((a, b) => {
-    const aFinale = isFinaleTournament(a.name);
-    const bFinale = isFinaleTournament(b.name);
-    if (aFinale !== bFinale) return aFinale ? -1 : 1;
-    return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime();
-  });
+  const sortByDate = <T extends { name: string; eventDate: string }>(list: T[]) =>
+    [...list].sort((a, b) => {
+      const aFinale = isFinaleTournament(a.name);
+      const bFinale = isFinaleTournament(b.name);
+      if (aFinale !== bFinale) return aFinale ? -1 : 1;
+      return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime();
+    });
+  const sortedTournaments = sortByDate(tournaments);
+  const sortedPublic = sortByDate(publicTournaments);
 
-  if (!isLoaded) {
+  const effectiveLoaded = isGuest ? publicLoaded : isLoaded;
+
+  if (!effectiveLoaded) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <Trophy className="w-12 h-12 text-primary opacity-50" />
           <p className="text-muted-foreground font-prototype">Chargement des tournois...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (isGuest) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-prototype tracking-tight mb-2">Tournois</h1>
+          <p className="text-muted-foreground font-prototype text-base sm:text-lg">
+            Suivez les tournois en direct ou consultez leurs résultats.
+          </p>
+        </div>
+        {sortedPublic.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed border-2">
+            <div className="bg-primary/10 p-4 rounded-full mb-4">
+              <Trophy className="w-10 h-10 text-primary" />
+            </div>
+            <h3 className="text-xl font-prototype mb-2">Aucun tournoi disponible</h3>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sortedPublic.map((tournament) => {
+              const isFinale = isFinaleTournament(tournament.name);
+              return (
+                <Link key={tournament.id} href={`/t/${tournament.id}`}>
+                  <Card className={`hover:border-primary/50 transition-colors group cursor-pointer h-full flex flex-col relative ${isFinale ? "bg-zinc-950 border-yellow-500/40 hover:border-yellow-500/70 shadow-lg shadow-yellow-500/10" : ""}`}>
+                    <span
+                      className={`absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-prototype ${tournament.status === "fini"
+                        ? "bg-green-500/10 text-green-500 border border-green-500/20"
+                        : tournament.status === "en_cours"
+                          ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                          : "bg-orange-500/10 text-orange-500 border border-orange-500/20"
+                        }`}
+                    >
+                      {tournament.status === "fini" ? "FINI" : tournament.status === "en_cours" ? "EN COURS" : "BROUILLON"}
+                    </span>
+                    <CardContent className="flex-1 flex flex-col items-center justify-between p-6 pt-12">
+                      <div className="flex flex-col items-center justify-center flex-1 w-full">
+                        <div className="w-32 h-32 flex items-center justify-center bg-muted/30 rounded-lg mb-4">
+                          <Trophy className="w-16 h-16 text-muted-foreground/50" />
+                        </div>
+                        <h3 className="text-lg font-prototype text-center mb-2">{tournament.name}</h3>
+                      </div>
+                      <div className="w-full pt-4 border-t border-border">
+                        <div className="flex items-center justify-between text-sm font-prototype text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            <span className="font-prototype">{new Date(tournament.eventDate).toLocaleDateString()}</span>
+                          </div>
+                          {tournament.ownerName && (
+                            <span className="font-prototype truncate max-w-[40%]">{tournament.ownerName}</span>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }

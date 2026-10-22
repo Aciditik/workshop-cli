@@ -1646,7 +1646,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             return (
                                                 <div
                                                     key={p.id}
-                                                    className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : isDay2Cutoff ? "bg-blue-500/15" : ""}`}
+                                                    className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : isDay2Cutoff ? "bg-orange-500/15" : ""}`}
                                                 >
                                                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
                                                         index === 0 ? "bg-yellow-500 text-black" :

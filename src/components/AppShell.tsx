@@ -32,6 +32,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       !isLoading &&
       user?.role === "guest" &&
       pathname !== "/stats" &&
+      pathname !== "/" &&
       !pathname.startsWith("/t/") &&
       pathname !== "/chrono" &&
       pathname !== "/login"
@@ -139,15 +140,13 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
-          {!isGuest && (
-            <Link
-              href="/"
-              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
-            >
-              <LayoutDashboard className="w-5 h-5 group-hover:text-primary transition-colors" />
-              <span className="font-prototype">Tableau de bord</span>
-            </Link>
-          )}
+          <Link
+            href="/"
+            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
+          >
+            <LayoutDashboard className="w-5 h-5 group-hover:text-primary transition-colors" />
+            <span className="font-prototype">Tableau de bord</span>
+          </Link>
           {(isAdmin || isGuest) && (
             <Link
               href="/stats"
