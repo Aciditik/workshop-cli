@@ -56,6 +56,7 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
 
     const format = tournament.format || "swiss";
     const qualifiedIds = new Set(tournament.qualifiedIds || []);
+    const isFinaleTournament = /finale/i.test(tournament.name);
 
     // Swiss / elimination classement.
     const sortedParticipants = rankSwissPlayers(tournament.matches, tournament.participants);
@@ -194,8 +195,12 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                                     const ntScore = calculateSwissNTScore(tournament.matches, p.id);
                                     const tableDiff = calculateSwissTableDifference(tournament.matches, p.id);
                                     const showStats = format === "swiss";
+                                    // Same day-2 cutoff band as the admin classement: on the CdF
+                                    // Finale (swiss), the top 32 rows are tinted to show who would
+                                    // provisionally qualify if nothing moved.
+                                    const isDay2Cutoff = isFinaleTournament && format === "swiss" && !p.dnf && index < 32;
                                     return (
-                                        <div key={p.id} className={`px-3 py-2.5 flex items-center gap-3 ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}>
+                                        <div key={p.id} className={`px-3 py-2.5 flex items-center gap-3 ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : isDay2Cutoff ? "bg-orange-500/15" : ""}`}>
                                             <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
                                                 index === 0 ? "bg-yellow-500 text-black" :
                                                 index === 1 ? "bg-slate-300 text-black" :
