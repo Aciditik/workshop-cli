@@ -1137,10 +1137,13 @@ export default function StatsPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Preselect a tournament when arriving from a public tournament page
-  // ("Voir les statistiques" links to /stats?tournament=<id>).
+  // ("Voir les statistiques" links to /stats?tournament=<id>). Deferred so
+  // the URL-param read doesn't setState synchronously in the effect body.
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tournament");
-    if (t) setTournamentFilter(t);
+    if (!t) return;
+    const id = setTimeout(() => setTournamentFilter(t), 0);
+    return () => clearTimeout(id);
   }, []);
 
   // Guard + one-time metadata fetch for the filter dropdowns.
@@ -1210,22 +1213,17 @@ export default function StatsPage() {
     }
   }
 
-  // Guests only see data from finished tournaments.
-  const finishedTournamentIds = useMemo(
-    () => new Set((meta?.tournaments ?? data?.tournaments ?? []).filter((t) => t.status === "fini").map((t) => t.id)),
-    [meta, data]
-  );
-
   const visibleEntries = useMemo(() => {
     if (!data) return [];
     // Hide scorecards with 0 total score (incomplete/placeholder data) and
     // normalize renamed corporations so old/new names aggregate together.
-    let entries = data.entries
+    // The API only ever returns scorecards from admin-validated tables
+    // (isCompleted), so guests can safely see en_cours tournaments too —
+    // pending-review tables never leak into stats.
+    return data.entries
       .filter((e) => e.totalScore !== 0)
       .map((e) => ({ ...e, corporation: canonicalCorporation(e.corporation) }));
-    if (isGuest) entries = entries.filter((e) => finishedTournamentIds.has(e.tournamentId));
-    return entries;
-  }, [data, isGuest, finishedTournamentIds]);
+  }, [data]);
 
   const sortedEntries = useMemo(() => {
     return [...visibleEntries].sort((a, b) =>
@@ -1236,14 +1234,10 @@ export default function StatsPage() {
   const tournamentOptions = useMemo(
     () =>
       (meta?.tournaments ?? data?.tournaments ?? [])
-        // Guests only see finished tournaments in the filter — but keep the
-        // currently-selected one (e.g. arrived via ?tournament=<en_cours id>)
-        // so the dropdown doesn't display an orphan value.
-        .filter((t) => !isGuest || t.status === "fini" || t.id === tournamentFilter)
         .slice()
         .sort((a, b) => (b.eventDate || "").localeCompare(a.eventDate || ""))
         .map((t) => ({ value: t.id, label: shortTournamentName(t.name, t.eventDate) })),
-    [meta, data, isGuest, tournamentFilter]
+    [meta, data]
   );
   const organizerOptions = useMemo(
     () => (meta?.organizers ?? data?.organizers ?? []).map((o) => ({ value: o.id, label: o.name || "Sans nom" })),
