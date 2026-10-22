@@ -13,8 +13,8 @@ import { ChevronDown, ChevronRight, GripVertical, Map as MapIcon, Pencil } from 
 interface SwissRoundsProps {
     matches: TableMatch[];
     participants: Participant[];
-    onSubmitResults: (matchId: string, results: Record<string, number>) => void;
-    onDeclineResults: (matchId: string) => void;
+    onSubmitResults?: (matchId: string, results: Record<string, number>) => void;
+    onDeclineResults?: (matchId: string) => void;
     onEditScorecards?: (matchId: string, results: Record<string, number>, scorecards: Record<string, PlayerScore>) => void;
     onSwapPlayers?: (fromMatchId: string, fromPid: string, toMatchId: string, toPid: string | null) => void;
     currentRound: number;
@@ -28,6 +28,10 @@ interface SwissRoundsProps {
     roundBoards?: Record<number, string>;
     onEditRoundBoard?: (round: number, board: string) => void;
     usePseudo?: boolean;
+    // Pure spectator mode (public/guest view): no edit/validate/drag actions,
+    // and pending-review scorecards stay hidden until the admin actually
+    // validates them — only then are scores "real" for an outside viewer.
+    readOnly?: boolean;
 }
 
 // Category keys used to compute a player's raw NT total.
@@ -59,7 +63,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -223,7 +227,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
 
         // Drag & drop: this table can receive a *move* (player from another table)
         // while the active round is not validated / pending review.
-        const canDropTable = !!onSwapPlayers && round === currentRound && !match.isCompleted && !match.isPendingReview;
+        const canDropTable = !readOnly && !!onSwapPlayers && round === currentRound && !match.isCompleted && !match.isPendingReview;
         const draggingFromOther = dragSource && dragSource.matchId !== match.id;
         const isFull = playerCount >= 5;
         // Highlight the whole card as a move target only when dragging from another
@@ -330,7 +334,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 </Button>
                             </div>
                         </div>
-                    ) : match.isPendingReview && !match.isCompleted && match.scorecards ? (
+                    ) : !readOnly && match.isPendingReview && !match.isCompleted && match.scorecards ? (
                         <div className="space-y-3">
                             {(match.participantIds || []).filter((id): id is string => id !== null).map(pId => {
                                 const p = getParticipant(pId);
@@ -381,7 +385,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 </Button>
                                 <Button
                                     className="flex-1 text-xs h-8 bg-green-500 hover:bg-green-600 text-white font-prototype"
-                                    onClick={() => onSubmitResults(match.id, match.results)}
+                                    onClick={() => onSubmitResults?.(match.id, match.results)}
                                 >
                                     Valider
                                 </Button>
@@ -460,13 +464,13 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 })()}
                             </div>
 
-                            {!match.isCompleted && round === currentRound && !match.isPendingReview && (
+                            {!match.isCompleted && !match.isPendingReview && round === currentRound && (
                                 <div className="text-center font-prototype text-xs text-muted-foreground p-2 border border-dashed rounded-md">
                                     En attente des scores des joueurs...
                                 </div>
                             )}
 
-                            {match.isPendingReview && !match.isCompleted && round === currentRound && (
+                            {!readOnly && match.isPendingReview && !match.isCompleted && round === currentRound && onSubmitResults && (
                                 <Button
                                     className="w-full text-xs h-8 bg-yellow-500 hover:bg-yellow-600 text-white font-prototype"
                                     onClick={() => onSubmitResults(match.id, match.results)}
@@ -475,8 +479,14 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                 </Button>
                             )}
 
+                            {readOnly && match.isPendingReview && !match.isCompleted && (
+                                <div className="text-center font-prototype text-xs text-muted-foreground p-2 border border-dashed rounded-md">
+                                    Scores en attente de validation par l&apos;organisateur...
+                                </div>
+                            )}
+
                             {/* Admin-only: re-open a validated match to correct scores. */}
-                            {match.isCompleted && isAdmin && match.scorecards && onEditScorecards && (
+                            {!readOnly && match.isCompleted && isAdmin && match.scorecards && onEditScorecards && (
                                 <Button
                                     className="w-full text-xs h-8 bg-orange-500 hover:bg-orange-600 text-white font-prototype"
                                     onClick={() => startEditing(match)}

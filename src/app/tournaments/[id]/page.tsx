@@ -31,7 +31,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { ListCheck, UserRoundSearch, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users } from "lucide-react";
+import { ListCheck, UserRoundSearch, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users, Copy } from "lucide-react";
 import Link from "next/link";
 
 // Human-readable label for the round about to be generated, used as the
@@ -487,6 +487,40 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // dashboard. Overwrites both raw scorecards and placement results, then
     // validates the match (same end state as submitMatchResults). Admins may
     // also correct already-validated matches, including on finished tournaments.
+    // Admin-only: clone this tournament's players into a brand new "brouillon"
+    // tournament, regardless of the source's current status (brouillon/en_cours/
+    // fini). Matches/results/qualifiedIds are never carried over — only the
+    // roster, so the organizer can re-run the same event from scratch.
+    const duplicateTournament = async () => {
+        const newParticipants: Participant[] = tournament.participants.map(p => ({
+            id: crypto.randomUUID(),
+            firstname: p.firstname,
+            name: p.name,
+            pseudo: p.pseudo || undefined,
+            email: p.email,
+            phone: p.phone,
+            score: 0,
+        }));
+        const newTournament: Tournament = {
+            id: crypto.randomUUID(),
+            name: `${tournament.name} (copie)`,
+            logoUrl: tournament.logoUrl,
+            eventDate: tournament.eventDate,
+            createdAt: new Date().toISOString(),
+            status: "brouillon",
+            format: tournament.format,
+            participants: newParticipants,
+            matches: [],
+            size: newParticipants.length,
+            currentRound: 0,
+            maxRounds: tournament.maxRounds,
+            qualifiedCount: tournament.qualifiedCount,
+            ...(isAdmin ? { ownerId: tournament.ownerId } : {}),
+        };
+        await addTournament(newTournament);
+        router.push(`/tournaments/${newTournament.id}`);
+    };
+
     const deleteTournament = async () => {
         if (!token) return;
         setDeleting(true);
@@ -1154,6 +1188,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             Modifier le tournoi
                         </Button>
                     )}
+                    {isAdmin && (
+                        <Button
+                            onClick={duplicateTournament}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
+                            title="Dupliquer le tournoi"
+                        >
+                            <Copy className="w-4 h-4" />
+                            Dupliquer
+                        </Button>
+                    )}
                     {(isAdmin || tournament.ownerId === user?.id) && (
                         <Button
                             onClick={() => setDeleteConfirm(true)}
@@ -1593,10 +1639,20 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             const tableDiff = calculateTableDifference(p.id);
                                             const qualifierT = getQualifierTournament(p);
                                             const showStats = tournament.status !== "brouillon" && format === "swiss";
+                                            // CdF Finale (2-day event): the top 32 ranks are provisionally
+                                            // qualifying for day 2 — darker row so it's obvious at a glance,
+                                            // independent of the podium (qualifiedIds) highlight.
+                                            const isDay2Cutoff = isFinaleTournament && format === "swiss" && !p.dnf && index < 32;
                                             return (
+                                                <>
+                                                {index === 32 && isFinaleTournament && format === "swiss" && (
+                                                    <p key="day2-cutoff-divider" className="px-3 py-1.5 text-[10px] font-prototype text-muted-foreground uppercase tracking-wider text-center bg-muted/10">
+                                                        ↑ Qualifiés provisoires pour le jour 2 (top 32)
+                                                    </p>
+                                                )}
                                                 <div
                                                     key={p.id}
-                                                    className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : ""}`}
+                                                    className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : isDay2Cutoff ? "bg-black/20" : ""}`}
                                                 >
                                                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
                                                         index === 0 ? "bg-yellow-500 text-black" :
@@ -1655,6 +1711,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         )}
                                                     </div>
                                                 </div>
+                                                </>
                                             );
                                         })}
                                     </div>
