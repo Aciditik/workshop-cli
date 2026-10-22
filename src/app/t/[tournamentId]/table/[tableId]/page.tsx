@@ -3,6 +3,8 @@
 import { use, useState, useEffect } from "react";
 import { Tournament } from "@/lib/types";
 import { playerDisplayName } from "@/lib/playerName";
+import { useAuth } from "@/lib/auth";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Trophy, CheckCircle2, ChevronUp, ChevronDown, ArrowLeft, AlertTriangle } from "lucide-react";
@@ -74,6 +76,16 @@ const CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
 
 export default function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, tableId: string }> }) {
     const { tournamentId, tableId } = use(params);
+    const router = useRouter();
+    const { user } = useAuth();
+
+    // Score entry is for players only — invité guests are spectators and
+    // get sent to the read-only follow view instead.
+    useEffect(() => {
+        if (user?.role === "guest") {
+            router.replace(`/t/${tournamentId}/suivre`);
+        }
+    }, [user, router, tournamentId]);
 
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);

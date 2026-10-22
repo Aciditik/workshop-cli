@@ -15,6 +15,7 @@ type PublicTournamentItem = {
   name: string;
   eventDate: string;
   status: string;
+  logoUrl?: string;
   ownerName?: string;
 };
 
@@ -85,7 +86,7 @@ export default function Dashboard() {
             {sortedPublic.map((tournament) => {
               const isFinale = isFinaleTournament(tournament.name);
               return (
-                <Link key={tournament.id} href={`/t/${tournament.id}`}>
+                <Link key={tournament.id} href={`/t/${tournament.id}/suivre`}>
                   <Card className={`hover:border-primary/50 transition-colors group cursor-pointer h-full flex flex-col relative ${isFinale ? "bg-zinc-950 border-yellow-500/40 hover:border-yellow-500/70 shadow-lg shadow-yellow-500/10" : ""}`}>
                     <span
                       className={`absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-prototype ${tournament.status === "fini"
@@ -99,9 +100,18 @@ export default function Dashboard() {
                     </span>
                     <CardContent className="flex-1 flex flex-col items-center justify-between p-6 pt-12">
                       <div className="flex flex-col items-center justify-center flex-1 w-full">
-                        <div className="w-32 h-32 flex items-center justify-center bg-muted/30 rounded-lg mb-4">
-                          <Trophy className="w-16 h-16 text-muted-foreground/50" />
-                        </div>
+                        {tournament.logoUrl ? (
+                          <img
+                            src={tournament.logoUrl}
+                            alt={`${tournament.name} logo`}
+                            className="w-32 h-32 object-contain mb-4"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-32 h-32 flex items-center justify-center bg-muted/30 rounded-lg mb-4">
+                            <Trophy className="w-16 h-16 text-muted-foreground/50" />
+                          </div>
+                        )}
                         <h3 className="text-lg font-prototype text-center mb-2">{tournament.name}</h3>
                       </div>
                       <div className="w-full pt-4 border-t border-border">
