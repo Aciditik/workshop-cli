@@ -1285,9 +1285,13 @@ export default function StatsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-2">
+          {/* Guests have no sidebar link back to the tournament they came
+              from — the back arrow is their only way out, so it stays visible
+              on all screen sizes for them (mobile-only for admin/organizer,
+              who have the sidebar). */}
           <button
             onClick={() => router.back()}
-            className="md:hidden mt-1 p-2 -ml-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className={`${isGuest ? "" : "md:hidden"} mt-1 p-2 -ml-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0`}
             aria-label="Retour"
           >
             <ChevronLeft className="w-5 h-5" />

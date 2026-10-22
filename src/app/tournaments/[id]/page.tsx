@@ -1644,15 +1644,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             // independent of the podium (qualifiedIds) highlight.
                                             const isDay2Cutoff = isFinaleTournament && format === "swiss" && !p.dnf && index < 32;
                                             return (
-                                                <>
-                                                {index === 32 && isFinaleTournament && format === "swiss" && (
-                                                    <p key="day2-cutoff-divider" className="px-3 py-1.5 text-[10px] font-prototype text-muted-foreground uppercase tracking-wider text-center bg-muted/10">
-                                                        ↑ Qualifiés provisoires pour le jour 2 (top 32)
-                                                    </p>
-                                                )}
                                                 <div
                                                     key={p.id}
-                                                    className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : isDay2Cutoff ? "bg-black/20" : ""}`}
+                                                    className={`px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors group ${p.dnf ? "opacity-50 bg-muted/20" : qualifiedIds.has(p.id) ? "bg-yellow-500/5" : isDay2Cutoff ? "bg-blue-500/15" : ""}`}
                                                 >
                                                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${p.dnf ? "bg-muted text-muted-foreground" :
                                                         index === 0 ? "bg-yellow-500 text-black" :
@@ -1711,7 +1705,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         )}
                                                     </div>
                                                 </div>
-                                                </>
                                             );
                                         })}
                                     </div>
