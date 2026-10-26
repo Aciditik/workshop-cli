@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { ReactNode, useRef } from "react";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -11,6 +11,9 @@ interface QRCodeModalProps {
     tournamentName: string;
     tournamentLogoUrl?: string;
     eventDate?: string;
+    // Optional custom trigger (e.g. a small hover-reveal icon button on a
+    // dashboard card) — defaults to the labeled "Voir le QR code" button.
+    trigger?: ReactNode;
 }
 
 function formatEventDate(iso?: string): string {
@@ -21,7 +24,7 @@ function formatEventDate(iso?: string): string {
     return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
 
-export function QRCodeModal({ tournamentId, tournamentName, tournamentLogoUrl, eventDate }: QRCodeModalProps) {
+export function QRCodeModal({ tournamentId, tournamentName, tournamentLogoUrl, eventDate, trigger }: QRCodeModalProps) {
     const qrRef = useRef<HTMLDivElement>(null);
 
     const url = typeof window !== "undefined"
@@ -117,10 +120,12 @@ export function QRCodeModal({ tournamentId, tournamentName, tournamentLogoUrl, e
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 h-8 text-xs font-prototype">
-                    <QrCode className="w-3.5 h-3.5" />
-                    Voir le QR code
-                </Button>
+                {trigger || (
+                    <Button variant="outline" size="sm" className="gap-2 h-8 text-xs font-prototype">
+                        <QrCode className="w-3.5 h-3.5" />
+                        Voir le QR code
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>

@@ -7,7 +7,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import Image from "next/image";
-import { Trophy, Calendar, Users, ChevronRight, Trash2, BarChart3, LogOut } from "lucide-react";
+import { Trophy, Calendar, Users, ChevronRight, Trash2, BarChart3, LogOut, QrCode } from "lucide-react";
+import { QRCodeModal } from "@/components/QRCodeModal";
 
 const isFinaleTournament = (name: string) => /finale/i.test(name);
 
@@ -174,7 +175,7 @@ export default function Dashboard() {
           </div>
           <h3 className="text-xl font-prototype mb-2">Aucun tournoi pour le moment</h3>
           <p className="text-muted-foreground font-prototype mb-6 max-w-md">
-            Vous n'avez pas créé de tournoi. Cliquez sur le bouton ci-dessous pour créer votre premier tournoi!
+            Vous n&apos;avez pas créé de tournoi. Cliquez sur le bouton ci-dessous pour créer votre premier tournoi!
           </p>
           <Link href="/tournaments/new">
             <Button className="font-prototype">Créer votre premier tournoi</Button>
@@ -187,6 +188,29 @@ export default function Dashboard() {
             return (
             <Link key={tournament.id} href={`/tournaments/${tournament.id}`}>
               <Card className={`hover:border-primary/50 transition-colors group cursor-pointer h-full flex flex-col relative ${isFinale ? "bg-zinc-950 border-yellow-500/40 hover:border-yellow-500/70 shadow-lg shadow-yellow-500/10" : ""}`}>
+                {tournament.status !== "brouillon" && (
+                  <div
+                    className="absolute top-2 right-10 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  >
+                    <QRCodeModal
+                      tournamentId={tournament.id}
+                      tournamentName={tournament.name}
+                      tournamentLogoUrl={tournament.logoUrl}
+                      eventDate={tournament.eventDate}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                          title="Voir le QR code"
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
+                  </div>
+                )}
                 {isAdmin && (
                   <Button
                     variant="ghost"

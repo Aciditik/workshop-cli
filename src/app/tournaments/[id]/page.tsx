@@ -1696,7 +1696,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             const totalPoints = format === "swiss" ? calculateTotalPoints(p.id) : null;
                                             const ntScore = calculateNTScore(p.id);
                                             const tableDiff = calculateTableDifference(p.id);
-                                            const qualifierT = getQualifierTournament(p);
                                             const showStats = tournament.status !== "brouillon" && format === "swiss";
                                             // CdF Finale (2-day event): the top 32 ranks are provisionally
                                             // qualifying for day 2 — darker row so it's obvious at a glance,
@@ -1714,15 +1713,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         }`}>
                                                         {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
                                                     </span>
-                                                    {qualifierT?.logoUrl && (
-                                                        <img
-                                                            src={qualifierT.logoUrl}
-                                                            alt={qualifierT.name}
-                                                            title={`Qualifié via ${qualifierT.name}`}
-                                                            className="w-7 h-7 object-contain shrink-0"
-                                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                        />
-                                                    )}
                                                     {(() => { const t = teams.find(tm => tm.id === p.teamId); return t && TEAM_TAGS[t.tag] ? (
                                                         <Image src={TEAM_TAGS[t.tag]} alt={t.tag} title={t.name} width={28} height={28} className="object-contain shrink-0" />
                                                     ) : null; })()}

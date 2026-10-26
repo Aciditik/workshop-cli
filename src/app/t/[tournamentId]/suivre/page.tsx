@@ -14,7 +14,8 @@ import {
 import { SwissRounds } from "@/components/SwissRounds";
 import { BracketTreeView } from "@/components/BracketTreeView";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Award, ChevronLeft, ListOrdered, Ban } from "lucide-react";
+import { Award, ChevronLeft, ChevronDown, ListOrdered, Ban, Users } from "lucide-react";
+import { TEAM_TAGS } from "@/lib/team-tags";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -27,11 +28,15 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
     const [showPseudos, setShowPseudos] = useState(false);
-    const [mainView, setMainView] = useState<"rounds" | "classement">("rounds");
-    // Finale only: sourceTournamentId → {name, logoUrl} of each qualifier
-    // tournament, so the classement can show each finalist's origin logo
-    // like the admin view does.
-    const [sourceTournaments, setSourceTournaments] = useState<Record<string, { name: string; logoUrl?: string }>>({});
+    const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">("rounds");
+    const [expandedTeamIds, setExpandedTeamIds] = useState<Set<string>>(new Set());
+    const toggleTeamExpanded = (teamId: string) => {
+        setExpandedTeamIds(prev => {
+            const next = new Set(prev);
+            if (next.has(teamId)) next.delete(teamId); else next.add(teamId);
+            return next;
+        });
+    };
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -54,37 +59,6 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
         const interval = setInterval(load, 10000);
         return () => { cancelled = true; clearInterval(interval); };
     }, [tournamentId]);
-
-    // Finale only: fetch the qualifier tournaments' logos once (not part of
-    // the polling above — source assignments don't change mid-tournament).
-    useEffect(() => {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-        const sourceIds = [...new Set(
-            (tournament?.participants || [])
-                .map(p => p.sourceTournamentId)
-                .filter((id): id is string => !!id)
-        )];
-        const missing = sourceIds.filter(id => !sourceTournaments[id]);
-        if (missing.length === 0) return;
-        let cancelled = false;
-        Promise.all(missing.map(async (sid) => {
-            try {
-                const r = await fetch(`${apiUrl}/api/public/tournaments/${sid}`);
-                if (r.ok) {
-                    const t = await r.json();
-                    return [sid, { name: t.name as string, logoUrl: t.logoUrl as string | undefined }] as const;
-                }
-            } catch { /* ignore individual failures */ }
-            return null;
-        })).then(results => {
-            if (cancelled) return;
-            setSourceTournaments(prev => ({
-                ...prev,
-                ...Object.fromEntries(results.filter((r): r is NonNullable<typeof r> => r !== null)),
-            }));
-        });
-        return () => { cancelled = true; };
-    }, [tournament, sourceTournaments]);
 
     if (loading) return <div className="p-8 text-center animate-pulse font-prototype">Chargement du tournoi...</div>;
     if (!tournament) return <div className="p-8 text-center text-red-500 font-prototype">Tournoi introuvable.</div>;
@@ -137,6 +111,20 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
         </div>
     );
 
+    // Finale team ranking — same rule as the admin view: a team's score is
+    // the sum of its members' cumulative participant.score, tie-broken by
+    // summed table-diff then summed NT (swiss only).
+    const teams = tournament.teams || [];
+    const teamRows = teams
+        .map(team => {
+            const members = tournament.participants.filter(p => p.teamId === team.id);
+            const totalScore = members.reduce((sum, p) => sum + (p.score || 0), 0);
+            const totalDiff = format === "swiss" ? members.reduce((sum, p) => sum + calculateSwissTableDifference(tournament.matches, p.id), 0) : 0;
+            const totalNT = format === "swiss" ? members.reduce((sum, p) => sum + calculateSwissNTScore(tournament.matches, p.id), 0) : 0;
+            return { team, members, totalScore, totalDiff, totalNT };
+        })
+        .sort((a, b) => b.totalScore - a.totalScore || a.totalDiff - b.totalDiff || b.totalNT - a.totalNT);
+
     return (
         <div className="min-h-screen bg-background py-8 px-4">
             <div className="w-full max-w-3xl mx-auto space-y-6">
@@ -173,6 +161,16 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                             <Award className="w-4 h-4" />
                             Classement
                         </button>
+                        {teams.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setMainView("teams")}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-sm transition-colors ${mainView === "teams" ? "bg-primary/10 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
+                            >
+                                <Users className="w-4 h-4" />
+                                Équipes
+                            </button>
+                        )}
                     </div>
                     {tournament.participants.some(p => p.pseudo) && (
                         <label className="flex items-center gap-1.5 text-xs font-prototype text-muted-foreground cursor-pointer select-none">
@@ -241,15 +239,6 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                                                 index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"}`}>
                                                 {p.dnf ? <Ban className="w-3.5 h-3.5" /> : index + 1}
                                             </span>
-                                            {p.sourceTournamentId && sourceTournaments[p.sourceTournamentId]?.logoUrl && (
-                                                <img
-                                                    src={sourceTournaments[p.sourceTournamentId].logoUrl}
-                                                    alt={sourceTournaments[p.sourceTournamentId].name}
-                                                    title={`Qualifié via ${sourceTournaments[p.sourceTournamentId].name}`}
-                                                    className="w-7 h-7 object-contain shrink-0"
-                                                    onError={(e) => { e.currentTarget.style.display = "none"; }}
-                                                />
-                                            )}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5">
                                                     <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`}>{playerDisplayName(p, showPseudos)}</span>
@@ -317,6 +306,68 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                                 </Card>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {tournament.status !== "brouillon" && mainView === "teams" && (
+                    <div className="space-y-2">
+                        {teamRows.length === 0 && (
+                            <Card className="p-6 text-center">
+                                <p className="text-muted-foreground font-prototype">Aucune équipe pour l&apos;instant.</p>
+                            </Card>
+                        )}
+                        {teamRows.map(({ team, members, totalScore }, index) => {
+                            const isExpanded = expandedTeamIds.has(team.id);
+                            return (
+                                <Card key={team.id} className="border-primary/20 overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleTeamExpanded(team.id)}
+                                        className="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors text-left"
+                                    >
+                                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                            index === 0 ? "bg-yellow-500 text-black" :
+                                            index === 1 ? "bg-slate-300 text-black" :
+                                            index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"
+                                        }`}>
+                                            {index + 1}
+                                        </span>
+                                        {TEAM_TAGS[team.tag] && (
+                                            <Image src={TEAM_TAGS[team.tag]} alt={team.tag} width={28} height={28} className="object-contain shrink-0" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-prototype truncate">{team.name}</p>
+                                            <p className="text-xs text-muted-foreground font-prototype">{members.length} joueur{members.length !== 1 ? "s" : ""}</p>
+                                        </div>
+                                        <span className="font-prototype text-base text-primary tabular-nums px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 shrink-0">
+                                            {totalScore}<span className="text-xs text-muted-foreground ml-0.5">pts</span>
+                                        </span>
+                                        <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                    </button>
+                                    {isExpanded && (
+                                        <div className="divide-y divide-border border-t border-border bg-background/40">
+                                            {members
+                                                .slice()
+                                                .sort((a, b) => (b.score || 0) - (a.score || 0))
+                                                .map(p => (
+                                                    <div key={p.id} className="pl-12 pr-3 py-2 flex items-center gap-3">
+                                                        <span className={`font-prototype truncate text-sm ${p.dnf ? "line-through text-muted-foreground" : ""}`}>
+                                                            {playerDisplayName(p, showPseudos)}
+                                                        </span>
+                                                        {p.dnf && (
+                                                            <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
+                                                        )}
+                                                        <span className="ml-auto font-prototype text-sm text-muted-foreground tabular-nums shrink-0">{p.score || 0} pts</span>
+                                                    </div>
+                                                ))}
+                                            {members.length === 0 && (
+                                                <p className="pl-12 pr-3 py-2 text-sm text-muted-foreground font-prototype">Aucun joueur assigné.</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </Card>
+                            );
+                        })}
                     </div>
                 )}
             </div>
