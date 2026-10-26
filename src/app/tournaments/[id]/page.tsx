@@ -31,8 +31,11 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { ListCheck, UserRoundSearch, Play, ChevronLeft, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users, Copy } from "lucide-react";
+import { ListCheck, UserRoundSearch, Play, ChevronLeft, ChevronDown, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users, Copy } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { TeamManagerModal } from "@/components/TeamManagerModal";
+import { TEAM_TAGS } from "@/lib/team-tags";
 
 // Human-readable label for the round about to be generated, used as the
 // board-selection modal title (bracket format uses Quart/Demi/Finale).
@@ -303,8 +306,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // created; null means the modal is closed.
     const [pendingRound, setPendingRound] = useState<number | null>(null);
 
-    // Main content tab: "Rondes & Tables" vs. "Classement" (swiss/elimination only).
-    const [mainView, setMainView] = useState<"rounds" | "classement">("rounds");
+    // Main content tab: "Rondes & Tables" vs. "Classement" (swiss/elimination
+    // only) vs. "Équipes" (Finale only).
+    const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">("rounds");
+    const [showTeamManager, setShowTeamManager] = useState(false);
+    const [expandedTeamIds, setExpandedTeamIds] = useState<Set<string>>(new Set());
+    const toggleTeamExpanded = (teamId: string) => {
+        setExpandedTeamIds(prev => {
+            const next = new Set(prev);
+            if (next.has(teamId)) next.delete(teamId); else next.add(teamId);
+            return next;
+        });
+    };
 
     // Sync the local format choice from the persisted tournament.format once
     // it loads, so a previously-saved choice (bracket) isn't silently reset
@@ -1043,6 +1056,22 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         calculateSwissTableDifference(tournament.matches, participantId);
     const sortedParticipants = rankSwissPlayers(tournament.matches, tournament.participants);
 
+    // Finale team ranking: a team's score is the sum of its members'
+    // cumulative participant.score. Tie-break mirrors the individual
+    // ranking's secondary criteria (table diff, then NT), summed across the
+    // team — only meaningful for swiss, the Finale's format.
+    const teams = tournament.teams || [];
+    const teamRows = teams
+        .map(team => {
+            const members = tournament.participants.filter(p => p.teamId === team.id);
+            const totalScore = members.reduce((sum, p) => sum + (p.score || 0), 0);
+            const totalDiff = format === "swiss" ? members.reduce((sum, p) => sum + calculateTableDifference(p.id), 0) : 0;
+            const totalNT = format === "swiss" ? members.reduce((sum, p) => sum + calculateNTScore(p.id), 0) : 0;
+            return { team, members, totalScore, totalDiff, totalNT };
+        })
+        .sort((a, b) => b.totalScore - a.totalScore || a.totalDiff - b.totalDiff || b.totalNT - a.totalNT);
+    const unassignedCount = tournament.participants.filter(p => !p.teamId).length;
+
     // Player list filtered by search text (name/firstname) and, for the Finale,
     // by origin qualifier tournament.
     const filteredSortedParticipants = sortedParticipants
@@ -1201,6 +1230,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         >
                             <Copy className="w-4 h-4" />
                             Dupliquer
+                        </Button>
+                    )}
+                    {isAdmin && isFinaleTournament && (
+                        <Button
+                            onClick={() => setShowTeamManager(true)}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 w-full sm:w-auto shrink-0 font-prototype"
+                            title="Gérer les équipes"
+                        >
+                            <Users className="w-4 h-4" />
+                            Gérer les équipes
                         </Button>
                     )}
                     {(isAdmin || tournament.ownerId === user?.id) && (
@@ -1555,6 +1596,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         Classement
                                     </button>
                                 )}
+                                {isFinaleTournament && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setMainView("teams")}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-lg sm:text-2xl transition-colors ${
+                                            mainView === "teams" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        <Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                                        Équipes
+                                    </button>
+                                )}
                             </div>
                             <div className="flex items-center gap-3">
                                 <label className="flex items-center gap-1.5 text-xs font-prototype text-muted-foreground cursor-pointer select-none">
@@ -1766,6 +1819,75 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             </CardContent>
                                         </Card>
                                     </div>
+                                )}
+                            </div>
+                        )}
+
+                        {mainView === "teams" && (
+                            <div className="space-y-2">
+                                {teamRows.length === 0 && (
+                                    <Card className="p-6 text-center">
+                                        <p className="text-muted-foreground font-prototype">
+                                            Aucune équipe pour l&apos;instant. Utilisez &quot;Gérer les équipes&quot; pour en créer.
+                                        </p>
+                                    </Card>
+                                )}
+                                {teamRows.map(({ team, members, totalScore }, index) => {
+                                    const isExpanded = expandedTeamIds.has(team.id);
+                                    return (
+                                        <Card key={team.id} className="border-primary/20 overflow-hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleTeamExpanded(team.id)}
+                                                className="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors text-left"
+                                            >
+                                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                                    index === 0 ? "bg-yellow-500 text-black" :
+                                                    index === 1 ? "bg-slate-300 text-black" :
+                                                    index === 2 ? "bg-amber-600 text-black" : "bg-muted text-muted-foreground"
+                                                }`}>
+                                                    {index + 1}
+                                                </span>
+                                                {TEAM_TAGS[team.tag] && (
+                                                    <Image src={TEAM_TAGS[team.tag]} alt={team.tag} width={28} height={28} className="object-contain shrink-0" />
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-prototype truncate">{team.name}</p>
+                                                    <p className="text-xs text-muted-foreground font-prototype">{members.length} joueur{members.length !== 1 ? "s" : ""}</p>
+                                                </div>
+                                                <span className="font-prototype text-base text-primary tabular-nums px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 shrink-0">
+                                                    {totalScore}<span className="text-xs text-muted-foreground ml-0.5">pts</span>
+                                                </span>
+                                                <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                            </button>
+                                            {isExpanded && (
+                                                <div className="divide-y divide-border border-t border-border bg-background/40">
+                                                    {members
+                                                        .slice()
+                                                        .sort((a, b) => (b.score || 0) - (a.score || 0))
+                                                        .map(p => (
+                                                            <div key={p.id} className="pl-12 pr-3 py-2 flex items-center gap-3">
+                                                                <span className={`font-prototype truncate text-sm ${p.dnf ? "line-through text-muted-foreground" : ""}`}>
+                                                                    {playerDisplayName(p, showPseudos)}
+                                                                </span>
+                                                                {p.dnf && (
+                                                                    <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
+                                                                )}
+                                                                <span className="ml-auto font-prototype text-sm text-muted-foreground tabular-nums shrink-0">{p.score || 0} pts</span>
+                                                            </div>
+                                                        ))}
+                                                    {members.length === 0 && (
+                                                        <p className="pl-12 pr-3 py-2 text-sm text-muted-foreground font-prototype">Aucun joueur assigné.</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </Card>
+                                    );
+                                })}
+                                {unassignedCount > 0 && (
+                                    <p className="text-xs text-muted-foreground font-prototype text-center pt-2">
+                                        {unassignedCount} joueur{unassignedCount !== 1 ? "s" : ""} sans équipe.
+                                    </p>
                                 )}
                             </div>
                         )}
@@ -2182,6 +2304,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         generateNextRound(board);
                     }
                     setPendingRound(null);
+                }}
+            />
+
+            {/* Finale: create/edit teams and assign players */}
+            <TeamManagerModal
+                open={showTeamManager}
+                onOpenChange={setShowTeamManager}
+                teams={teams}
+                participants={tournament.participants}
+                usePseudo={showPseudos}
+                onSave={(newTeams, newParticipants) => {
+                    updateTournament({ ...tournament, teams: newTeams, participants: newParticipants });
                 }}
             />
         </div>

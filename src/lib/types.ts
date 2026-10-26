@@ -15,6 +15,13 @@ export interface Participant {
     score: number; // Accrued points
     dnf?: boolean; // Dropped / Did Not Finish — permanent, admin only
     sourceTournamentId?: string; // Finale only: qualifier tournament this player came from (persisted server-side)
+    teamId?: string; // Finale only: references a Team in Tournament.teams
+}
+
+export interface Team {
+    id: string;
+    name: string;
+    tag: string; // Key into TEAM_TAGS (src/lib/team-tags.ts), used as the team's icon
 }
 
 export interface PlayerScore {
@@ -59,4 +66,5 @@ export interface Tournament {
     qualifiedIds?: string[]; // IDs of qualified players (set when tournament completes)
     roundBoards?: Record<number, string>; // Maps round number -> board name chosen by the organizer
     ownerId?: string; // Owner user ID (set by admin when creating on behalf of organizer)
+    teams?: Team[]; // Finale only: team rosters (players reference a team via Participant.teamId)
 }
