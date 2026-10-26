@@ -62,3 +62,36 @@ export const TEAM_TAGS: Record<string, StaticImageData> = {
 };
 
 export const TEAM_TAG_NAMES = Object.keys(TEAM_TAGS);
+
+// Quick-add presets for the team manager: one suggested "Team <Nom>" per
+// available tag icon, so organizers can build the roster with a click
+// instead of typing a name and picking an icon separately each time.
+export const TEAM_PRESETS: { tag: string; label: string }[] = [
+    { tag: "Animal", label: "Team Animaux" },
+    { tag: "Building", label: "Team Bâtisseur" },
+    { tag: "CDF", label: "Team CDF" },
+    { tag: "City", label: "Team Cité" },
+    { tag: "Clone", label: "Team Clone" },
+    { tag: "Colonie", label: "Team Colonie" },
+    { tag: "Crime", label: "Team Crime" },
+    { tag: "Earth", label: "Team Terre" },
+    { tag: "Event", label: "Team Événement" },
+    { tag: "Flotteur", label: "Team Flotteur" },
+    { tag: "Galaxy", label: "Team Galaxie" },
+    { tag: "ISS", label: "Team ISS" },
+    { tag: "Jovian", label: "Team Jovien" },
+    { tag: "Ludophiles", label: "Team Ludophiles" },
+    { tag: "Mars", label: "Team Mars" },
+    { tag: "Mercury", label: "Team Mercure" },
+    { tag: "Microbe", label: "Team Microbe" },
+    { tag: "Moon", label: "Team Lune" },
+    { tag: "Multitag", label: "Team Multitag" },
+    { tag: "Plant", label: "Team Plante" },
+    { tag: "Power", label: "Team Énergie" },
+    { tag: "Radiations", label: "Team Radiation" },
+    { tag: "Science", label: "Team Science" },
+    { tag: "Space", label: "Team Espace" },
+    { tag: "Upgrade", label: "Team Amélioration" },
+    { tag: "Venus", label: "Team Vénus" },
+    { tag: "Wild", label: "Team Joker" },
+];

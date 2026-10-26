@@ -1480,6 +1480,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                                     />
                                                 )}
+                                                {(() => { const t = teams.find(tm => tm.id === p.teamId); return t && TEAM_TAGS[t.tag] ? (
+                                                    <Image src={TEAM_TAGS[t.tag]} alt={t.tag} title={t.name} width={24} height={24} className="object-contain shrink-0" />
+                                                ) : null; })()}
                                                 <span className={`font-prototype truncate ${isCheckedIn ? "" : "text-muted-foreground"}`}>{playerDisplayName(p, showPseudos)}</span>
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
@@ -1720,6 +1723,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                                         />
                                                     )}
+                                                    {(() => { const t = teams.find(tm => tm.id === p.teamId); return t && TEAM_TAGS[t.tag] ? (
+                                                        <Image src={TEAM_TAGS[t.tag]} alt={t.tag} title={t.name} width={28} height={28} className="object-contain shrink-0" />
+                                                    ) : null; })()}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-1.5">
                                                             <span className={`font-prototype truncate ${p.dnf ? "line-through" : ""} ${!p.dnf && qualifiedIds.has(p.id) ? "text-yellow-400" : ""}`} title={`${p.firstname} ${p.name}`}>{playerDisplayName(p, showPseudos)}</span>

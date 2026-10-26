@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/Button";
 import { Participant, Team } from "@/lib/types";
 import { playerDisplayName } from "@/lib/playerName";
-import { TEAM_TAGS, TEAM_TAG_NAMES } from "@/lib/team-tags";
+import { TEAM_TAGS, TEAM_TAG_NAMES, TEAM_PRESETS } from "@/lib/team-tags";
 import { Plus, Trash2, Users } from "lucide-react";
 
 interface TeamManagerModalProps {
@@ -50,6 +50,10 @@ export function TeamManagerModal({ open, onOpenChange, teams, participants, useP
         if (!name) return;
         setDraftTeams(prev => [...prev, { id: crypto.randomUUID(), name, tag: newTeamTag }]);
         setNewTeamName("");
+    };
+
+    const addPreset = (preset: { tag: string; label: string }) => {
+        setDraftTeams(prev => [...prev, { id: crypto.randomUUID(), name: preset.label, tag: preset.tag }]);
     };
 
     const removeTeam = (teamId: string) => {
@@ -114,9 +118,33 @@ export function TeamManagerModal({ open, onOpenChange, teams, participants, useP
                         ))}
                     </div>
 
+                    {/* Quick-add presets — one "Team <Nom>" per available tag icon */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-prototype text-muted-foreground">Équipes prédéfinies</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-40 overflow-y-auto p-1 border border-border rounded-lg">
+                            {TEAM_PRESETS.map(preset => {
+                                const alreadyAdded = draftTeams.some(t => t.tag === preset.tag && t.name === preset.label);
+                                return (
+                                    <button
+                                        key={preset.tag}
+                                        type="button"
+                                        onClick={() => addPreset(preset)}
+                                        disabled={alreadyAdded}
+                                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md border text-sm font-prototype text-left transition-colors ${
+                                            alreadyAdded ? "border-border bg-muted/20 text-muted-foreground cursor-default" : "border-border hover:bg-accent/40"
+                                        }`}
+                                    >
+                                        <Image src={TEAM_TAGS[preset.tag]} alt={preset.tag} width={20} height={20} className="object-contain shrink-0" />
+                                        <span className="truncate">{preset.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {/* New team form */}
                     <div className="space-y-2 p-3 rounded-lg border border-dashed border-border">
-                        <label className="text-xs font-prototype text-muted-foreground">Nouvelle équipe</label>
+                        <label className="text-xs font-prototype text-muted-foreground">Équipe personnalisée</label>
                         <input
                             type="text"
                             value={newTeamName}
