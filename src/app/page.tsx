@@ -188,29 +188,27 @@ export default function Dashboard() {
             return (
             <Link key={tournament.id} href={`/tournaments/${tournament.id}`}>
               <Card className={`hover:border-primary/50 transition-colors group cursor-pointer h-full flex flex-col relative ${isFinale ? "bg-zinc-950 border-yellow-500/40 hover:border-yellow-500/70 shadow-lg shadow-yellow-500/10" : ""}`}>
-                {tournament.status !== "brouillon" && (
-                  <div
-                    className="absolute top-2 right-10 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  >
-                    <QRCodeModal
-                      tournamentId={tournament.id}
-                      tournamentName={tournament.name}
-                      tournamentLogoUrl={tournament.logoUrl}
-                      eventDate={tournament.eventDate}
-                      trigger={
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                          title="Voir le QR code"
-                        >
-                          <QrCode className="h-4 w-4" />
-                        </Button>
-                      }
-                    />
-                  </div>
-                )}
+                <div
+                  className="absolute top-2 right-10 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                >
+                  <QRCodeModal
+                    tournamentId={tournament.id}
+                    tournamentName={tournament.name}
+                    tournamentLogoUrl={tournament.logoUrl}
+                    eventDate={tournament.eventDate}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                        title="Voir le QR code"
+                      >
+                        <QrCode className="h-4 w-4" />
+                      </Button>
+                    }
+                  />
+                </div>
                 {isAdmin && (
                   <Button
                     variant="ghost"
