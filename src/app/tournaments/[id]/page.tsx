@@ -950,14 +950,13 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     };
 
     const exportTopPlayers = () => {
-        const exportCount = qualifiedCount * 2 + 1;
         // Bracket: the swiss-style points/diff/NT ranking (sortedParticipants)
         // doesn't reflect who actually made it furthest in the elimination
         // tree — it previously produced exports where the 2nd row wasn't even
         // a real qualifier. Use the real qualifiedIds (correctly ordered)
-        // first, then fill remaining export slots with the next best-ranked
-        // bracket finishers.
-        const topPlayers = format === "bracket"
+        // first, then fill the rest with the next best-ranked bracket
+        // finishers, so the full field is still covered.
+        const allPlayers = format === "bracket"
             ? (() => {
                 const qualifiedFirst = (tournament.qualifiedIds || [])
                     .map(id => tournament.participants.find(p => p.id === id))
@@ -966,17 +965,17 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 const rest = rankBracketPlayers(tournament.matches, tournament.participants)
                     .map(r => r.participant)
                     .filter(p => !qualifiedIdSet.has(p.id));
-                return [...qualifiedFirst, ...rest].slice(0, exportCount);
+                return [...qualifiedFirst, ...rest];
             })()
-            : sortedParticipants.slice(0, exportCount);
-        const csvHeader = "Prénom,Nom,Email,Téléphone";
-        const csvRows = topPlayers.map(p => `${p.firstname || ""},${p.name},${p.email || ""},${p.phone || ""}`);
+            : sortedParticipants;
+        const csvHeader = "Classement,Nom,Prénom,Email,Téléphone";
+        const csvRows = allPlayers.map((p, index) => `${index + 1},${p.name},${p.firstname || ""},${p.email || ""},${p.phone || ""}`);
         const csvContent = [csvHeader, ...csvRows].join("\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `${tournament.name}_top${exportCount}.csv`;
+        link.download = `${tournament.name}_classement.csv`;
         link.click();
         URL.revokeObjectURL(url);
     };
@@ -1284,7 +1283,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         <div className="mt-4 pt-4 border-t border-yellow-500/20 flex flex-col sm:flex-row gap-3">
                             <Button onClick={exportTopPlayers} className="gap-2 font-prototype" variant="outline">
                                 <Download className="w-4 h-4" />
-                                Exporter le top {qualifiedCount * 2 + 1} (CSV)
+                                Exporter le classement complet (CSV)
                             </Button>
                             <Button onClick={openFinaleModal} className="gap-2 font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black">
                                 <CalendarPlus className="w-4 h-4" />
