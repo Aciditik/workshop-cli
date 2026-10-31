@@ -305,14 +305,14 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                             Corporation <span className="text-destructive">*</span>
                         </div>
                         <div className="p-4 space-y-3">
-                            {activePlayers.map((pId, i) => {
+                            {activePlayers.map((pId) => {
                                 const p = getParticipant(pId);
                                 const playerScore = scores[pId] ?? DEFAULT_SCORE;
                                 const isInvalid = showValidation && !isCorporationValid(playerScore.corporation);
                                 return (
                                     <div key={pId}>
                                         <label className="text-xs text-muted-foreground font-prototype block mb-1">
-                                            Joueur #{i + 1} — {playerDisplayName(p, showPseudos)}
+                                            {playerDisplayName(p, showPseudos)}
                                         </label>
                                         <select
                                             className={`w-full p-2 border rounded-md bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary ${isInvalid ? "border-destructive ring-1 ring-destructive" : "border-border"}`}
@@ -337,14 +337,14 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                 {cat.label} <span className="text-destructive">*</span>
                             </div>
                             <div className="p-4 grid grid-cols-2 gap-3">
-                                {activePlayers.map((pId, i) => {
+                                {activePlayers.map((pId) => {
                                     const p = getParticipant(pId);
                                     const playerScore = scores[pId] ?? DEFAULT_SCORE;
                                     const isInvalid = showValidation && playerScore[cat.key] === null;
                                     return (
                                         <div key={pId}>
                                             <label className="text-xs text-muted-foreground font-prototype block mb-1 truncate">
-                                                #{i + 1} {p ? (showPseudos && p.pseudo ? p.pseudo : p.firstname) : ""}
+                                                {p ? (showPseudos && p.pseudo ? p.pseudo : p.firstname) : ""}
                                             </label>
                                             <input
                                                 type="number"
@@ -368,7 +368,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                     <div className="glass rounded-xl overflow-hidden">
                         <div className="bg-primary/40 px-4 py-3 font-prototype">Total NT &amp; Classement</div>
                         <div className="p-4 space-y-2">
-                            {activePlayers.map((pId, i) => {
+                            {activePlayers.map((pId) => {
                                 const p = getParticipant(pId);
                                 const rank = rankings[pId];
                                 return (
@@ -377,7 +377,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                             {rank?.rank === 1 && <span className="text-yellow-500 text-lg drop-shadow-md">🥇</span>}
                                             {rank?.rank === 2 && <span className="text-gray-300 text-lg drop-shadow-md">🥈</span>}
                                             {rank?.rank === 3 && <span className="text-orange-500 text-lg drop-shadow-md">🥉</span>}
-                                            <span className="font-prototype truncate text-sm">#{i + 1} {playerDisplayName(p, showPseudos)}</span>
+                                            <span className="font-prototype truncate text-sm">{playerDisplayName(p, showPseudos)}</span>
                                         </div>
                                         <div className="flex items-center gap-3 shrink-0">
                                             {rank && <span className="text-xs font-prototype text-muted-foreground">{rank.displayRank}</span>}
