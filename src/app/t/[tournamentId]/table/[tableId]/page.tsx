@@ -368,7 +368,9 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                     <div className="glass rounded-xl overflow-hidden">
                         <div className="bg-primary/40 px-4 py-3 font-prototype">Total NT &amp; Classement</div>
                         <div className="p-4 space-y-2">
-                            {activePlayers.map((pId) => {
+                            {[...activePlayers]
+                                .sort((a, b) => (rankings[a]?.rank ?? Infinity) - (rankings[b]?.rank ?? Infinity))
+                                .map((pId) => {
                                 const p = getParticipant(pId);
                                 const rank = rankings[pId];
                                 return (

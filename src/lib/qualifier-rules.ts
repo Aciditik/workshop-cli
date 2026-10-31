@@ -229,6 +229,41 @@ function getSwissTableSizes(n: number): number[] {
     ];
 }
 
+// Round 1 only: seat players so that, whenever possible, no two players
+// sharing a Team.id land at the same table (Finale team-building request —
+// players without a teamId, or tournaments with no teams at all, are
+// unaffected). Greedy single pass: for each player (in random order), drop
+// them into the first table with room and no teammate already seated; if
+// every table with room would create a conflict (e.g. a team bigger than
+// the number of tables), fall back to whichever has the fewest teammates.
+function distributeAvoidingTeammates(pool: Participant[], tableSizes: number[]): Participant[][] {
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const tables: Participant[][] = tableSizes.map(() => []);
+
+    for (const p of shuffled) {
+        let target = -1;
+        for (let i = 0; i < tables.length; i++) {
+            if (tables[i].length >= tableSizes[i]) continue;
+            if (p.teamId && tables[i].some(q => q.teamId === p.teamId)) continue;
+            target = i;
+            break;
+        }
+        if (target === -1) {
+            let bestConflicts = Infinity;
+            for (let i = 0; i < tables.length; i++) {
+                if (tables[i].length >= tableSizes[i]) continue;
+                const conflicts = p.teamId ? tables[i].filter(q => q.teamId === p.teamId).length : 0;
+                if (conflicts < bestConflicts) {
+                    bestConflicts = conflicts;
+                    target = i;
+                }
+            }
+        }
+        tables[target].push(p);
+    }
+    return tables;
+}
+
 // ─── Main: Generate Round 1 ────────────────────────────────────────
 export function generateRound1(
     tournamentId: string,
@@ -236,21 +271,31 @@ export function generateRound1(
     size: number
 ): TableMatch[] {
     const format = getFormat(size);
-    const pool = [...participants].sort(() => Math.random() - 0.5); // Random shuffle
 
     let tableSizes: number[];
     if (format === "elimination") {
         tableSizes = getRound1TableSizes(size);
     } else {
-        tableSizes = getSwissTableSizes(pool.length);
+        tableSizes = getSwissTableSizes(participants.length);
     }
 
+    const seatedTables = participants.some(p => p.teamId)
+        ? distributeAvoidingTeammates(participants, tableSizes)
+        : (() => {
+            const pool = [...participants].sort(() => Math.random() - 0.5);
+            const result: Participant[][] = [];
+            let cursor = 0;
+            for (const n of tableSizes) {
+                result.push(pool.slice(cursor, cursor + n));
+                cursor += n;
+            }
+            return result;
+        })();
+
     const matches: TableMatch[] = [];
-    let cursor = 0;
 
     for (let i = 0; i < tableSizes.length; i++) {
-        const tablePlayers = pool.slice(cursor, cursor + tableSizes[i]);
-        cursor += tableSizes[i];
+        const tablePlayers = seatedTables[i];
 
         matches.push({
             id: crypto.randomUUID(),

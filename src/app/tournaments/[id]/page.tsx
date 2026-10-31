@@ -1674,6 +1674,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     qualifiedIds={tournament.qualifiedIds}
                                     roundBoards={tournament.roundBoards}
                                     usePseudo={showPseudos}
+                                    teams={teams}
                                     onEditRoundBoard={(round, board) => updateTournament({
                                         ...tournament,
                                         roundBoards: { ...(tournament.roundBoards || {}), [round]: board },

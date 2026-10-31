@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { TableMatch, Participant, PlayerScore } from "@/lib/types";
+import Image from "next/image";
+import { TableMatch, Participant, PlayerScore, Team } from "@/lib/types";
 import { CORPORATIONS } from "@/lib/corporations";
 import { playerDisplayName } from "@/lib/playerName";
+import { TEAM_TAGS } from "@/lib/team-tags";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QRCodeModal } from "@/components/QRCodeModal";
@@ -28,6 +30,10 @@ interface SwissRoundsProps {
     roundBoards?: Record<number, string>;
     onEditRoundBoard?: (round: number, board: string) => void;
     usePseudo?: boolean;
+    // Finale only: team tag icon shown next to each player's name in the
+    // Rondes & Tables view. Admin-only by convention — callers simply omit
+    // this prop (e.g. the spectator view) to hide it.
+    teams?: Team[];
     // Pure spectator mode (public/guest view): no edit/validate/drag actions,
     // and pending-review scorecards stay hidden until the admin actually
     // validates them — only then are scores "real" for an outside viewer.
@@ -63,7 +69,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -448,6 +454,12 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                                     {canDrag && p && (
                                                         <GripVertical className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                                                     )}
+                                                    {(() => {
+                                                        const t = p && teams?.find(tm => tm.id === p.teamId);
+                                                        return t && TEAM_TAGS[t.tag] ? (
+                                                            <Image src={TEAM_TAGS[t.tag]} alt={t.tag} title={t.name} width={18} height={18} className="object-contain shrink-0" />
+                                                        ) : null;
+                                                    })()}
                                                     <span className={`font-prototype ${p && qualifiedSet.has(p.id) ? "text-yellow-400" : ""}`}>{p ? playerDisplayName(p, usePseudo) : "Place vide"}</span>
                                                 </div>
                                                 <div className="flex items-center gap-3">
