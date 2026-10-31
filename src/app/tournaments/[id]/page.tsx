@@ -1137,6 +1137,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // activeDayOverride without affecting round generation.
     const liveDay: 1 | 2 = (isTwoDayFinale && day2StartRound && currentRound >= day2StartRound) ? 2 : 1;
     const activeDay = activeDayOverride ?? liveDay;
+    // Équipes is a Day 1-only view: while Day 2 is active (manually or
+    // automatically once it goes live), render Rondes & Tables instead.
+    const effectiveMainView = mainView === "teams" && activeDay === 2 ? "rounds" : mainView;
     const day2Participants = tournament.participants.filter(p => day2ParticipantIdSet.has(p.id));
     const day1ScopedMatches = tournament.matches.filter(m => !day2StartRound || m.round < day2StartRound);
     const day2ScopedMatches = tournament.matches.filter(m => day2StartRound && m.round >= day2StartRound);
@@ -1165,17 +1168,20 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         calculateSwissTableDifference(classementMatches, participantId);
     const sortedParticipants = rankSwissPlayers(classementMatches, classementParticipants);
 
-    // Finale team ranking: a team's score is the sum of its members'
-    // cumulative participant.score. Tie-break mirrors the individual
-    // ranking's secondary criteria (table diff, then NT), summed across the
-    // team — only meaningful for swiss, the Finale's format.
+    // Finale team ranking (Day 1 only): a team's score is the sum of its
+    // members' Day 1 placement points. A Day 2 participant's `score` field
+    // is reset and only counts Day 2 matches, so derive the totals from the
+    // Day-1-scoped matches instead (all matches for a normal tournament).
+    // Tie-break mirrors the individual ranking's secondary criteria (table
+    // diff, then NT), summed across the team.
+    const teamScoreMatches = isTwoDayFinale && day2StartRound ? day1ScopedMatches : tournament.matches;
     const teams = tournament.teams || [];
     const teamRows = teams
         .map(team => {
             const members = tournament.participants.filter(p => p.teamId === team.id);
-            const totalScore = members.reduce((sum, p) => sum + (p.score || 0), 0);
-            const totalDiff = format === "swiss" ? members.reduce((sum, p) => sum + calculateTableDifference(p.id), 0) : 0;
-            const totalNT = format === "swiss" ? members.reduce((sum, p) => sum + calculateNTScore(p.id), 0) : 0;
+            const totalScore = members.reduce((sum, p) => sum + (format === "swiss" ? calculateSwissTotalPoints(teamScoreMatches, p.id) : (p.score || 0)), 0);
+            const totalDiff = format === "swiss" ? members.reduce((sum, p) => sum + calculateSwissTableDifference(teamScoreMatches, p.id), 0) : 0;
+            const totalNT = format === "swiss" ? members.reduce((sum, p) => sum + calculateSwissNTScore(teamScoreMatches, p.id), 0) : 0;
             return { team, members, totalScore, totalDiff, totalNT };
         })
         .sort((a, b) => b.totalScore - a.totalScore || a.totalDiff - b.totalDiff || b.totalNT - a.totalNT);
@@ -1697,7 +1703,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setActiveDayOverride(2)}
+                                    onClick={() => {
+                                        setActiveDayOverride(2);
+                                        // Équipes is Day 1 only — fall back to Rondes & Tables
+                                        // rather than leaving the tab selected with no content.
+                                        if (mainView === "teams") setMainView("rounds");
+                                    }}
                                     className={`p-4 rounded-xl border text-center transition-colors ${
                                         activeDay === 2 ? "bg-orange-500/20 border-orange-500/50 text-orange-400" : "border-border text-muted-foreground hover:bg-accent/30"
                                     }`}
@@ -1713,7 +1724,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     type="button"
                                     onClick={() => setMainView("rounds")}
                                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-lg sm:text-2xl transition-colors ${
-                                        mainView === "rounds" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                        effectiveMainView === "rounds" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                                     }`}
                                 >
                                     <ListOrdered className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
@@ -1724,19 +1735,19 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                         type="button"
                                         onClick={() => setMainView("classement")}
                                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-lg sm:text-2xl transition-colors ${
-                                            mainView === "classement" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                            effectiveMainView === "classement" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                                         }`}
                                     >
                                         <Award className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                                         Classement
                                     </button>
                                 )}
-                                {isFinaleTournament && (
+                                {isFinaleTournament && activeDay === 1 && (
                                     <button
                                         type="button"
                                         onClick={() => setMainView("teams")}
                                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-lg sm:text-2xl transition-colors ${
-                                            mainView === "teams" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                            effectiveMainView === "teams" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                                         }`}
                                     >
                                         <Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
@@ -1754,7 +1765,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     />
                                     Afficher les pseudos
                                 </label>
-                                {mainView === "rounds" && activeDay === liveDay && (
+                                {effectiveMainView === "rounds" && activeDay === liveDay && (
                                     tournament.status === "fini" ? (
                                         <div className="text-green-500 font-prototype bg-green-500/10 px-4 py-2 rounded-lg">
                                             Tournoi Terminé !
@@ -1771,7 +1782,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </div>
                         </div>
 
-                        {mainView === "rounds" && (
+                        {effectiveMainView === "rounds" && (
                             <>
                                 {format === "bracket" && tournament.matches.length > 0 && (
                                     <Card className="border-primary/20">
@@ -1819,7 +1830,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </>
                         )}
 
-                        {mainView === "classement" && (format === "swiss" || format === "elimination") && (
+                        {effectiveMainView === "classement" && (format === "swiss" || format === "elimination") && (
                             <Card className="border-primary/20">
                                 <CardContent className="p-0">
                                     <div className="divide-y divide-border">
@@ -1900,7 +1911,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </Card>
                         )}
 
-                        {mainView === "classement" && format === "bracket" && (
+                        {effectiveMainView === "classement" && format === "bracket" && (
                             <div className="space-y-6">
                                 {bracketDisplayList.length === 0 && (
                                     <p className="text-sm font-prototype text-muted-foreground text-center py-4">
@@ -1955,7 +1966,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </div>
                         )}
 
-                        {mainView === "teams" && (
+                        {effectiveMainView === "teams" && activeDay === 1 && (
                             <div className="space-y-2">
                                 {teamRows.length === 0 && (
                                     <Card className="p-6 text-center">

@@ -29,6 +29,8 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
     const [loading, setLoading] = useState(true);
     const [showPseudos, setShowPseudos] = useState(false);
     const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">("rounds");
+    // Two-day CdF Finale: which day to show. null = follow the live day.
+    const [activeDayOverride, setActiveDayOverride] = useState<1 | 2 | null>(null);
     const [expandedTeamIds, setExpandedTeamIds] = useState<Set<string>>(new Set());
     const toggleTeamExpanded = (teamId: string) => {
         setExpandedTeamIds(prev => {
@@ -68,15 +70,40 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
     // Same "day-2" cutoff band as the admin classement: for the CdF Finale
     // (swiss), the top 32 provisional qualifiers get a tinted row.
     const isFinaleTournament = /finale/i.test(tournament.name);
+    const maxRounds = tournament.maxRounds || 3;
+
+    // Two-day CdF Finale — same day scoping as the admin page: Day 1 is
+    // rounds 1..day1Rounds, Day 2 the rounds from day2StartRound on,
+    // displayed as its own Ronde 1..N with only its 32 participants.
+    const isTwoDayFinale = isFinaleTournament && format === "swiss";
+    const day1Rounds = 3;
+    const day2StartRound = tournament.day2StartRound;
+    const day2ParticipantIdSet = new Set(tournament.day2ParticipantIds || []);
+    const liveDay: 1 | 2 = (isTwoDayFinale && day2StartRound && (tournament.currentRound || 0) >= day2StartRound) ? 2 : 1;
+    const activeDay = activeDayOverride ?? liveDay;
+    // Équipes is a Day 1-only view: while Day 2 is active, fall back to
+    // Rondes & Tables instead of leaving a tab selected with no content.
+    const effectiveMainView = mainView === "teams" && activeDay === 2 ? "rounds" : mainView;
+    const day1ScopedMatches = tournament.matches.filter(m => !day2StartRound || m.round < day2StartRound);
+    const day2ScopedMatches = tournament.matches.filter(m => day2StartRound && m.round >= day2StartRound);
+    const scopedMatches = isTwoDayFinale && day2StartRound
+        ? (activeDay === 2 ? day2ScopedMatches : day1ScopedMatches)
+        : tournament.matches;
+    const scopedParticipants = isTwoDayFinale && day2StartRound && activeDay === 2
+        ? tournament.participants.filter(p => day2ParticipantIdSet.has(p.id))
+        : tournament.participants;
+    const dayMaxRounds = isTwoDayFinale && day2StartRound
+        ? (activeDay === 2 ? Math.max(1, maxRounds - day1Rounds) : Math.min(maxRounds, day1Rounds))
+        : maxRounds;
+    const dayRoundLabelOffset = isTwoDayFinale && day2StartRound && activeDay === 2 ? day1Rounds : 0;
 
     // Swiss / elimination classement.
-    const sortedParticipants = rankSwissPlayers(tournament.matches, tournament.participants);
+    const sortedParticipants = rankSwissPlayers(scopedMatches, scopedParticipants);
 
     // Bracket classement: same grouping logic as the admin view (advancing /
     // pending / eliminated, no raw points shown — see qualifier-rules.ts).
     const bracketRanked = format === "bracket" ? rankBracketPlayers(tournament.matches, tournament.participants) : [];
     const bracketFinalRound = tournament.matches.reduce((max, m) => Math.max(max, m.round), 0);
-    const maxRounds = tournament.maxRounds || 3;
     const atBracketFinalRound = format === "bracket" && bracketFinalRound > 0 && bracketFinalRound >= maxRounds;
     const bracketFinaleQualifiedIds = atBracketFinalRound
         ? new Set(
@@ -111,16 +138,19 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
         </div>
     );
 
-    // Finale team ranking — same rule as the admin view: a team's score is
-    // the sum of its members' cumulative participant.score, tie-broken by
-    // summed table-diff then summed NT (swiss only).
+    // Finale team ranking (Day 1 only) — same rule as the admin view: a
+    // team's score is the sum of its members' Day 1 placement points,
+    // tie-broken by summed table-diff then summed NT (swiss only). Day 2
+    // participants have their `score` reset, so the totals are derived from
+    // the Day-1-scoped matches rather than the score field.
+    const teamScoreMatches = isTwoDayFinale && day2StartRound ? day1ScopedMatches : tournament.matches;
     const teams = tournament.teams || [];
     const teamRows = teams
         .map(team => {
             const members = tournament.participants.filter(p => p.teamId === team.id);
-            const totalScore = members.reduce((sum, p) => sum + (p.score || 0), 0);
-            const totalDiff = format === "swiss" ? members.reduce((sum, p) => sum + calculateSwissTableDifference(tournament.matches, p.id), 0) : 0;
-            const totalNT = format === "swiss" ? members.reduce((sum, p) => sum + calculateSwissNTScore(tournament.matches, p.id), 0) : 0;
+            const totalScore = members.reduce((sum, p) => sum + (format === "swiss" ? calculateSwissTotalPoints(teamScoreMatches, p.id) : (p.score || 0)), 0);
+            const totalDiff = format === "swiss" ? members.reduce((sum, p) => sum + calculateSwissTableDifference(teamScoreMatches, p.id), 0) : 0;
+            const totalNT = format === "swiss" ? members.reduce((sum, p) => sum + calculateSwissNTScore(teamScoreMatches, p.id), 0) : 0;
             return { team, members, totalScore, totalDiff, totalNT };
         })
         .sort((a, b) => b.totalScore - a.totalScore || a.totalDiff - b.totalDiff || b.totalNT - a.totalNT);
@@ -143,12 +173,35 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                     </div>
                 </div>
 
+                {isTwoDayFinale && day2StartRound && (
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setActiveDayOverride(1)}
+                            className={`p-3 rounded-xl border text-center transition-colors ${
+                                activeDay === 1 ? "bg-orange-500/20 border-orange-500/50 text-orange-400" : "border-border text-muted-foreground hover:bg-accent/30"
+                            }`}
+                        >
+                            <div className="font-prototype">Jour 1</div>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveDayOverride(2)}
+                            className={`p-3 rounded-xl border text-center transition-colors ${
+                                activeDay === 2 ? "bg-orange-500/20 border-orange-500/50 text-orange-400" : "border-border text-muted-foreground hover:bg-accent/30"
+                            }`}
+                        >
+                            <div className="font-prototype">Jour 2</div>
+                        </button>
+                    </div>
+                )}
+
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
                             onClick={() => setMainView("rounds")}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-sm transition-colors ${mainView === "rounds" ? "bg-primary/10 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-sm transition-colors ${effectiveMainView === "rounds" ? "bg-primary/10 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
                         >
                             <ListOrdered className="w-4 h-4" />
                             Rondes &amp; Tables
@@ -156,16 +209,16 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                         <button
                             type="button"
                             onClick={() => setMainView("classement")}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-sm transition-colors ${mainView === "classement" ? "bg-primary/10 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-sm transition-colors ${effectiveMainView === "classement" ? "bg-primary/10 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
                         >
                             <Award className="w-4 h-4" />
                             Classement
                         </button>
-                        {teams.length > 0 && (
+                        {teams.length > 0 && activeDay === 1 && (
                             <button
                                 type="button"
                                 onClick={() => setMainView("teams")}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-sm transition-colors ${mainView === "teams" ? "bg-primary/10 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-prototype text-sm transition-colors ${effectiveMainView === "teams" ? "bg-primary/10 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground"}`}
                             >
                                 <Users className="w-4 h-4" />
                                 Équipes
@@ -186,7 +239,7 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                     </Card>
                 )}
 
-                {tournament.status !== "brouillon" && mainView === "rounds" && (
+                {tournament.status !== "brouillon" && effectiveMainView === "rounds" && (
                     <>
                         {format === "bracket" && tournament.matches.length > 0 && (
                             <Card className="border-primary/20">
@@ -205,14 +258,15 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                             </Card>
                         )}
                         <SwissRounds
-                            matches={tournament.matches}
-                            participants={tournament.participants}
+                            matches={scopedMatches}
+                            participants={scopedParticipants}
                             currentRound={tournament.currentRound || 0}
                             tournamentId={tournament.id}
                             tournamentName={tournament.name}
                             tournamentLogoUrl={tournament.logoUrl}
                             eventDate={tournament.eventDate}
-                            maxRounds={maxRounds}
+                            maxRounds={dayMaxRounds}
+                            roundLabelOffset={dayRoundLabelOffset}
                             qualifiedIds={tournament.qualifiedIds}
                             roundBoards={tournament.roundBoards}
                             usePseudo={showPseudos}
@@ -221,14 +275,14 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                     </>
                 )}
 
-                {tournament.status !== "brouillon" && mainView === "classement" && (format === "swiss" || format === "elimination") && (
+                {tournament.status !== "brouillon" && effectiveMainView === "classement" && (format === "swiss" || format === "elimination") && (
                     <Card className="border-primary/20">
                         <CardContent className="p-0">
                             <div className="divide-y divide-border">
                                 {sortedParticipants.map((p, index) => {
-                                    const totalPoints = format === "swiss" ? calculateSwissTotalPoints(tournament.matches, p.id) : null;
-                                    const ntScore = calculateSwissNTScore(tournament.matches, p.id);
-                                    const tableDiff = calculateSwissTableDifference(tournament.matches, p.id);
+                                    const totalPoints = format === "swiss" ? calculateSwissTotalPoints(scopedMatches, p.id) : null;
+                                    const ntScore = calculateSwissNTScore(scopedMatches, p.id);
+                                    const tableDiff = calculateSwissTableDifference(scopedMatches, p.id);
                                     const showStats = format === "swiss";
                                     const isDay2Cutoff = isFinaleTournament && format === "swiss" && !p.dnf && index < 32;
                                     return (
@@ -265,7 +319,7 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                     </Card>
                 )}
 
-                {tournament.status !== "brouillon" && mainView === "classement" && format === "bracket" && (
+                {tournament.status !== "brouillon" && effectiveMainView === "classement" && format === "bracket" && (
                     <div className="space-y-6">
                         {bracketAdvancing.length > 0 && (
                             <div className="space-y-2">
@@ -309,7 +363,7 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                     </div>
                 )}
 
-                {tournament.status !== "brouillon" && mainView === "teams" && (
+                {tournament.status !== "brouillon" && effectiveMainView === "teams" && activeDay === 1 && (
                     <div className="space-y-2">
                         {teamRows.length === 0 && (
                             <Card className="p-6 text-center">
