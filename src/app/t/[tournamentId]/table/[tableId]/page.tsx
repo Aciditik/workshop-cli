@@ -344,7 +344,7 @@ export default function MobileScorecard({ params }: { params: Promise<{ tourname
                                     return (
                                         <div key={pId}>
                                             <label className="text-xs text-muted-foreground font-prototype block mb-1 truncate">
-                                                {p ? (showPseudos && p.pseudo ? p.pseudo : p.firstname) : ""}
+                                                {playerDisplayName(p, showPseudos)}
                                             </label>
                                             <input
                                                 type="number"
