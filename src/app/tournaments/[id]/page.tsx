@@ -27,6 +27,7 @@ import {
     calculateSwissTableDifference,
     getFormatLabel,
     generateRound1,
+    generateDay2Round1,
     getFormat,
     getMaxRounds,
     getQualifiedCount,
@@ -310,6 +311,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // only) vs. "Équipes" (Finale only).
     const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">("rounds");
     const [showTeamManager, setShowTeamManager] = useState(false);
+    // Two-day CdF Finale: which day's Rondes & Tables / Classement to show.
+    // null means "follow the tournament's actual live day" (defaults to
+    // Day 2 once it exists); set once the organizer manually clicks a tab.
+    const [activeDayOverride, setActiveDayOverride] = useState<1 | 2 | null>(null);
     const [expandedTeamIds, setExpandedTeamIds] = useState<Set<string>>(new Set());
     const toggleTeamExpanded = (teamId: string) => {
         setExpandedTeamIds(prev => {
@@ -354,8 +359,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         if (!tournament) return;
         const tMaxRounds = tournament.maxRounds || 3;
         const tCurrentRound = tournament.currentRound || 0;
+        // A two-day Finale that just finished Day 1 (round === day1Rounds, Day 2
+        // not started yet) must NOT auto-finalize — it's waiting on the
+        // organizer to click "Passer au Jour 2", not actually done.
+        const pausedForDay2 = isTwoDayFinale && !day2StartRound && tCurrentRound === day1Rounds;
         // Case A: final round fully validated but still "en_cours" → finalize it.
-        const needsFinalize = tournament.status === "en_cours" && tCurrentRound >= tMaxRounds;
+        const needsFinalize = tournament.status === "en_cours" && tCurrentRound >= tMaxRounds && !pausedForDay2;
         // Case B: already "fini" but qualifiers were never resolved (e.g. computed
         // empty due to table reorg before the robust logic) → recompute them.
         const needsQualifiers = tournament.status === "fini"
@@ -370,12 +379,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         updateTournament({
             ...tournament,
             status: "fini",
-            qualifiedIds: determineQualifiedPlayers(
-                tournament.format || "swiss",
-                tournament.size,
-                tournament.matches,
-                tournament.participants
-            ),
+            qualifiedIds: isTwoDayFinale
+                ? computeFinaleQualifiedIds(tournament.matches, tournament.participants)
+                : determineQualifiedPlayers(
+                    tournament.format || "swiss",
+                    tournament.size,
+                    tournament.matches,
+                    tournament.participants
+                ),
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tournament]);
@@ -391,20 +402,68 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const currentRound = tournament.currentRound || 0;
 
+    // Two-day CdF Finale (swiss only): after Day 1's 3 rounds, the organizer
+    // can carry the top 32 over to a fresh Day 2 instead of finishing the
+    // tournament. isFinaleTournament is also used further down for the
+    // qualifier-origin display.
+    const isFinaleTournament = /finale/i.test(tournament.name);
+    const isTwoDayFinale = isFinaleTournament && format === "swiss";
+    const day1Rounds = 3;
+    const day2StartRound = tournament.day2StartRound;
+    const day2ParticipantIdSet = new Set(tournament.day2ParticipantIds || []);
+    const isDay2Round = (round: number) => !!day2StartRound && round >= day2StartRound;
+
     const generateNextRound = (board: string) => {
         console.log("=== GENERATING NEXT ROUND ===");
         console.log("Current round:", currentRound);
         console.log("Format:", format);
         console.log("Player count:", playerCount);
         console.log("Participants count:", tournament.participants.length);
-        
+
         const nextRound = currentRound + 1;
+
+        // Two-day CdF Finale: round day1Rounds -> day1Rounds+1 is the Day 1 ->
+        // Day 2 transition, not a normal swiss round — carry over the top 32
+        // Day 1 finishers, reset their score to 0, and seed Day 2's Round 1
+        // by Day 1 rank instead of pairing by (now-stale) cumulative score.
+        // Checked before the maxRounds guard below since maxRounds is still
+        // Day 1's own count (3) until this very transition bumps it.
+        if (isTwoDayFinale && currentRound === day1Rounds && !day2StartRound) {
+            const day1Ranked = rankSwissPlayers(tournament.matches, tournament.participants);
+            const day2Players = day1Ranked.slice(0, 32);
+            const day2Ids = new Set(day2Players.map(p => p.id));
+            const day2Round = day1Rounds + 1;
+            const day2Matches = generateDay2Round1(tournament.id, day2Players, day2Round);
+            const updatedParticipants = tournament.participants.map(p =>
+                day2Ids.has(p.id) ? { ...p, score: 0 } : p
+            );
+
+            updateTournament({
+                ...tournament,
+                status: "en_cours",
+                currentRound: day2Round,
+                maxRounds: day1Rounds + day1Rounds, // Day 2 runs the same number of rounds as Day 1
+                matches: [...tournament.matches, ...day2Matches],
+                participants: updatedParticipants,
+                day2StartRound: day2Round,
+                day2ParticipantIds: Array.from(day2Ids),
+                roundBoards: { ...(tournament.roundBoards || {}), [day2Round]: board },
+            });
+
+            console.log("=== DAY 2 TRANSITION SENT ===");
+            return;
+        }
+
         if (nextRound > maxRounds) return;
 
         let newMatches;
 
-        // Only active (non-DNF) players are seated in new rounds.
-        const activePlayers = tournament.participants.filter(p => !p.dnf);
+        // Only active (non-DNF) players are seated in new rounds. Once Day 2
+        // has started, rounds from day2StartRound onward are restricted to
+        // the carried-over 32 — Day-1-only players don't get more matches.
+        const activePlayers = tournament.participants.filter(p =>
+            !p.dnf && (!isDay2Round(nextRound) || day2ParticipantIdSet.has(p.id))
+        );
 
         if (format === "elimination" && nextRound === 2) {
             // Elimination Round 2: crossed finalist tables
@@ -417,7 +476,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             console.log("Generating bracket round", nextRound, "from", previousRoundMatches.length, "previous round tables");
             newMatches = generateBracketNextRound(tournament.id, previousRoundMatches, nextRound);
         } else {
-            // Swiss rounds 2-3: sorted by score
+            // Swiss rounds 2-3 (and Day 2 rounds 2-3): sorted by score
             console.log("Generating Swiss round", nextRound, "with", activePlayers.length, "active participants");
             newMatches = generateSwissRound(tournament.id, activePlayers, currentRound);
         }
@@ -441,6 +500,33 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         console.log("=== ROUND GENERATION SENT ===");
     };
 
+    // A participant's running score is the sum of their results across the
+    // matches that belong to their current "stage": once Day 2 has started,
+    // a Day 2 participant's score only counts Day 2 matches (round >=
+    // day2StartRound) — this is the actual score reset, since the field
+    // itself is recomputed from scratch on every submit. Day-1-only players
+    // (and everyone before Day 2 starts) are scoped to all of their matches,
+    // same as before.
+    const computeParticipantScore = (p: Participant, allMatches: typeof tournament.matches): number => {
+        const relevant = day2StartRound && day2ParticipantIdSet.has(p.id)
+            ? allMatches.filter(m => m.round >= day2StartRound)
+            : allMatches;
+        let total = 0;
+        relevant.forEach(m => { if (m.isCompleted && m.results[p.id]) total += m.results[p.id]; });
+        return total;
+    };
+
+    // Qualifiers for a two-day Finale are decided purely on Day 2's own
+    // result (once Day 2 exists) — Day-1-only players never factor in.
+    const computeFinaleQualifiedIds = (allMatches: typeof tournament.matches, allParticipants: Participant[]): string[] => {
+        if (day2StartRound) {
+            const day2Matches = allMatches.filter(m => m.round >= day2StartRound);
+            const day2Participants = allParticipants.filter(p => day2ParticipantIdSet.has(p.id));
+            return determineQualifiedPlayers(format, day2Participants.length, day2Matches, day2Participants);
+        }
+        return determineQualifiedPlayers(format, tournament.size, allMatches, allParticipants);
+    };
+
     const submitMatchResults = (matchId: string, results: Record<string, number>) => {
         if (tournament.status !== "en_cours") return;
 
@@ -449,15 +535,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         );
 
         // Update overall participant scores based on these results
-        const updatedParticipants = tournament.participants.map(p => {
-            let newTotal = 0;
-            updatedMatches.forEach(m => {
-                if (m.isCompleted && m.results[p.id]) {
-                    newTotal += m.results[p.id];
-                }
-            });
-            return { ...p, score: newTotal };
-        });
+        const updatedParticipants = tournament.participants.map(p => ({
+            ...p,
+            score: computeParticipantScore(p, updatedMatches),
+        }));
 
         const newTournamentData = {
             ...tournament,
@@ -472,12 +553,16 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             .filter(m => m.isCompleted || m.participantIds.filter(Boolean).length > 0)
             .every(m => m.isCompleted);
 
-        // Tournament completes when current round is max AND all tables are truly done
-        if (allTablesCompleted && currentRound === maxRounds) {
+        // Tournament completes when current round is max AND all tables are
+        // truly done. A two-day Finale doesn't finish at the end of Day 1
+        // (round === day1Rounds) — it pauses for "Passer au Jour 2" instead,
+        // and only finishes once Day 2 itself reaches its last round.
+        const reachedDay1EndOfTwoDayFinale = isTwoDayFinale && !day2StartRound && currentRound === day1Rounds;
+        if (allTablesCompleted && currentRound === maxRounds && !reachedDay1EndOfTwoDayFinale) {
             newTournamentData.status = "fini";
-            newTournamentData.qualifiedIds = determineQualifiedPlayers(
-                format, tournament.size, updatedMatches, updatedParticipants
-            );
+            newTournamentData.qualifiedIds = isTwoDayFinale
+                ? computeFinaleQualifiedIds(updatedMatches, updatedParticipants)
+                : determineQualifiedPlayers(format, tournament.size, updatedMatches, updatedParticipants);
         }
 
         updateTournament(newTournamentData);
@@ -574,13 +659,10 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 : m
         );
 
-        const updatedParticipants = tournament.participants.map(p => {
-            let newTotal = 0;
-            updatedMatches.forEach(m => {
-                if (m.isCompleted && m.results[p.id]) newTotal += m.results[p.id];
-            });
-            return { ...p, score: newTotal };
-        });
+        const updatedParticipants = tournament.participants.map(p => ({
+            ...p,
+            score: computeParticipantScore(p, updatedMatches),
+        }));
 
         const newTournamentData = {
             ...tournament,
@@ -592,11 +674,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const allTablesCompleted = updatedMatches
             .filter(m => m.isCompleted || m.participantIds.filter(Boolean).length > 0)
             .every(m => m.isCompleted);
-        if (allTablesCompleted && currentRound === maxRounds) {
+        const reachedDay1EndOfTwoDayFinale = isTwoDayFinale && !day2StartRound && currentRound === day1Rounds;
+        if (allTablesCompleted && currentRound === maxRounds && !reachedDay1EndOfTwoDayFinale) {
             newTournamentData.status = "fini";
-            newTournamentData.qualifiedIds = determineQualifiedPlayers(
-                format, tournament.size, updatedMatches, updatedParticipants
-            );
+            newTournamentData.qualifiedIds = isTwoDayFinale
+                ? computeFinaleQualifiedIds(updatedMatches, updatedParticipants)
+                : determineQualifiedPlayers(format, tournament.size, updatedMatches, updatedParticipants);
         }
 
         updateTournament(newTournamentData);
@@ -606,7 +689,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const activeCount = tournament.participants.filter(p => !p.dnf).length;
     const dnfCount = playerCount - activeCount;
     const canGenerateNextRound = () => {
-        if (currentRound >= maxRounds) return false;
+        // A two-day Finale that just finished Day 1 (round === day1Rounds)
+        // hasn't hit maxRounds yet in spirit — Day 2 hasn't been created, so
+        // maxRounds is still Day 1's own count. Allow the check through so
+        // the "Passer au Jour 2" button can appear.
+        const atDay1End = isTwoDayFinale && !day2StartRound && currentRound === day1Rounds;
+        if (currentRound >= maxRounds && !atDay1End) return false;
         const roundMatches = tournament.matches
             .filter(m => m.round === currentRound)
             // Ignore tables left completely empty after consolidating players.
@@ -985,7 +1073,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     // Finale-only: map each finalist (by email) to the source qualifier tournament
     // they were qualified from, so we can display that tournament's logo next to
     // their name in the player lists.
-    const isFinaleTournament = /finale/i.test(tournament.name);
     const normalizeName = (firstname: string, name: string) =>
         `${firstname} ${name}`.trim().toLowerCase().replace(/\s+/g, " ");
     const qualifierTournamentByEmail = new Map<string, Tournament>();
@@ -1044,16 +1131,39 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         ).sort((a, b) => a.name.localeCompare(b.name))
         : [];
 
+    // Two-day CdF Finale: which day's Rondes & Tables / Classement is
+    // currently shown — defaults to whichever day the tournament is actually
+    // live in, but the organizer can browse back to Day 1's results via
+    // activeDayOverride without affecting round generation.
+    const liveDay: 1 | 2 = (isTwoDayFinale && day2StartRound && currentRound >= day2StartRound) ? 2 : 1;
+    const activeDay = activeDayOverride ?? liveDay;
+    const day2Participants = tournament.participants.filter(p => day2ParticipantIdSet.has(p.id));
+    const day1ScopedMatches = tournament.matches.filter(m => !day2StartRound || m.round < day2StartRound);
+    const day2ScopedMatches = tournament.matches.filter(m => day2StartRound && m.round >= day2StartRound);
+    const classementMatches = isTwoDayFinale && day2StartRound
+        ? (activeDay === 2 ? day2ScopedMatches : day1ScopedMatches)
+        : tournament.matches;
+    const classementParticipants = isTwoDayFinale && day2StartRound && activeDay === 2
+        ? day2Participants
+        : tournament.participants;
+    // Rondes & Tables reuses the same day-scoped matches/participants as the
+    // Classement tab, plus the round count/offset SwissRounds needs to
+    // iterate only that day's absolute round numbers and label them 1..N.
+    const dayMaxRounds = isTwoDayFinale && day2StartRound
+        ? (activeDay === 2 ? Math.max(1, maxRounds - day1Rounds) : Math.min(maxRounds, day1Rounds))
+        : maxRounds;
+    const dayRoundLabelOffset = isTwoDayFinale && day2StartRound && activeDay === 2 ? day1Rounds : 0;
+
     // Swiss ranking (points → table diff → NT), shared with
     // determineQualifiedPlayers via qualifier-rules.ts so the Classement and
     // the actual qualifiedIds never drift apart.
     const calculateTotalPoints = (participantId: string): number =>
-        calculateSwissTotalPoints(tournament.matches, participantId);
+        calculateSwissTotalPoints(classementMatches, participantId);
     const calculateNTScore = (participantId: string): number =>
-        calculateSwissNTScore(tournament.matches, participantId);
+        calculateSwissNTScore(classementMatches, participantId);
     const calculateTableDifference = (participantId: string): number =>
-        calculateSwissTableDifference(tournament.matches, participantId);
-    const sortedParticipants = rankSwissPlayers(tournament.matches, tournament.participants);
+        calculateSwissTableDifference(classementMatches, participantId);
+    const sortedParticipants = rankSwissPlayers(classementMatches, classementParticipants);
 
     // Finale team ranking: a team's score is the sum of its members'
     // cumulative participant.score. Tie-break mirrors the individual
@@ -1574,6 +1684,29 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             )}
 
             <div className="space-y-4">
+                        {isTwoDayFinale && day2StartRound && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveDayOverride(1)}
+                                    className={`p-4 rounded-xl border text-center transition-colors ${
+                                        activeDay === 1 ? "bg-orange-500/20 border-orange-500/50 text-orange-400" : "border-border text-muted-foreground hover:bg-accent/30"
+                                    }`}
+                                >
+                                    <div className="font-prototype text-lg">Jour 1</div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveDayOverride(2)}
+                                    className={`p-4 rounded-xl border text-center transition-colors ${
+                                        activeDay === 2 ? "bg-orange-500/20 border-orange-500/50 text-orange-400" : "border-border text-muted-foreground hover:bg-accent/30"
+                                    }`}
+                                >
+                                    <div className="font-prototype text-lg">Jour 2</div>
+                                    <div className="text-xs font-prototype opacity-80">{day2Participants.length} joueurs</div>
+                                </button>
+                            </div>
+                        )}
                         <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2">
                                 <button
@@ -1621,7 +1754,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     />
                                     Afficher les pseudos
                                 </label>
-                                {mainView === "rounds" && (
+                                {mainView === "rounds" && activeDay === liveDay && (
                                     tournament.status === "fini" ? (
                                         <div className="text-green-500 font-prototype bg-green-500/10 px-4 py-2 rounded-lg">
                                             Tournoi Terminé !
@@ -1629,7 +1762,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     ) : canGenerateNextRound() ? (
                                         <Button onClick={() => setPendingRound(currentRound + 1)} className="gap-2 font-prototype" variant="secondary">
                                             <Play className="w-4 h-4 fill-foreground" />
-                                            Générer Ronde {currentRound + 1}
+                                            {isTwoDayFinale && currentRound === day1Rounds && !day2StartRound
+                                                ? "Passer au Jour 2"
+                                                : `Générer Ronde ${isDay2Round(currentRound + 1) ? currentRound + 1 - day1Rounds : currentRound + 1}`}
                                         </Button>
                                     ) : null
                                 )}
@@ -1658,8 +1793,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     </Card>
                                 )}
                                 <SwissRounds
-                                    matches={tournament.matches}
-                                    participants={tournament.participants}
+                                    matches={classementMatches}
+                                    participants={classementParticipants}
                                     onSubmitResults={submitMatchResults}
                                     onDeclineResults={declineMatchResults}
                                     onEditScorecards={editMatchScorecards}
@@ -1670,7 +1805,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     tournamentName={tournament.name}
                                     tournamentLogoUrl={tournament.logoUrl}
                                     eventDate={tournament.eventDate}
-                                    maxRounds={maxRounds}
+                                    maxRounds={dayMaxRounds}
+                                    roundLabelOffset={dayRoundLabelOffset}
                                     qualifiedIds={tournament.qualifiedIds}
                                     roundBoards={tournament.roundBoards}
                                     usePseudo={showPseudos}
@@ -2291,7 +2427,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             <BoardSelectModal
                 open={pendingRound !== null}
                 onOpenChange={(open) => { if (!open) setPendingRound(null); }}
-                roundLabel={pendingRound ? roundLabel(pendingRound === 1 ? (playerCount >= 29 ? selectedFormat : getFormat(playerCount)) : format, pendingRound) : ""}
+                roundLabel={
+                    pendingRound === null ? "" :
+                    isTwoDayFinale && pendingRound === day1Rounds + 1 && !day2StartRound ? "Jour 2 — Ronde 1" :
+                    isTwoDayFinale && isDay2Round(pendingRound) ? `Jour 2 — Ronde ${pendingRound - day1Rounds}` :
+                    roundLabel(pendingRound === 1 ? (playerCount >= 29 ? selectedFormat : getFormat(playerCount)) : format, pendingRound)
+                }
                 defaultBoard={pendingRound ? tournament.roundBoards?.[pendingRound] : undefined}
                 onConfirm={(board) => {
                     if (pendingRound === 1 && tournament.status === "brouillon") {

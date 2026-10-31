@@ -67,4 +67,11 @@ export interface Tournament {
     roundBoards?: Record<number, string>; // Maps round number -> board name chosen by the organizer
     ownerId?: string; // Owner user ID (set by admin when creating on behalf of organizer)
     teams?: Team[]; // Finale only: team rosters (players reference a team via Participant.teamId)
+    // Two-day CdF Finale: set when the organizer clicks "Passer au Jour 2"
+    // after Day 1's last round. day2StartRound is the first absolute round
+    // number that belongs to Day 2 (e.g. 4 when Day 1 had 3 rounds);
+    // day2ParticipantIds are the top 32 Day 1 finishers carried over, with
+    // their Participant.score reset to 0 at the moment of the transition.
+    day2StartRound?: number;
+    day2ParticipantIds?: string[];
 }

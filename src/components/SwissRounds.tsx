@@ -38,6 +38,12 @@ interface SwissRoundsProps {
     // and pending-review scorecards stay hidden until the admin actually
     // validates them — only then are scores "real" for an outside viewer.
     readOnly?: boolean;
+    // Two-day CdF Finale: `matches`/`maxRounds`/`currentRound` keep using
+    // absolute round numbers (e.g. Day 2 is rounds 4-6) so match filtering
+    // and "Active" detection stay correct, but the displayed "Ronde N"
+    // label is shifted back by `roundLabelOffset` so Day 2 reads as its own
+    // Ronde 1/2/3. Both default to 0 (every other caller is unaffected).
+    roundLabelOffset?: number;
 }
 
 // Category keys used to compute a player's raw NT total.
@@ -69,8 +75,8 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams }: SwissRoundsProps) {
-    const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1);
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams, roundLabelOffset = 0 }: SwissRoundsProps) {
+    const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1 + roundLabelOffset);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
     const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set([currentRound]));
@@ -164,7 +170,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                         >
                             <h3 className="text-base sm:text-xl font-prototype flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
                                 {isExpanded ? <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" /> : <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />}
-                                <span className="font-prototype">Ronde {round}</span>
+                                <span className="font-prototype">Ronde {round - roundLabelOffset}</span>
                                 {round === currentRound && <span className="bg-primary/20 text-primary text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full uppercase tracking-wider font-prototype">Active</span>}
                                 {roundBoards?.[round] && (
                                     <span className="flex items-center gap-1 bg-muted text-muted-foreground text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full font-prototype">
@@ -215,7 +221,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
             <BoardSelectModal
                 open={editingBoardRound !== null}
                 onOpenChange={(open) => { if (!open) setEditingBoardRound(null); }}
-                roundLabel={editingBoardRound ? `Ronde ${editingBoardRound}` : ""}
+                roundLabel={editingBoardRound ? `Ronde ${editingBoardRound - roundLabelOffset}` : ""}
                 defaultBoard={editingBoardRound ? roundBoards?.[editingBoardRound] : undefined}
                 confirmLabel="Enregistrer le plateau"
                 onConfirm={(board) => {

@@ -313,6 +313,48 @@ export function generateRound1(
     return matches;
 }
 
+// Two-day CdF Finale: seat Day 2's 32 qualifiers for Day 2's own Round 1.
+// `rankedParticipants` must already be ordered best → worst by their Day 1
+// result. Seeding is a capacity-aware round-robin over the table order (seed
+// 1 → table 1, seed 2 → table 2, …, wrapping once every table has one
+// player) so the strongest Day 1 finishers are spread across different
+// tables instead of clustering together.
+function distributeByRankRoundRobin(ranked: Participant[], tableSizes: number[]): Participant[][] {
+    const tables: Participant[][] = tableSizes.map(() => []);
+    let t = 0;
+    for (const p of ranked) {
+        let attempts = 0;
+        while (tables[t].length >= tableSizes[t] && attempts < tableSizes.length) {
+            t = (t + 1) % tableSizes.length;
+            attempts++;
+        }
+        tables[t].push(p);
+        t = (t + 1) % tableSizes.length;
+    }
+    return tables;
+}
+
+export function generateDay2Round1(
+    tournamentId: string,
+    rankedParticipants: Participant[],
+    round: number
+): TableMatch[] {
+    const tableSizes = getSwissTableSizes(rankedParticipants.length);
+    const seatedTables = distributeByRankRoundRobin(rankedParticipants, tableSizes);
+
+    return tableSizes.map((_, i) => ({
+        id: crypto.randomUUID(),
+        tournamentId,
+        round,
+        tableNumber: i + 1,
+        tableLabel: `Table ${i + 1}`,
+        participantIds: seatedTables[i].map(p => p.id),
+        results: {},
+        isCompleted: false,
+        isFinalist: false,
+    }));
+}
+
 // ─── Main: Generate Round 2 (Elimination format) ───────────────────
 export function generateEliminationRound2(
     tournamentId: string,
