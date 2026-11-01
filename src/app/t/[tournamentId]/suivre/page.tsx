@@ -66,10 +66,10 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
     if (!tournament) return <div className="p-8 text-center text-red-500 font-prototype">Tournoi introuvable.</div>;
 
     const format = tournament.format || "swiss";
-    const qualifiedIds = new Set(tournament.qualifiedIds || []);
-    // Same "day-2" cutoff band as the admin classement: for the CdF Finale
-    // (swiss), the top 32 provisional qualifiers get a tinted row.
     const isFinaleTournament = /finale/i.test(tournament.name);
+    // A Finale has no "qualified" players — the empty set removes every
+    // qualified highlight for it.
+    const qualifiedIds = new Set(isFinaleTournament ? [] : (tournament.qualifiedIds || []));
     const maxRounds = tournament.maxRounds || 3;
 
     // Two-day CdF Finale — same day scoping as the admin page: Day 1 is
@@ -267,7 +267,7 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                             eventDate={tournament.eventDate}
                             maxRounds={dayMaxRounds}
                             roundLabelOffset={dayRoundLabelOffset}
-                            qualifiedIds={tournament.qualifiedIds}
+                            qualifiedIds={isFinaleTournament ? undefined : tournament.qualifiedIds}
                             roundBoards={tournament.roundBoards}
                             usePseudo={showPseudos}
                             readOnly

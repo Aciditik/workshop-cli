@@ -367,7 +367,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         const needsFinalize = tournament.status === "en_cours" && tCurrentRound >= tMaxRounds && !pausedForDay2;
         // Case B: already "fini" but qualifiers were never resolved (e.g. computed
         // empty due to table reorg before the robust logic) → recompute them.
-        const needsQualifiers = tournament.status === "fini"
+        // A Finale has no qualified players at all — nothing to recompute.
+        const needsQualifiers = tournament.status === "fini" && !isFinaleTournament
             && (!tournament.qualifiedIds || tournament.qualifiedIds.length === 0);
         if (!needsFinalize && !needsQualifiers) return;
         const relevant = tournament.matches.filter(
@@ -380,7 +381,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             ...tournament,
             status: "fini",
             qualifiedIds: isTwoDayFinale
-                ? computeFinaleQualifiedIds(tournament.matches, tournament.participants)
+                ? []
                 : determineQualifiedPlayers(
                     tournament.format || "swiss",
                     tournament.size,
@@ -516,17 +517,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         return total;
     };
 
-    // Qualifiers for a two-day Finale are decided purely on Day 2's own
-    // result (once Day 2 exists) — Day-1-only players never factor in.
-    const computeFinaleQualifiedIds = (allMatches: typeof tournament.matches, allParticipants: Participant[]): string[] => {
-        if (day2StartRound) {
-            const day2Matches = allMatches.filter(m => m.round >= day2StartRound);
-            const day2Participants = allParticipants.filter(p => day2ParticipantIdSet.has(p.id));
-            return determineQualifiedPlayers(format, day2Participants.length, day2Matches, day2Participants);
-        }
-        return determineQualifiedPlayers(format, tournament.size, allMatches, allParticipants);
-    };
-
     const submitMatchResults = (matchId: string, results: Record<string, number>) => {
         if (tournament.status !== "en_cours") return;
 
@@ -561,7 +551,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         if (allTablesCompleted && currentRound === maxRounds && !reachedDay1EndOfTwoDayFinale) {
             newTournamentData.status = "fini";
             newTournamentData.qualifiedIds = isTwoDayFinale
-                ? computeFinaleQualifiedIds(updatedMatches, updatedParticipants)
+                ? []
                 : determineQualifiedPlayers(format, tournament.size, updatedMatches, updatedParticipants);
         }
 
@@ -678,7 +668,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         if (allTablesCompleted && currentRound === maxRounds && !reachedDay1EndOfTwoDayFinale) {
             newTournamentData.status = "fini";
             newTournamentData.qualifiedIds = isTwoDayFinale
-                ? computeFinaleQualifiedIds(updatedMatches, updatedParticipants)
+                ? []
                 : determineQualifiedPlayers(format, tournament.size, updatedMatches, updatedParticipants);
         }
 
@@ -1068,7 +1058,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         URL.revokeObjectURL(url);
     };
 
-    const qualifiedIds = new Set(tournament.qualifiedIds || []);
+    // A Finale has no "qualified" players — the podium is the final result.
+    // The empty set removes every qualified highlight/section for it.
+    const qualifiedIds = new Set(isFinaleTournament ? [] : (tournament.qualifiedIds || []));
 
     // Finale-only: map each finalist (by email) to the source qualifier tournament
     // they were qualified from, so we can display that tournament's logo next to
@@ -1324,7 +1316,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             {dnfCount > 0 && (
                                 <> • <span className="text-orange-500">{activeCount} actif{activeCount > 1 ? "s" : ""} ({dnfCount} DNF)</span></>
                             )}
-                            {" • "}{getFormatLabel(activeCount, tournament.status === "brouillon" ? selectedFormat : format)} • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}
+                            {" • "}{getFormatLabel(activeCount, tournament.status === "brouillon" ? selectedFormat : format)}
+                            {!isFinaleTournament && <> • {qualifiedCount} qualifié{qualifiedCount > 1 ? "s" : ""}</>}
                         </p>
                     </div>
                 </div>
@@ -1381,7 +1374,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Qualified Players Banner */}
-            {tournament.status === "fini" && tournament.qualifiedIds && tournament.qualifiedIds.length > 0 && (
+            {tournament.status === "fini" && (isFinaleTournament || (tournament.qualifiedIds && tournament.qualifiedIds.length > 0)) && (
                 <Card className="border-yellow-500/30 bg-yellow-500/5">
                     <CardContent className="p-6">
                         {isFinaleTournament ? (
@@ -1418,7 +1411,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     <h3 className="text-xl font-prototype text-yellow-400">Joueurs Qualifiés</h3>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                    {tournament.qualifiedIds.map((qId, idx) => {
+                                    {(tournament.qualifiedIds || []).map((qId, idx) => {
                                         const p = tournament.participants.find(pp => pp.id === qId);
                                         return (
                                             <div key={qId} className="flex items-center gap-3 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10">
@@ -1835,7 +1828,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                             <BracketTreeView
                                                 matches={tournament.matches}
                                                 participants={tournament.participants}
-                                                qualifiedIds={tournament.qualifiedIds}
+                                                qualifiedIds={isFinaleTournament ? undefined : tournament.qualifiedIds}
                                                 roundBoards={tournament.roundBoards}
                                                 usePseudo={showPseudos}
                                             />
@@ -1857,7 +1850,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     eventDate={tournament.eventDate}
                                     maxRounds={dayMaxRounds}
                                     roundLabelOffset={dayRoundLabelOffset}
-                                    qualifiedIds={tournament.qualifiedIds}
+                                    qualifiedIds={isFinaleTournament ? undefined : tournament.qualifiedIds}
                                     roundBoards={tournament.roundBoards}
                                     usePseudo={showPseudos}
                                     teams={activeDay === 1 ? teams : undefined}
