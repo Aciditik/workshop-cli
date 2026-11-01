@@ -32,7 +32,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { ListCheck, UserRoundSearch, Play, ChevronLeft, ChevronDown, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users, Copy } from "lucide-react";
+import { ListCheck, UserRoundSearch, Play, ChevronLeft, ChevronDown, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users, Copy, Trophy } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { TeamManagerModal } from "@/components/TeamManagerModal";
@@ -1167,6 +1167,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const calculateTableDifference = (participantId: string): number =>
         calculateSwissTableDifference(classementMatches, participantId);
     const sortedParticipants = rankSwissPlayers(classementMatches, classementParticipants);
+    // The finished-tournament podium always reflects the final standings:
+    // Day 2's ranking for a two-day Finale, regardless of which day the
+    // organizer is currently browsing.
+    const podiumParticipants = isTwoDayFinale && day2StartRound
+        ? rankSwissPlayers(day2ScopedMatches, day2Participants)
+        : sortedParticipants;
 
     // Finale team ranking (Day 1 only): a team's score is the sum of its
     // members' Day 1 placement points. A Day 2 participant's `score` field
@@ -1378,33 +1384,66 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             {tournament.status === "fini" && tournament.qualifiedIds && tournament.qualifiedIds.length > 0 && (
                 <Card className="border-yellow-500/30 bg-yellow-500/5">
                     <CardContent className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <Award className="w-6 h-6 text-yellow-500" />
-                            <h3 className="text-xl font-prototype text-yellow-400">Joueurs Qualifiés</h3>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {tournament.qualifiedIds.map((qId, idx) => {
-                                const p = tournament.participants.find(pp => pp.id === qId);
-                                return (
-                                    <div key={qId} className="flex items-center gap-3 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10">
-                                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                                        <div>
-                                            <p className="font-prototype">{playerDisplayName(p, showPseudos)}</p>
-                                            <p className="text-xs font-prototype text-muted-foreground">Qualifié #{idx + 1}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        {isFinaleTournament ? (
+                            <>
+                                <div className="flex items-center gap-3 mb-6">
+                                    <Trophy className="w-6 h-6 text-yellow-500" />
+                                    <h3 className="text-xl font-prototype text-yellow-400">Podium</h3>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 sm:gap-4 items-end">
+                                    {[
+                                        { rankIndex: 1, label: "2e", medal: "text-slate-300", step: "border-slate-300/40 bg-slate-300/10", height: "h-16" },
+                                        { rankIndex: 0, label: "1er", medal: "text-yellow-500", step: "border-yellow-500/50 bg-yellow-500/15", height: "h-24" },
+                                        { rankIndex: 2, label: "3e", medal: "text-amber-600", step: "border-amber-600/40 bg-amber-600/10", height: "h-10" },
+                                    ].map(slot => {
+                                        const p = podiumParticipants[slot.rankIndex];
+                                        return (
+                                            <div key={slot.rankIndex} className="flex flex-col items-center gap-2 min-w-0">
+                                                {slot.rankIndex === 0 && <Trophy className="w-8 h-8 text-yellow-500" />}
+                                                <p className="font-prototype text-center truncate w-full" title={p ? playerDisplayName(p, showPseudos) : undefined}>
+                                                    {p ? playerDisplayName(p, showPseudos) : "—"}
+                                                </p>
+                                                <div className={`w-full rounded-t-lg border ${slot.step} ${slot.height} flex items-start justify-center pt-1.5`}>
+                                                    <span className={`font-prototype text-xl ${slot.medal}`}>{slot.label}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <Award className="w-6 h-6 text-yellow-500" />
+                                    <h3 className="text-xl font-prototype text-yellow-400">Joueurs Qualifiés</h3>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                    {tournament.qualifiedIds.map((qId, idx) => {
+                                        const p = tournament.participants.find(pp => pp.id === qId);
+                                        return (
+                                            <div key={qId} className="flex items-center gap-3 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10">
+                                                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                                                <div>
+                                                    <p className="font-prototype">{playerDisplayName(p, showPseudos)}</p>
+                                                    <p className="text-xs font-prototype text-muted-foreground">Qualifié #{idx + 1}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
                         <div className="mt-4 pt-4 border-t border-yellow-500/20 flex flex-col sm:flex-row gap-3">
                             <Button onClick={exportTopPlayers} className="gap-2 font-prototype" variant="outline">
                                 <Download className="w-4 h-4" />
                                 Exporter le classement complet (CSV)
                             </Button>
-                            <Button onClick={openFinaleModal} className="gap-2 font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black">
-                                <CalendarPlus className="w-4 h-4" />
-                                Ajouter les joueurs à la finale de la CdF
-                            </Button>
+                            {!isFinaleTournament && (
+                                <Button onClick={openFinaleModal} className="gap-2 font-prototype bg-yellow-500 hover:bg-yellow-500/90 text-black">
+                                    <CalendarPlus className="w-4 h-4" />
+                                    Ajouter les joueurs à la finale de la CdF
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
