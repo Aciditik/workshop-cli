@@ -1,6 +1,7 @@
 import { StaticImageData } from "next/image";
 
 import animal from "@/assets/tags/Tag_Animal.png";
+import asteroid from "@/assets/tags/Tag_Asteroïd.png";
 import building from "@/assets/tags/Tag_Building.png";
 import cdf from "@/assets/tags/Tag_CDF.png";
 import city from "@/assets/tags/Tag_City.png";
@@ -15,6 +16,7 @@ import iss from "@/assets/tags/Tag_ISS.png";
 import jovian from "@/assets/tags/Tag_Jovian.png";
 import ludophiles from "@/assets/tags/Tag_Ludophiles.png";
 import mars from "@/assets/tags/Tag_Mars.png";
+import mecha from "@/assets/tags/Tag_Mecha.png";
 import mercury from "@/assets/tags/Tag_Mercury.png";
 import microbe from "@/assets/tags/Tag_Microbe.png";
 import moon from "@/assets/tags/Tag_Moon.png";
@@ -33,6 +35,7 @@ import wild from "@/assets/tags/Tag_Wild.png";
 // Keys are what gets persisted as Team.tag.
 export const TEAM_TAGS: Record<string, StaticImageData> = {
     "Animal": animal,
+    "Asteroïd": asteroid,
     "Building": building,
     "CDF": cdf,
     "City": city,
@@ -47,6 +50,7 @@ export const TEAM_TAGS: Record<string, StaticImageData> = {
     "Jovian": jovian,
     "Ludophiles": ludophiles,
     "Mars": mars,
+    "Mecha": mecha,
     "Mercury": mercury,
     "Microbe": microbe,
     "Moon": moon,
@@ -68,6 +72,7 @@ export const TEAM_TAG_NAMES = Object.keys(TEAM_TAGS);
 // instead of typing a name and picking an icon separately each time.
 export const TEAM_PRESETS: { tag: string; label: string }[] = [
     { tag: "Animal", label: "Team Animaux" },
+    { tag: "Asteroïd", label: "Team Asteroïde" },
     { tag: "Building", label: "Team Bâtisseur" },
     { tag: "CDF", label: "Team CDF" },
     { tag: "City", label: "Team Cité" },
@@ -82,6 +87,7 @@ export const TEAM_PRESETS: { tag: string; label: string }[] = [
     { tag: "Jovian", label: "Team Jovien" },
     { tag: "Ludophiles", label: "Team Ludophiles" },
     { tag: "Mars", label: "Team Mars" },
+    { tag: "Mecha", label: "Team Mecha" },
     { tag: "Mercury", label: "Team Mercure" },
     { tag: "Microbe", label: "Team Microbe" },
     { tag: "Moon", label: "Team Lune" },
