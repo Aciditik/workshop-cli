@@ -32,7 +32,7 @@ import {
     getMaxRounds,
     getQualifiedCount,
 } from "@/lib/qualifier-rules";
-import { ListCheck, UserRoundSearch, Play, ChevronLeft, ChevronDown, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users, Copy, Trophy } from "lucide-react";
+import { ListCheck, UserRoundSearch, Play, ChevronLeft, ChevronDown, ListOrdered, Award, Star, RotateCcw, Plus, X, UserPlus, Download, AlertTriangle, Check, CalendarPlus, Pencil, Settings, Upload, Ban, Trash2, Users, Copy, Trophy, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { TeamManagerModal } from "@/components/TeamManagerModal";
@@ -1135,6 +1135,23 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const day2Participants = tournament.participants.filter(p => day2ParticipantIdSet.has(p.id));
     const day1ScopedMatches = tournament.matches.filter(m => !day2StartRound || m.round < day2StartRound);
     const day2ScopedMatches = tournament.matches.filter(m => day2StartRound && m.round >= day2StartRound);
+    // Finale suspense reveal: once a day's final round (round 3) has at
+    // least one validated table, that day's classement (individual + team)
+    // is considered to have a "real" result worth hiding from spectators
+    // until the organizer publishes it. Publishing never re-locks, even if
+    // a round-3 scorecard is edited afterward.
+    const day1Round3Started = isTwoDayFinale && day1ScopedMatches.some(m => m.round === day1Rounds && m.isCompleted);
+    const day2Round3Started = isTwoDayFinale && !!day2StartRound && day2ScopedMatches.some(m => m.round === maxRounds && m.isCompleted);
+    const day1ResultsPublished = !!tournament.day1ResultsPublished;
+    const day2ResultsPublished = !!tournament.day2ResultsPublished;
+    const canManageTournament = isAdmin || tournament.ownerId === user?.id;
+    const publishDayResults = (day: 1 | 2) => {
+        if (!canManageTournament) return;
+        updateTournament({
+            ...tournament,
+            ...(day === 1 ? { day1ResultsPublished: true } : { day2ResultsPublished: true }),
+        });
+    };
     const classementMatches = isTwoDayFinale && day2StartRound
         ? (activeDay === 2 ? day2ScopedMatches : day1ScopedMatches)
         : tournament.matches;
@@ -1814,6 +1831,30 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             </div>
                         </div>
 
+                        {(effectiveMainView === "classement" || effectiveMainView === "teams") && isTwoDayFinale && (
+                            (activeDay === 1 ? day1Round3Started : day2Round3Started) && (
+                                <div className={`flex items-center justify-between gap-3 flex-wrap p-3 rounded-lg border font-prototype text-sm ${
+                                    (activeDay === 1 ? day1ResultsPublished : day2ResultsPublished)
+                                        ? "border-green-500/30 bg-green-500/5 text-green-500"
+                                        : "border-orange-500/30 bg-orange-500/5 text-orange-500"
+                                }`}>
+                                    <div className="flex items-center gap-2">
+                                        {(activeDay === 1 ? day1ResultsPublished : day2ResultsPublished) ? (
+                                            <><Eye className="w-4 h-4" /> Classement du Jour {activeDay} publié — visible par les spectateurs.</>
+                                        ) : (
+                                            <><EyeOff className="w-4 h-4" /> Classement du Jour {activeDay} masqué pour les spectateurs tant qu&apos;il n&apos;est pas publié.</>
+                                        )}
+                                    </div>
+                                    {!(activeDay === 1 ? day1ResultsPublished : day2ResultsPublished) && canManageTournament && (
+                                        <Button onClick={() => publishDayResults(activeDay)} size="sm" className="gap-2 font-prototype bg-orange-500 hover:bg-orange-500/90 text-black">
+                                            <Eye className="w-4 h-4" />
+                                            Publier le classement
+                                        </Button>
+                                    )}
+                                </div>
+                            )
+                        )}
+
                         {effectiveMainView === "rounds" && (
                             <>
                                 {format === "bracket" && tournament.matches.length > 0 && (
@@ -2039,7 +2080,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 <div className="divide-y divide-border border-t border-border bg-background/40">
                                                     {members
                                                         .slice()
-                                                        .sort((a, b) => (b.score || 0) - (a.score || 0))
+                                                        .sort((a, b) => calculateSwissTotalPoints(teamScoreMatches, b.id) - calculateSwissTotalPoints(teamScoreMatches, a.id))
                                                         .map(p => (
                                                             <div key={p.id} className="pl-12 pr-3 py-2 flex items-center gap-3">
                                                                 <span className={`font-prototype truncate text-sm ${p.dnf ? "line-through text-muted-foreground" : ""}`}>
@@ -2048,7 +2089,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                                 {p.dnf && (
                                                                     <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
                                                                 )}
-                                                                <span className="ml-auto font-prototype text-sm text-muted-foreground tabular-nums shrink-0">{p.score || 0} pts</span>
+                                                                <span className="ml-auto font-prototype text-sm text-muted-foreground tabular-nums shrink-0">{calculateSwissTotalPoints(teamScoreMatches, p.id)} pts</span>
                                                             </div>
                                                         ))}
                                                     {members.length === 0 && (

@@ -74,4 +74,10 @@ export interface Tournament {
     // their Participant.score reset to 0 at the moment of the transition.
     day2StartRound?: number;
     day2ParticipantIds?: string[];
+    // Finale suspense reveal: each day's final (round 3) classement — both
+    // the individual ranking and the team ranking — stays hidden from
+    // non-admins (spectators/players) once that round starts resolving,
+    // until the organizer explicitly publishes it.
+    day1ResultsPublished?: boolean;
+    day2ResultsPublished?: boolean;
 }

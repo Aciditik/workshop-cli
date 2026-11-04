@@ -14,7 +14,7 @@ import {
 import { SwissRounds } from "@/components/SwissRounds";
 import { BracketTreeView } from "@/components/BracketTreeView";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Award, ChevronLeft, ChevronDown, ListOrdered, Ban, Users } from "lucide-react";
+import { Award, ChevronLeft, ChevronDown, ListOrdered, Ban, Users, Lock } from "lucide-react";
 import { TEAM_TAGS } from "@/lib/team-tags";
 import Image from "next/image";
 import Link from "next/link";
@@ -96,6 +96,17 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
         ? (activeDay === 2 ? Math.max(1, maxRounds - day1Rounds) : Math.min(maxRounds, day1Rounds))
         : maxRounds;
     const dayRoundLabelOffset = isTwoDayFinale && day2StartRound && activeDay === 2 ? day1Rounds : 0;
+
+    // Finale suspense reveal: once a day's final round (round 3) has a
+    // validated table, that day's classement (individual + team) is hidden
+    // from spectators until the organizer explicitly publishes it.
+    const day1Round3Started = isTwoDayFinale && day1ScopedMatches.some(m => m.round === day1Rounds && m.isCompleted);
+    const day2Round3Started = isTwoDayFinale && !!day2StartRound && day2ScopedMatches.some(m => m.round === maxRounds && m.isCompleted);
+    const currentDayBlurred = isTwoDayFinale && (
+        activeDay === 1
+            ? day1Round3Started && !tournament.day1ResultsPublished
+            : day2Round3Started && !tournament.day2ResultsPublished
+    );
 
     // Swiss / elimination classement.
     const sortedParticipants = rankSwissPlayers(scopedMatches, scopedParticipants);
@@ -276,7 +287,15 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                 )}
 
                 {tournament.status !== "brouillon" && effectiveMainView === "classement" && (format === "swiss" || format === "elimination") && (
-                    <Card className="border-primary/20">
+                    <div className="relative">
+                        {currentDayBlurred && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 text-center px-4 bg-background/60 backdrop-blur-[2px] rounded-xl">
+                                <Lock className="w-6 h-6 text-orange-500" />
+                                <p className="font-prototype text-orange-500">Classement du Jour {activeDay} masqué</p>
+                                <p className="text-xs font-prototype text-muted-foreground">En attente de publication par l&apos;organisateur.</p>
+                            </div>
+                        )}
+                        <Card className={`border-primary/20 ${currentDayBlurred ? "blur-sm select-none pointer-events-none" : ""}`}>
                         <CardContent className="p-0">
                             <div className="divide-y divide-border">
                                 {sortedParticipants.map((p, index) => {
@@ -316,7 +335,8 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                                 })}
                             </div>
                         </CardContent>
-                    </Card>
+                        </Card>
+                    </div>
                 )}
 
                 {tournament.status !== "brouillon" && effectiveMainView === "classement" && format === "bracket" && (
@@ -365,19 +385,27 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
 
                 {tournament.status !== "brouillon" && effectiveMainView === "teams" && activeDay === 1 && (
                     <div className="space-y-2">
+                        {currentDayBlurred && (
+                            <div className="flex items-center gap-2 p-2.5 rounded-lg border border-orange-500/30 bg-orange-500/5 font-prototype text-sm text-orange-500">
+                                <Lock className="w-4 h-4 shrink-0" />
+                                Identités des équipes masquées en attente de publication du classement.
+                            </div>
+                        )}
                         {teamRows.length === 0 && (
                             <Card className="p-6 text-center">
                                 <p className="text-muted-foreground font-prototype">Aucune équipe pour l&apos;instant.</p>
                             </Card>
                         )}
                         {teamRows.map(({ team, members, totalScore }, index) => {
-                            const isExpanded = expandedTeamIds.has(team.id);
+                            const isExpanded = !currentDayBlurred && expandedTeamIds.has(team.id);
+                            const displayTag = currentDayBlurred ? "Wild" : team.tag;
+                            const displayName = currentDayBlurred ? "Team ???" : team.name;
                             return (
                                 <Card key={team.id} className="border-primary/20 overflow-hidden">
                                     <button
                                         type="button"
-                                        onClick={() => toggleTeamExpanded(team.id)}
-                                        className="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors text-left"
+                                        onClick={() => { if (!currentDayBlurred) toggleTeamExpanded(team.id); }}
+                                        className={`w-full px-3 py-2.5 flex items-center gap-3 transition-colors text-left ${currentDayBlurred ? "cursor-default" : "hover:bg-accent/30"}`}
                                     >
                                         <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                                             index === 0 ? "bg-yellow-500 text-black" :
@@ -386,23 +414,27 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                                         }`}>
                                             {index + 1}
                                         </span>
-                                        {TEAM_TAGS[team.tag] && (
-                                            <Image src={TEAM_TAGS[team.tag]} alt={team.tag} width={28} height={28} className="object-contain shrink-0" />
+                                        {TEAM_TAGS[displayTag] && (
+                                            <Image src={TEAM_TAGS[displayTag]} alt={displayTag} width={28} height={28} className="object-contain shrink-0" />
                                         )}
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-prototype truncate">{team.name}</p>
-                                            <p className="text-xs text-muted-foreground font-prototype">{members.length} joueur{members.length !== 1 ? "s" : ""}</p>
+                                            <p className="font-prototype truncate">{displayName}</p>
+                                            {!currentDayBlurred && (
+                                                <p className="text-xs text-muted-foreground font-prototype">{members.length} joueur{members.length !== 1 ? "s" : ""}</p>
+                                            )}
                                         </div>
                                         <span className="font-prototype text-base text-primary tabular-nums px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 shrink-0">
                                             {totalScore}<span className="text-xs text-muted-foreground ml-0.5">pts</span>
                                         </span>
-                                        <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                        {!currentDayBlurred && (
+                                            <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                        )}
                                     </button>
                                     {isExpanded && (
                                         <div className="divide-y divide-border border-t border-border bg-background/40">
                                             {members
                                                 .slice()
-                                                .sort((a, b) => (b.score || 0) - (a.score || 0))
+                                                .sort((a, b) => calculateSwissTotalPoints(teamScoreMatches, b.id) - calculateSwissTotalPoints(teamScoreMatches, a.id))
                                                 .map(p => (
                                                     <div key={p.id} className="pl-12 pr-3 py-2 flex items-center gap-3">
                                                         <span className={`font-prototype truncate text-sm ${p.dnf ? "line-through text-muted-foreground" : ""}`}>
@@ -411,7 +443,7 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                                                         {p.dnf && (
                                                             <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
                                                         )}
-                                                        <span className="ml-auto font-prototype text-sm text-muted-foreground tabular-nums shrink-0">{p.score || 0} pts</span>
+                                                        <span className="ml-auto font-prototype text-sm text-muted-foreground tabular-nums shrink-0">{calculateSwissTotalPoints(teamScoreMatches, p.id)} pts</span>
                                                     </div>
                                                 ))}
                                             {members.length === 0 && (
