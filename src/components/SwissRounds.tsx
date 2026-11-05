@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QRCodeModal } from "@/components/QRCodeModal";
 import { BoardSelectModal } from "@/components/BoardSelectModal";
-import { ChevronDown, ChevronRight, GripVertical, Map as MapIcon, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, GripVertical, Map as MapIcon, Pencil, Lock } from "lucide-react";
 
 interface SwissRoundsProps {
     matches: TableMatch[];
@@ -44,6 +44,12 @@ interface SwissRoundsProps {
     // label is shifted back by `roundLabelOffset` so Day 2 reads as its own
     // Ronde 1/2/3. Both default to 0 (every other caller is unaffected).
     roundLabelOffset?: number;
+    // Finale suspense reveal: absolute round numbers (e.g. the Day 1/Day 2
+    // final round) whose validated table results stay hidden from this
+    // viewer — seat order instead of ranked order, NT/placement replaced by
+    // a lock icon — until the organizer publishes. Admin callers simply
+    // omit this prop so they always see the real result.
+    hiddenResultRounds?: Set<number>;
 }
 
 // Category keys used to compute a player's raw NT total.
@@ -75,7 +81,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams, roundLabelOffset = 0 }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams, roundLabelOffset = 0, hiddenResultRounds }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1 + roundLabelOffset);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -233,6 +239,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
     );
 
     function renderMatchCard(match: TableMatch, round: number, isFinalist: boolean) {
+        const resultsHidden = match.isCompleted && !!hiddenResultRounds?.has(round);
         const displayLabel = match.tableLabel || `Table ${match.tableNumber}`;
         const playerCount = (match.participantIds || []).filter((id): id is string => id !== null).length;
         const scale = playerCount === 3 ? "3/2/1" : playerCount === 5 ? "5/3/2/1/0" : "5/3/2/1";
@@ -409,8 +416,10 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                             <div className="space-y-2">
                                 {(() => {
                                     const playerIds = (match.participantIds || []).filter((id): id is string => id !== null);
-                                    // Sort by ranking (1st to last) when completed
-                                    const sortedIds = match.isCompleted
+                                    // Sort by ranking (1st to last) when completed — unless the
+                                    // result is still hidden pending publish, in which case seat
+                                    // order is kept so the list doesn't itself reveal who won.
+                                    const sortedIds = match.isCompleted && !resultsHidden
                                         ? [...playerIds].sort((a, b) => (match.results[b] || 0) - (match.results[a] || 0))
                                         : playerIds;
 
@@ -428,7 +437,7 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                     return sortedIds.map((pId, i) => {
                                         const p = getParticipant(pId);
                                         let placement = "";
-                                        if (match.isCompleted && p) {
+                                        if (match.isCompleted && !resultsHidden && p) {
                                             const rank = sortedIds.indexOf(p.id) + 1;
                                             const suffixes = ["er", "ème", "ème", "ème", "ème"];
                                             placement = `${rank}${suffixes[rank - 1] || "ème"}`;
@@ -469,11 +478,17 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                                     <span className={`font-prototype ${p && qualifiedSet.has(p.id) ? "text-yellow-400" : ""}`}>{p ? playerDisplayName(p, usePseudo) : "Place vide"}</span>
                                                 </div>
                                                 <div className="flex items-center gap-3">
-                                                    {match.isCompleted && nt > 0 && (
-                                                        <span className="text-xs font-prototype text-muted-foreground whitespace-nowrap">{nt} NT</span>
-                                                    )}
-                                                    {match.isCompleted && p && (
-                                                        <span className="font-prototype text-primary whitespace-nowrap">{placement}</span>
+                                                    {resultsHidden ? (
+                                                        <Lock className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                                                    ) : (
+                                                        <>
+                                                            {match.isCompleted && nt > 0 && (
+                                                                <span className="text-xs font-prototype text-muted-foreground whitespace-nowrap">{nt} NT</span>
+                                                            )}
+                                                            {match.isCompleted && p && (
+                                                                <span className="font-prototype text-primary whitespace-nowrap">{placement}</span>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>

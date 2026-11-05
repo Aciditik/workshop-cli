@@ -107,6 +107,12 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
             ? day1Round3Started && !tournament.day1ResultsPublished
             : day2Round3Started && !tournament.day2ResultsPublished
     );
+    // Same suspense reveal, applied to the Rondes & Tables view: the
+    // currently displayed day's final-round tables stay hidden (seat order,
+    // no NT/placement) until that day is published.
+    const hiddenResultRounds = currentDayBlurred
+        ? new Set([activeDay === 1 ? day1Rounds : maxRounds])
+        : undefined;
 
     // Swiss / elimination classement.
     const sortedParticipants = rankSwissPlayers(scopedMatches, scopedParticipants);
@@ -281,6 +287,7 @@ export default function TournamentFollow({ params }: { params: Promise<{ tournam
                             qualifiedIds={isFinaleTournament ? undefined : tournament.qualifiedIds}
                             roundBoards={tournament.roundBoards}
                             usePseudo={showPseudos}
+                            hiddenResultRounds={hiddenResultRounds}
                             readOnly
                         />
                     </>
