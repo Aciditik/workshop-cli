@@ -15,7 +15,7 @@ import { TeamsStreamView, TeamStreamEntry } from "@/components/TeamsStreamView";
 import { TEAM_TAGS } from "@/lib/team-tags";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { canonicalCorporation, CORPORATION_PLACEHOLDER } from "@/lib/corporations";
-import { ListOrdered, Users, Lock } from "lucide-react";
+import { ListOrdered, Users, Lock, Search, Pin, X, ArrowUp, ArrowDown } from "lucide-react";
 import Image from "next/image";
 
 // Read-only broadcast view for the streamer account: large, self-explanatory
@@ -48,6 +48,19 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
     const [loading, setLoading] = useState(true);
     const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">(initialView);
     const [activeDayOverride, setActiveDayOverride] = useState<1 | 2 | null>(null);
+    // Cards: which round to show stats for (absolute round number). null =
+    // follow the latest round of the displayed day.
+    const [selectedRound, setSelectedRound] = useState<number | null>(null);
+    // Classement: search-to-scroll, pinned players (max 3), detail panel.
+    const [search, setSearch] = useState("");
+    const [pinnedPlayerIds, setPinnedPlayerIds] = useState<string[]>([]);
+    const [detailPid, setDetailPid] = useState<string | null>(null);
+    // Équipes: pinned teams (max 3), handled inside TeamsStreamView.
+    const [pinnedTeamIds, setPinnedTeamIds] = useState<string[]>([]);
+    const togglePinPlayer = (id: string) =>
+        setPinnedPlayerIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 3 ? [...prev, id] : prev);
+    const togglePinTeam = (id: string) =>
+        setPinnedTeamIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 3 ? [...prev, id] : prev);
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -112,14 +125,21 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
 
     // ─── Round stat cards ────────────────────────────────────────────────
     // "Current round" = the most recent round of the displayed day that has
-    // tables. If every table is validated it is shown as finished.
-    const absoluteCurrentRound = scopedMatches.reduce((max, m) => Math.max(max, m.round), 0);
-    const relCurrentRound = absoluteCurrentRound - dayRoundLabelOffset;
-    const roundBoard = absoluteCurrentRound > 0 ? tournament.roundBoards?.[absoluteCurrentRound] : undefined;
-    const currentRoundMatches = scopedMatches.filter((m) => m.round === absoluteCurrentRound);
+    // tables; the streamer can also step back to earlier rounds via the
+    // Ronde 1/2/3 switcher. If every table of the shown round is validated
+    // it is marked finished; otherwise the pending-table count is shown.
+    const availableRounds = [...new Set(scopedMatches.map((m) => m.round))].sort((a, b) => a - b);
+    const absoluteCurrentRound = availableRounds[availableRounds.length - 1] ?? 0;
+    const displayedRound = selectedRound !== null && availableRounds.includes(selectedRound)
+        ? selectedRound
+        : absoluteCurrentRound;
+    const relCurrentRound = displayedRound - dayRoundLabelOffset;
+    const roundBoard = displayedRound > 0 ? tournament.roundBoards?.[displayedRound] : undefined;
+    const currentRoundMatches = scopedMatches.filter((m) => m.round === displayedRound);
     const roundFinished = currentRoundMatches.length > 0 && currentRoundMatches.every((m) => m.isCompleted);
+    const pendingTables = currentRoundMatches.filter((m) => !m.isCompleted).length;
     // Cards never leak the suspense-gated final round.
-    const cardsHidden = isTwoDayFinale && !dayPublished && absoluteCurrentRound === dayFinalRound;
+    const cardsHidden = isTwoDayFinale && !dayPublished && displayedRound === dayFinalRound;
 
     interface RoundEntry { pid: string; total: number; points: number; corporation: string }
     const roundEntries: RoundEntry[] = currentRoundMatches
@@ -237,9 +257,83 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
     const maxAvg = Math.max(1, ...rows.map((r) => r.avg));
     const maxPts = Math.max(1, ...rows.map((r) => r.pts));
     // Top-32 cut line: Day 1 of a two-day finale only. Once Day 2 exists the
-    // actual qualifiers are known, so badge from day2ParticipantIds rather
+    // actual qualifiers are known, so the cut uses day2ParticipantIds rather
     // than rank alone (covers DNF/manual edits between the two days).
-    const showCutLine = isTwoDayFinale && activeDay === 1 && dayPublished;
+    const showCutLine = isTwoDayFinale && activeDay === 1 && dayPublished && rows.length > 32;
+    // Bubble watch: distance in points to the rank-32 score, shown on the
+    // rows around the cut where the Day-2 drama actually is.
+    const cutPts = showCutLine ? rows[31].pts : 0;
+    const isBubbleRank = (rank: number) => showCutLine && rank >= 28 && rank <= 36;
+
+    // Rank movement vs the previous round: recompute the same classement
+    // without the most recent scored round and diff the positions.
+    const roundsWithScores = [...new Set(scopedMatches.filter((m) => m.isCompleted).map((m) => m.round))].sort((a, b) => a - b);
+    const lastScoredRound = roundsWithScores[roundsWithScores.length - 1];
+    const prevRankMap = new Map<string, number>();
+    if (roundsWithScores.length >= 2) {
+        const prevMatches = scopedMatches.filter((m) => m.round !== lastScoredRound);
+        const prevRows = scopedParticipants.map((p) => {
+            const pts = calculateSwissTotalPoints(prevMatches, p.id);
+            const nt = calculateSwissNTScore(prevMatches, p.id);
+            const diff = calculateSwissTableDifference(prevMatches, p.id);
+            const games = prevMatches.filter((m) => m.isCompleted && m.scorecards?.[p.id]).length;
+            return { p, pts, nt, diff, games, avg: games > 0 ? nt / games : 0 };
+        });
+        prevRows.sort((a, b) => {
+            if (!!a.p.dnf !== !!b.p.dnf) return a.p.dnf ? 1 : -1;
+            if (b.pts !== a.pts) return b.pts - a.pts;
+            if (a.diff !== b.diff) return a.diff - b.diff;
+            return b.avg - a.avg;
+        });
+        prevRows.forEach((r, i) => prevRankMap.set(r.p.id, i + 1));
+    }
+
+    // Search-to-highlight: every matching row is tinted, the first one is
+    // scrolled into view from the input's onChange (DOM side effect, no
+    // state needed).
+    const searchQuery = search.trim().toLowerCase();
+    const searchHitIds = new Set(
+        searchQuery.length >= 2
+            ? rows.filter((r) => playerDisplayName(r.p, false).toLowerCase().includes(searchQuery)).map((r) => r.p.id)
+            : []
+    );
+    const firstSearchHitId = searchHitIds.size > 0 ? rows.find((r) => searchHitIds.has(r.p.id))?.p.id : null;
+    const handleSearchChange = (q: string) => {
+        setSearch(q);
+        const query = q.trim().toLowerCase();
+        if (query.length < 2) return;
+        const match = rows.find((r) => playerDisplayName(r.p, false).toLowerCase().includes(query));
+        if (match) {
+            requestAnimationFrame(() =>
+                document.getElementById(`stream-row-${match.p.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+            );
+        }
+    };
+
+    // Player detail panel: round-by-round breakdown for the clicked row.
+    const detailPlayer = detailPid ? participantById.get(detailPid) : undefined;
+    const detailRounds = detailPlayer
+        ? scopedMatches
+            .filter((m) => m.isCompleted && m.scorecards?.[detailPlayer.id])
+            .sort((a, b) => a.round - b.round)
+            .map((m) => ({
+                roundLabel: `Ronde ${m.round - dayRoundLabelOffset}`,
+                table: m.tableLabel || `Table ${m.tableNumber}`,
+                pts: m.results[detailPlayer.id] || 0,
+                nt: matchScoreTotal(m, detailPlayer.id),
+                corporation: m.scorecards![detailPlayer.id].corporation
+                    ? canonicalCorporation(m.scorecards![detailPlayer.id].corporation)
+                    : "",
+                mates: m.participantIds
+                    .filter((id): id is string => !!id && id !== detailPlayer.id)
+                    .map((id) => playerDisplayName(participantById.get(id), false)),
+            }))
+        : [];
+    const detailBest = detailRounds.reduce<(typeof detailRounds)[number] | null>(
+        (best, r) => (!best || r.pts > best.pts || (r.pts === best.pts && r.nt > best.nt) ? r : best), null
+    );
+    const detailTeam = detailPlayer?.teamId ? teamById.get(detailPlayer.teamId) : undefined;
+    const detailRank = detailPid ? rows.findIndex((r) => r.p.id === detailPid) + 1 : 0;
 
     const pill = (on: boolean) =>
         `px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-prototype transition-colors ${on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"}`;
@@ -316,15 +410,36 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                     <div className="space-y-8">
                         {/* ── Round stat cards ── */}
                         <section>
-                            <h2 className="text-lg sm:text-xl font-prototype mb-4">
-                                {absoluteCurrentRound > 0 ? (
-                                    <>Ronde {relCurrentRound}{roundBoard ? ` · ${roundBoard}` : ""}
-                                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                            {roundFinished ? "(ronde terminée)" : "(en direct)"}
-                                        </span>
-                                    </>
-                                ) : "En attente de la première ronde"}
-                            </h2>
+                            <div className="flex items-center gap-3 mb-4 flex-wrap">
+                                <h2 className="text-lg sm:text-xl font-prototype">
+                                    {displayedRound > 0 ? (
+                                        <>Ronde {relCurrentRound}{roundBoard ? ` · ${roundBoard}` : ""}
+                                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                                {roundFinished ? "(ronde terminée)" : "(en direct)"}
+                                            </span>
+                                        </>
+                                    ) : "En attente de la première ronde"}
+                                </h2>
+                                {availableRounds.length > 1 && (
+                                    <div className="flex items-center gap-1 bg-card/50 border border-border rounded-lg p-1">
+                                        {availableRounds.map((r) => (
+                                            <button
+                                                key={r}
+                                                type="button"
+                                                onClick={() => setSelectedRound(r === absoluteCurrentRound ? null : r)}
+                                                className={pill(r === displayedRound)}
+                                            >
+                                                R{r - dayRoundLabelOffset}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {!roundFinished && pendingTables > 0 && (
+                                    <span className="text-xs font-prototype text-orange-400 bg-orange-500/10 border border-orange-500/25 rounded-md px-2 py-1">
+                                        Scores en attente : {pendingTables} table{pendingTables > 1 ? "s" : ""}
+                                    </span>
+                                )}
+                            </div>
                             {cardsHidden && (
                                 <p className="flex items-center gap-2 text-xs text-muted-foreground font-prototype mb-3">
                                     <Lock className="w-3.5 h-3.5" /> Résultats masqués jusqu&apos;à publication par l&apos;organisateur.
@@ -361,21 +476,36 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                 {/* Corporation la plus choisie */}
                                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4">
                                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporation la plus choisie</p>
-                                    <p className="text-lg leading-tight font-prototype mt-2 truncate" title={topCorps.join(", ")}>
-                                        {!cardsHidden && topCorps.length > 0
-                                            ? `${topCorps.slice(0, 2).join(", ")}${topCorps.length > 2 ? ` +${topCorps.length - 2}` : ""}`
-                                            : "—"}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 min-h-[18px]">
-                                        {!cardsHidden && topCorps.length > 0 && (
-                                            <>
+                                    {!cardsHidden && topCorps.length === 1 ? (
+                                        <>
+                                            <p className="text-lg leading-tight font-prototype mt-2 truncate" title={topCorps[0]}>{topCorps[0]}</p>
+                                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 min-h-[18px]">
                                                 {CORPORATION_LOGOS[topCorps[0]] && (
                                                     <Image src={CORPORATION_LOGOS[topCorps[0]]} alt={topCorps[0]} width={16} height={16} />
                                                 )}
                                                 <span>choisie par {maxCorpCount} joueur{maxCorpCount > 1 ? "s" : ""}</span>
-                                            </>
-                                        )}
-                                    </p>
+                                            </p>
+                                        </>
+                                    ) : !cardsHidden && topCorps.length > 1 ? (
+                                        <>
+                                            <p className="text-lg leading-tight font-prototype mt-2" title={topCorps.join(", ")}>
+                                                {topCorps.length} corporations à égalité
+                                            </p>
+                                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 min-h-[18px]">
+                                                <span className="flex items-center -space-x-1.5 shrink-0">
+                                                    {topCorps.slice(0, 5).map((c) => CORPORATION_LOGOS[c] && (
+                                                        <Image key={c} src={CORPORATION_LOGOS[c]} alt={c} title={c} width={18} height={18} className="rounded-full ring-1 ring-[#16151a]" />
+                                                    ))}
+                                                </span>
+                                                <span>{maxCorpCount} joueurs chacune</span>
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-lg leading-tight font-prototype mt-2">—</p>
+                                            <p className="text-xs text-muted-foreground mt-1 min-h-[18px]" />
+                                        </>
+                                    )}
                                 </div>
                                 {/* Équipe la plus performante */}
                                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4">
@@ -399,9 +529,54 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
 
                         {/* ── Classement ── */}
                         <section>
-                            <h2 className="text-lg sm:text-xl font-prototype mb-4">
-                                Classement{isTwoDayFinale ? ` — Jour ${activeDay}` : ""}
-                            </h2>
+                            <div className="flex items-center gap-3 mb-4 flex-wrap">
+                                <h2 className="text-lg sm:text-xl font-prototype">
+                                    Classement{isTwoDayFinale ? ` — Jour ${activeDay}` : ""}
+                                </h2>
+                                {!currentDayBlurred && hasCompletedMatch && (
+                                    <div className="relative ml-auto">
+                                        <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                        <input
+                                            type="text"
+                                            value={search}
+                                            onChange={(e) => handleSearchChange(e.target.value)}
+                                            placeholder="Trouver un joueur..."
+                                            className="w-44 sm:w-56 h-8 rounded-md border border-input bg-card/60 pl-7 pr-7 text-xs font-prototype placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        />
+                                        {search && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSearch("")}
+                                                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-accent text-muted-foreground"
+                                                aria-label="Effacer la recherche"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                {pinnedPlayerIds.length > 0 && (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        {pinnedPlayerIds.map((id) => {
+                                            const p = participantById.get(id);
+                                            if (!p) return null;
+                                            return (
+                                                <button
+                                                    key={id}
+                                                    type="button"
+                                                    onClick={() => togglePinPlayer(id)}
+                                                    title="Désépingler"
+                                                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/15 border border-primary/30 text-primary text-[11px] font-prototype hover:bg-primary/25 transition-colors"
+                                                >
+                                                    <Pin className="w-3 h-3" />
+                                                    {playerDisplayName(p, false)}
+                                                    <X className="w-3 h-3 opacity-60" />
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                             {currentDayBlurred ? (
                                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-10 text-center">
                                     <Lock className="w-6 h-6 text-muted-foreground mx-auto mb-3" />
@@ -424,14 +599,26 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                                 <th className="px-3 py-3 text-center">Diff</th>
                                                 <th className="px-3 py-3 text-center">NT total</th>
                                                 <th className="px-3 py-3 text-center">Pts de ronde</th>
+                                                <th className="px-1 py-3 w-10"></th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {rows.map((r, i) => {
                                                 const rank = i + 1;
                                                 const team = r.p.teamId ? teamById.get(r.p.teamId) : undefined;
-                                                const qualified = showCutLine &&
-                                                    (day2ParticipantIdSet.size > 0 ? day2ParticipantIdSet.has(r.p.id) : rank <= 32);
+                                                const isPinned = pinnedPlayerIds.includes(r.p.id);
+                                                const isSearchHit = searchHitIds.has(r.p.id);
+                                                const isFirstHit = r.p.id === firstSearchHitId;
+                                                // Highlighted rows (pinned / search hits) need their sticky
+                                                // cells repainted in the same tint — they paint over the row.
+                                                const rowTint = isPinned || isFirstHit ? "bg-[#2a1f10]"
+                                                    : isSearchHit ? "bg-[#1d1812]" : "";
+                                                const stickyBg = isPinned || isFirstHit ? "bg-[#2a1f10]"
+                                                    : isSearchHit ? "bg-[#1d1812]" : "bg-[#16151a]";
+                                                const movement = prevRankMap.get(r.p.id);
+                                                const delta = movement !== undefined ? movement - rank : 0;
+                                                const gapAbove = i > 0 ? rows[i - 1].pts - r.pts : null;
+                                                const cutDist = isBubbleRank(rank) ? r.pts - cutPts : null;
                                                 const medal = rank === 1 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/40"
                                                     : rank === 2 ? "bg-gray-300/15 text-gray-300 border-gray-300/30"
                                                     : rank === 3 ? "bg-amber-700/20 text-amber-500 border-amber-700/40"
@@ -439,22 +626,29 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                                 const green = Math.min(1, r.pts / maxPts);
                                                 return (
                                                     <Fragment key={r.p.id}>
-                                                        <tr className={`border-t border-white/5 h-14 ${r.p.dnf ? "opacity-50" : ""}`}>
-                                                            <td className="px-3 py-2 text-center sticky left-0 bg-[#16151a] z-10">
-                                                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full border text-xs ${medal}`}>{rank}</span>
+                                                        <tr
+                                                            id={`stream-row-${r.p.id}`}
+                                                            onClick={() => setDetailPid(r.p.id)}
+                                                            className={`group border-t border-white/5 h-14 cursor-pointer transition-colors hover:bg-white/[0.03] ${r.p.dnf ? "opacity-50" : ""} ${rowTint} ${isPinned ? "border-l-2 border-l-primary" : ""}`}
+                                                        >
+                                                            <td className={`px-3 py-2 text-center sticky left-0 ${stickyBg} z-10`}>
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full border text-xs ${medal}`}>{rank}</span>
+                                                                    {delta !== 0 && (
+                                                                        <span className={`inline-flex items-center text-[9px] font-bold leading-none ${delta > 0 ? "text-green-400" : "text-red-400"}`}>
+                                                                            {delta > 0 ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />}
+                                                                            {Math.abs(delta)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </td>
-                                                            <td className="px-3 py-2 text-center sticky left-12 bg-[#16151a] z-10">
+                                                            <td className={`px-3 py-2 text-center sticky left-12 ${stickyBg} z-10`}>
                                                                 {team && TEAM_TAGS[team.tag] ? (
                                                                     <Image src={TEAM_TAGS[team.tag]} alt={team.name} title={team.name} width={24} height={24} className="inline-block" />
                                                                 ) : "—"}
                                                             </td>
-                                                            <td className="px-3 py-2 sticky left-24 bg-[#16151a] z-10 min-w-[160px]">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="truncate">{playerDisplayName(r.p, false)}{r.p.dnf ? " (DNF)" : ""}</span>
-                                                                    {qualified && (
-                                                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/25 uppercase tracking-wide shrink-0">Qualifié</span>
-                                                                    )}
-                                                                </div>
+                                                            <td className={`px-3 py-2 sticky left-24 ${stickyBg} z-10 min-w-[160px]`}>
+                                                                <span className="truncate">{playerDisplayName(r.p, false)}{r.p.dnf ? " (DNF)" : ""}</span>
                                                             </td>
                                                             <td className="px-3 py-2 text-center tabular-nums">{r.games}</td>
                                                             <td className="px-3 py-2 text-center tabular-nums">
@@ -468,22 +662,45 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                                             <td className="px-3 py-2 text-center tabular-nums">{r.diff}</td>
                                                             <td className="px-3 py-2 text-center tabular-nums">{r.nt}</td>
                                                             <td className="px-3 py-2 text-center">
-                                                                <span
-                                                                    className="inline-block px-2.5 py-1 rounded-md text-xs tabular-nums border"
-                                                                    style={{
-                                                                        backgroundColor: `rgba(34, 197, 94, ${0.08 + green * 0.35})`,
-                                                                        borderColor: `rgba(34, 197, 94, ${0.2 + green * 0.4})`,
-                                                                        color: green > 0.5 ? "#86efac" : "#a3a3a3",
-                                                                    }}
-                                                                >{r.pts}</span>
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span
+                                                                        className="inline-block px-2.5 py-1 rounded-md text-xs tabular-nums border"
+                                                                        style={{
+                                                                            backgroundColor: `rgba(34, 197, 94, ${0.08 + green * 0.35})`,
+                                                                            borderColor: `rgba(34, 197, 94, ${0.2 + green * 0.4})`,
+                                                                            color: green > 0.5 ? "#86efac" : "#a3a3a3",
+                                                                        }}
+                                                                    >{r.pts}</span>
+                                                                    {/* Gap to the player above — hover only, commentary fodder */}
+                                                                    {gapAbove !== null && (
+                                                                        <span className="text-[9px] text-muted-foreground leading-none opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            {gapAbove > 0 ? `-${gapAbove}` : "="} vs n°{i}
+                                                                        </span>
+                                                                    )}
+                                                                    {cutDist !== null && cutDist !== 0 && (
+                                                                        <span className={`text-[9px] leading-none ${cutDist > 0 ? "text-green-400" : "text-red-400"}`}>
+                                                                            cut {cutDist > 0 ? `+${cutDist}` : cutDist}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-1 py-2 text-center">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); togglePinPlayer(r.p.id); }}
+                                                                    title={isPinned ? "Désépingler" : "Épingler"}
+                                                                    className={`p-1.5 rounded-md transition-colors ${isPinned ? "text-primary" : "text-muted-foreground/40 hover:text-primary opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
+                                                                >
+                                                                    <Pin className="w-3.5 h-3.5" />
+                                                                </button>
                                                             </td>
                                                         </tr>
-                                                        {showCutLine && rows.length > 32 && rank === 32 && (
+                                                        {showCutLine && rank === 32 && (
                                                             <tr aria-hidden="true">
-                                                                <td colSpan={8} className="p-0">
+                                                                <td colSpan={9} className="p-0">
                                                                     <div className="border-t-2 border-dashed border-green-500/40 relative">
                                                                         <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#16151a] px-3 text-[10px] uppercase tracking-wider text-green-400 font-prototype whitespace-nowrap">
-                                                                            Top 32 — qualifiés pour le Jour 2
+                                                                            Top 32 → Jour 2
                                                                         </span>
                                                                     </div>
                                                                 </td>
@@ -508,9 +725,74 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                         initialRostersOpen={initialRostersOpen}
                         streamMode={streamMode}
                         rotateSeconds={rotateSeconds}
+                        pinnedIds={pinnedTeamIds}
+                        onTogglePin={togglePinTeam}
                     />
                 )}
             </div>
+
+            {/* Player detail side panel — click a classement row */}
+            {detailPlayer && (
+                <>
+                    <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setDetailPid(null)} />
+                    <aside className="fixed right-0 top-0 h-full w-full sm:w-96 bg-[#141318] border-l border-[#232229] z-50 overflow-y-auto p-5 space-y-5">
+                        <div className="flex items-start gap-3">
+                            {detailTeam && TEAM_TAGS[detailTeam.tag] && (
+                                <Image src={TEAM_TAGS[detailTeam.tag]} alt={detailTeam.name} width={32} height={32} className="shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-prototype text-lg truncate">{playerDisplayName(detailPlayer, false)}</h3>
+                                <p className="text-xs text-muted-foreground font-prototype">
+                                    {detailTeam ? `${detailTeam.name} · ` : ""}n°{detailRank} au classement
+                                    {detailPlayer.dnf ? " · DNF" : ""}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setDetailPid(null)}
+                                className="p-1.5 rounded-md hover:bg-accent text-muted-foreground shrink-0"
+                                aria-label="Fermer"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {detailBest && (
+                            <div className="rounded-md border border-[#e8743b]/30 bg-[#e8743b]/10 px-3 py-2 text-xs font-prototype text-[#e8743b]">
+                                Meilleure ronde : {detailBest.roundLabel} — {detailBest.pts} pts, {detailBest.nt} NT
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            {detailRounds.length === 0 && (
+                                <p className="text-sm text-muted-foreground font-prototype">Aucune ronde validée pour l&apos;instant.</p>
+                            )}
+                            {detailRounds.map((r, i) => (
+                                <div key={i} className="rounded-md border border-[#232229] bg-[#16151a] p-3 space-y-1.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="font-prototype text-sm">{r.roundLabel} <span className="text-muted-foreground">· {r.table}</span></p>
+                                        <span className="font-prototype text-sm text-[#e8743b] shrink-0">{r.pts} pts</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-prototype">
+                                        <span>{r.nt} NT</span>
+                                        {r.corporation && CORPORATION_LOGOS[r.corporation] && (
+                                            <span className="inline-flex items-center gap-1">
+                                                <Image src={CORPORATION_LOGOS[r.corporation]} alt={r.corporation} width={14} height={14} />
+                                                {r.corporation}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {r.mates.length > 0 && (
+                                        <p className="text-[11px] text-muted-foreground font-prototype truncate" title={r.mates.join(", ")}>
+                                            vs {r.mates.join(", ")}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </aside>
+                </>
+            )}
         </div>
     );
 }
