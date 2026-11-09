@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useEffect, useState, Fragment } from "react";
+import { use, useEffect, useState, Suspense, Fragment } from "react";
+import { useSearchParams } from "next/navigation";
 import { Tournament, Team } from "@/lib/types";
 import { playerDisplayName } from "@/lib/playerName";
 import {
@@ -10,30 +11,43 @@ import {
     calculateSwissTableDifference,
 } from "@/lib/qualifier-rules";
 import { SwissRounds } from "@/components/SwissRounds";
+import { TeamsStreamView, TeamStreamEntry } from "@/components/TeamsStreamView";
 import { TEAM_TAGS } from "@/lib/team-tags";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { canonicalCorporation, CORPORATION_PLACEHOLDER } from "@/lib/corporations";
-import { ListOrdered, Users, Lock, Tv, ChevronDown } from "lucide-react";
+import { ListOrdered, Users, Lock } from "lucide-react";
 import Image from "next/image";
 
 // Read-only broadcast view for the streamer account: large, self-explanatory
 // numbers for the finale. Same suspense rules as the spectator view — a day's
 // final round stays hidden (cards "—", classement empty) until the organizer
 // publishes it.
-export default function TournamentStream({ params }: { params: Promise<{ tournamentId: string }> }) {
+export default function TournamentStreamPage({ params }: { params: Promise<{ tournamentId: string }> }) {
+    return (
+        <Suspense fallback={<div className="p-8 text-center animate-pulse font-prototype">Chargement du tournoi...</div>}>
+            <TournamentStream params={params} />
+        </Suspense>
+    );
+}
+
+function TournamentStream({ params }: { params: Promise<{ tournamentId: string }> }) {
     const { tournamentId } = use(params);
+    const searchParams = useSearchParams();
+    // ?stream=1 strips navigation chrome for an OBS scene; ?view=... picks the
+    // initial tab (useful combined with ?stream=1 for a dedicated scene);
+    // ?rosters=1 opens the Équipes view with every card already flipped;
+    // ?rotate=N auto-pages the team grid every N seconds in stream mode.
+    const streamMode = searchParams.get("stream") === "1";
+    const initialRostersOpen = searchParams.get("rosters") === "1";
+    const rotateParam = parseInt(searchParams.get("rotate") || "", 10);
+    const rotateSeconds = Number.isFinite(rotateParam) && rotateParam > 0 ? rotateParam : undefined;
+    const viewParam = searchParams.get("view");
+    const initialView = viewParam === "rounds" || viewParam === "teams" || viewParam === "classement" ? viewParam : "classement";
+
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
-    const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">("classement");
+    const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">(initialView);
     const [activeDayOverride, setActiveDayOverride] = useState<1 | 2 | null>(null);
-    const [expandedTeamIds, setExpandedTeamIds] = useState<Set<string>>(new Set());
-    const toggleTeamExpanded = (teamId: string) => {
-        setExpandedTeamIds(prev => {
-            const next = new Set(prev);
-            if (next.has(teamId)) next.delete(teamId); else next.add(teamId);
-            return next;
-        });
-    };
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -158,6 +172,7 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
     // matches (Day 2 participants have their score reset), tie-broken by
     // summed table-diff then summed NT. Day 1 only.
     const teamScoreMatches = isTwoDayFinale && day2StartRound ? day1ScopedMatches : scopedMatches;
+    const hasTeamScores = teamScoreMatches.some((m) => m.isCompleted);
     const teamRows = teams
         .map((team) => {
             const members = tournament.participants.filter((p) => p.teamId === team.id);
@@ -167,6 +182,42 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
             return { team, members, totalScore, totalDiff, totalNT };
         })
         .sort((a, b) => b.totalScore - a.totalScore || a.totalDiff - b.totalDiff || b.totalNT - a.totalNT);
+    // Standard competition ranking (1, 2, 2, 4 ...) — tied teams share a rank
+    // instead of being arbitrarily split by the tie-break fields above, which
+    // only decide display order, not the rank *number* shown on the card.
+    let lastRank = 0;
+    let lastRankScore: number | null = null;
+    const teamEntries: TeamStreamEntry[] = teamRows.map(({ team, members, totalScore }, idx) => {
+        if (lastRankScore === null || totalScore !== lastRankScore) {
+            lastRank = idx + 1;
+            lastRankScore = totalScore;
+        }
+        const displayName = currentDayBlurred ? "Team ???" : team.name;
+        const displayTag = currentDayBlurred ? "Wild" : team.tag;
+        const players = members
+            .map((p) => {
+                const games = teamScoreMatches.filter((m) => m.isCompleted && m.scorecards?.[p.id]).length;
+                return {
+                    id: p.id,
+                    name: playerDisplayName(p, false),
+                    points: games > 0 ? calculateSwissTotalPoints(teamScoreMatches, p.id) : null,
+                    dnf: !!p.dnf,
+                };
+            })
+            .sort((a, b) => (b.points ?? -Infinity) - (a.points ?? -Infinity));
+        return {
+            id: team.id,
+            name: displayName,
+            tag: displayTag,
+            points: hasTeamScores ? totalScore : null,
+            rank: lastRank,
+            players,
+        };
+    });
+    const day1CurrentRound = day1ScopedMatches.reduce((max, m) => Math.max(max, m.round), 0);
+    const teamsRoundLabel = day1CurrentRound > 0
+        ? `Mis à jour après la ronde ${day1CurrentRound}`
+        : "En attente de la première ronde";
 
     // ─── Classement ──────────────────────────────────────────────────────
     const rows = scopedParticipants.map((p) => {
@@ -196,48 +247,46 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
     return (
         <div className="min-h-screen bg-background">
             <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-                {/* Header */}
-                <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="flex items-center gap-3">
-                        <Tv className="w-5 h-5 text-primary" />
-                        <span className="text-[11px] font-prototype uppercase tracking-widest text-muted-foreground">Vue streamer</span>
-                    </div>
-                    {tournament.logoUrl && (
-                        <img src={tournament.logoUrl} alt="" className="w-20 h-20 object-contain" />
-                    )}
-                    <h1 className="text-2xl sm:text-4xl font-prototype tracking-tight">{tournament.name}</h1>
-                    <div className="flex items-center gap-2 flex-wrap justify-center">
-                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-prototype ${tournament.status === "fini"
-                            ? "bg-green-500/10 text-green-500 border border-green-500/20"
-                            : tournament.status === "en_cours"
-                                ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
-                                : "bg-orange-500/10 text-orange-500 border border-orange-500/20"}`}>
-                            {tournament.status === "fini" ? "FINI" : tournament.status === "en_cours" ? "EN COURS" : "BROUILLON"}
-                        </span>
-                        <span className="text-xs text-muted-foreground font-prototype">
-                            {new Date(tournament.eventDate).toLocaleDateString()} · {tournament.participants.length} joueurs
-                        </span>
-                    </div>
-                    {isTwoDayFinale && day2StartRound && (
-                        <div className="flex items-center gap-1 bg-card/50 border border-border rounded-lg p-1">
-                            <button type="button" onClick={() => setActiveDayOverride(1)} className={pill(activeDay === 1)}>Jour 1</button>
-                            <button type="button" onClick={() => setActiveDayOverride(2)} className={pill(activeDay === 2)}>Jour 2</button>
-                        </div>
-                    )}
-                    <div className="flex items-center gap-1 bg-card/50 border border-border rounded-lg p-1">
-                        <button type="button" onClick={() => setMainView("classement")} className={pill(effectiveMainView === "classement")}>
-                            <ListOrdered className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Classement
-                        </button>
-                        <button type="button" onClick={() => setMainView("rounds")} className={pill(effectiveMainView === "rounds")}>
-                            <Users className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Rondes &amp; Tables
-                        </button>
-                        {teams.length > 0 && activeDay === 1 && (
-                            <button type="button" onClick={() => setMainView("teams")} className={pill(effectiveMainView === "teams")}>
-                                <Users className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Équipes
-                            </button>
+                {/* Header — hidden entirely in ?stream=1 scenes (no nav chrome) */}
+                {!streamMode && (
+                    <div className="flex flex-col items-center gap-3 text-center">
+                        {tournament.logoUrl && (
+                            <img src={tournament.logoUrl} alt="" className="w-20 h-20 object-contain" />
                         )}
+                        <h1 className="text-2xl sm:text-4xl font-prototype tracking-tight">{tournament.name}</h1>
+                        <div className="flex items-center gap-2 flex-wrap justify-center">
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-prototype ${tournament.status === "fini"
+                                ? "bg-green-500/10 text-green-500 border border-green-500/20"
+                                : tournament.status === "en_cours"
+                                    ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                                    : "bg-orange-500/10 text-orange-500 border border-orange-500/20"}`}>
+                                {tournament.status === "fini" ? "FINI" : tournament.status === "en_cours" ? "EN COURS" : "BROUILLON"}
+                            </span>
+                            <span className="text-xs text-muted-foreground font-prototype">
+                                {new Date(tournament.eventDate).toLocaleDateString()} · {tournament.participants.length} joueurs
+                            </span>
+                        </div>
+                        {isTwoDayFinale && day2StartRound && (
+                            <div className="flex items-center gap-1 bg-card/50 border border-border rounded-lg p-1">
+                                <button type="button" onClick={() => setActiveDayOverride(1)} className={pill(activeDay === 1)}>Jour 1</button>
+                                <button type="button" onClick={() => setActiveDayOverride(2)} className={pill(activeDay === 2)}>Jour 2</button>
+                            </div>
+                        )}
+                        <div className="flex items-center gap-1 bg-card/50 border border-border rounded-lg p-1">
+                            <button type="button" onClick={() => setMainView("classement")} className={pill(effectiveMainView === "classement")}>
+                                <ListOrdered className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Classement
+                            </button>
+                            <button type="button" onClick={() => setMainView("rounds")} className={pill(effectiveMainView === "rounds")}>
+                                <Users className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Rondes &amp; Tables
+                            </button>
+                            {teams.length > 0 && activeDay === 1 && (
+                                <button type="button" onClick={() => setMainView("teams")} className={pill(effectiveMainView === "teams")}>
+                                    <Users className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Équipes
+                                </button>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {effectiveMainView === "rounds" && (
                     <SwissRounds
@@ -446,81 +495,14 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
                 )}
 
                 {effectiveMainView === "teams" && activeDay === 1 && (
-                    <section>
-                        <h2 className="text-lg sm:text-xl font-prototype mb-4">Classement Équipes — Jour 1</h2>
-                        {currentDayBlurred && (
-                            <p className="flex items-center gap-2 text-xs text-muted-foreground font-prototype mb-3">
-                                <Lock className="w-3.5 h-3.5" /> Identités des équipes masquées en attente de publication.
-                            </p>
-                        )}
-                        <div className="space-y-3">
-                            {teamRows.length === 0 && (
-                                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-10 text-center">
-                                    <p className="text-muted-foreground font-prototype">Aucune équipe pour l&apos;instant.</p>
-                                </div>
-                            )}
-                            {teamRows.map(({ team, members, totalScore }, index) => {
-                                const isExpanded = !currentDayBlurred && expandedTeamIds.has(team.id);
-                                const displayTag = currentDayBlurred ? "Wild" : team.tag;
-                                const displayName = currentDayBlurred ? "Team ???" : team.name;
-                                const medal = index === 0 ? "bg-yellow-500 text-black"
-                                    : index === 1 ? "bg-slate-300 text-black"
-                                    : index === 2 ? "bg-amber-600 text-black"
-                                    : "bg-muted text-muted-foreground";
-                                return (
-                                    <div key={team.id} className="rounded-[10px] border border-[#26252c] bg-[#16151a] overflow-hidden">
-                                        <button
-                                            type="button"
-                                            onClick={() => { if (!currentDayBlurred) toggleTeamExpanded(team.id); }}
-                                            className={`w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors ${currentDayBlurred ? "cursor-default" : "hover:bg-white/[0.03]"}`}
-                                        >
-                                            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${medal}`}>
-                                                {index + 1}
-                                            </span>
-                                            {TEAM_TAGS[displayTag] && (
-                                                <Image src={TEAM_TAGS[displayTag]} alt={displayTag} width={32} height={32} className="object-contain shrink-0" />
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-prototype truncate text-base">{displayName}</p>
-                                                {!currentDayBlurred && (
-                                                    <p className="text-xs text-muted-foreground font-prototype">{members.length} joueur{members.length !== 1 ? "s" : ""}</p>
-                                                )}
-                                            </div>
-                                            <span className="font-prototype text-lg text-primary tabular-nums px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 shrink-0">
-                                                {totalScore}<span className="text-xs text-muted-foreground ml-1">pts</span>
-                                            </span>
-                                            {!currentDayBlurred && (
-                                                <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                                            )}
-                                        </button>
-                                        {isExpanded && (
-                                            <div className="divide-y divide-white/5 border-t border-white/5">
-                                                {members
-                                                    .slice()
-                                                    .sort((a, b) => calculateSwissTotalPoints(teamScoreMatches, b.id) - calculateSwissTotalPoints(teamScoreMatches, a.id))
-                                                    .map((p) => (
-                                                        <div key={p.id} className="pl-14 pr-4 py-2.5 flex items-center gap-3">
-                                                            <span className={`font-prototype truncate text-sm ${p.dnf ? "line-through text-muted-foreground" : ""}`}>
-                                                                {playerDisplayName(p, false)}
-                                                            </span>
-                                                            {p.dnf && (
-                                                                <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
-                                                            )}
-                                                            <span className="ml-auto font-prototype text-sm text-muted-foreground tabular-nums shrink-0">
-                                                                {calculateSwissTotalPoints(teamScoreMatches, p.id)} pts
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                {members.length === 0 && (
-                                                    <p className="pl-14 pr-4 py-2.5 text-sm text-muted-foreground font-prototype">Aucun joueur assigné.</p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </section>
+                    <TeamsStreamView
+                        teams={teamEntries}
+                        blurred={currentDayBlurred}
+                        roundLabel={teamsRoundLabel}
+                        initialRostersOpen={initialRostersOpen}
+                        streamMode={streamMode}
+                        rotateSeconds={rotateSeconds}
+                    />
                 )}
             </div>
         </div>
