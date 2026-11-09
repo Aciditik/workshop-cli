@@ -13,7 +13,7 @@ import { SwissRounds } from "@/components/SwissRounds";
 import { TEAM_TAGS } from "@/lib/team-tags";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { canonicalCorporation, CORPORATION_PLACEHOLDER } from "@/lib/corporations";
-import { ListOrdered, Users, Lock, Tv } from "lucide-react";
+import { ListOrdered, Users, Lock, Tv, ChevronDown } from "lucide-react";
 import Image from "next/image";
 
 // Read-only broadcast view for the streamer account: large, self-explanatory
@@ -24,8 +24,16 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
     const { tournamentId } = use(params);
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
-    const [mainView, setMainView] = useState<"rounds" | "classement">("classement");
+    const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">("classement");
     const [activeDayOverride, setActiveDayOverride] = useState<1 | 2 | null>(null);
+    const [expandedTeamIds, setExpandedTeamIds] = useState<Set<string>>(new Set());
+    const toggleTeamExpanded = (teamId: string) => {
+        setExpandedTeamIds(prev => {
+            const next = new Set(prev);
+            if (next.has(teamId)) next.delete(teamId); else next.add(teamId);
+            return next;
+        });
+    };
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -84,6 +92,9 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
     const currentDayBlurred = isTwoDayFinale && !dayPublished &&
         scopedMatches.some((m) => m.round === dayFinalRound && m.isCompleted);
     const hiddenResultRounds = currentDayBlurred ? new Set([dayFinalRound]) : undefined;
+    // Équipes is a Day 1-only view: while Day 2 is active, fall back to the
+    // classement instead of leaving a tab selected with no content.
+    const effectiveMainView = mainView === "teams" && activeDay === 2 ? "classement" : mainView;
 
     // ─── Round stat cards ────────────────────────────────────────────────
     // "Current round" = the most recent round of the displayed day that has
@@ -142,6 +153,21 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
         (best, t) => (t.total > 0 && (!best || t.total > best.total) ? t : best), null
     );
 
+    // ─── Équipes classement ──────────────────────────────────────────────
+    // Same rule as the spectator view: totals come from the Day-1-scoped
+    // matches (Day 2 participants have their score reset), tie-broken by
+    // summed table-diff then summed NT. Day 1 only.
+    const teamScoreMatches = isTwoDayFinale && day2StartRound ? day1ScopedMatches : scopedMatches;
+    const teamRows = teams
+        .map((team) => {
+            const members = tournament.participants.filter((p) => p.teamId === team.id);
+            const totalScore = members.reduce((sum, p) => sum + calculateSwissTotalPoints(teamScoreMatches, p.id), 0);
+            const totalDiff = members.reduce((sum, p) => sum + calculateSwissTableDifference(teamScoreMatches, p.id), 0);
+            const totalNT = members.reduce((sum, p) => sum + calculateSwissNTScore(teamScoreMatches, p.id), 0);
+            return { team, members, totalScore, totalDiff, totalNT };
+        })
+        .sort((a, b) => b.totalScore - a.totalScore || a.totalDiff - b.totalDiff || b.totalNT - a.totalNT);
+
     // ─── Classement ──────────────────────────────────────────────────────
     const rows = scopedParticipants.map((p) => {
         const pts = calculateSwissTotalPoints(scopedMatches, p.id);
@@ -156,6 +182,7 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
         if (a.diff !== b.diff) return a.diff - b.diff;
         return b.avg - a.avg;
     });
+    const hasCompletedMatch = scopedMatches.some((m) => m.isCompleted);
     const maxAvg = Math.max(1, ...rows.map((r) => r.avg));
     const maxPts = Math.max(1, ...rows.map((r) => r.pts));
     // Top-32 cut line: Day 1 of a two-day finale only. Once Day 2 exists the
@@ -198,16 +225,21 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
                         </div>
                     )}
                     <div className="flex items-center gap-1 bg-card/50 border border-border rounded-lg p-1">
-                        <button type="button" onClick={() => setMainView("classement")} className={pill(mainView === "classement")}>
+                        <button type="button" onClick={() => setMainView("classement")} className={pill(effectiveMainView === "classement")}>
                             <ListOrdered className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Classement
                         </button>
-                        <button type="button" onClick={() => setMainView("rounds")} className={pill(mainView === "rounds")}>
+                        <button type="button" onClick={() => setMainView("rounds")} className={pill(effectiveMainView === "rounds")}>
                             <Users className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Rondes &amp; Tables
                         </button>
+                        {teams.length > 0 && activeDay === 1 && (
+                            <button type="button" onClick={() => setMainView("teams")} className={pill(effectiveMainView === "teams")}>
+                                <Users className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Équipes
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                {mainView === "rounds" && (
+                {effectiveMainView === "rounds" && (
                     <SwissRounds
                         matches={scopedMatches}
                         participants={scopedParticipants}
@@ -225,7 +257,7 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
                     />
                 )}
 
-                {mainView === "classement" && (
+                {effectiveMainView === "classement" && (
                     <div className="space-y-8">
                         {/* ── Round stat cards ── */}
                         <section>
@@ -315,10 +347,14 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
                             <h2 className="text-lg sm:text-xl font-prototype mb-4">
                                 Classement{isTwoDayFinale ? ` — Jour ${activeDay}` : ""}
                             </h2>
-                            {isTwoDayFinale && !dayPublished ? (
+                            {currentDayBlurred ? (
                                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-10 text-center">
                                     <Lock className="w-6 h-6 text-muted-foreground mx-auto mb-3" />
-                                    <p className="text-muted-foreground font-prototype">Classement disponible à la fin du Jour {activeDay}.</p>
+                                    <p className="text-muted-foreground font-prototype">Classement du Jour {activeDay} masqué — en attente de publication par l&apos;organisateur.</p>
+                                </div>
+                            ) : !hasCompletedMatch ? (
+                                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-10 text-center">
+                                    <p className="text-muted-foreground font-prototype">Classement disponible à la fin de la première ronde.</p>
                                 </div>
                             ) : (
                                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] overflow-x-auto">
@@ -407,6 +443,84 @@ export default function TournamentStream({ params }: { params: Promise<{ tournam
                             )}
                         </section>
                     </div>
+                )}
+
+                {effectiveMainView === "teams" && activeDay === 1 && (
+                    <section>
+                        <h2 className="text-lg sm:text-xl font-prototype mb-4">Classement Équipes — Jour 1</h2>
+                        {currentDayBlurred && (
+                            <p className="flex items-center gap-2 text-xs text-muted-foreground font-prototype mb-3">
+                                <Lock className="w-3.5 h-3.5" /> Identités des équipes masquées en attente de publication.
+                            </p>
+                        )}
+                        <div className="space-y-3">
+                            {teamRows.length === 0 && (
+                                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-10 text-center">
+                                    <p className="text-muted-foreground font-prototype">Aucune équipe pour l&apos;instant.</p>
+                                </div>
+                            )}
+                            {teamRows.map(({ team, members, totalScore }, index) => {
+                                const isExpanded = !currentDayBlurred && expandedTeamIds.has(team.id);
+                                const displayTag = currentDayBlurred ? "Wild" : team.tag;
+                                const displayName = currentDayBlurred ? "Team ???" : team.name;
+                                const medal = index === 0 ? "bg-yellow-500 text-black"
+                                    : index === 1 ? "bg-slate-300 text-black"
+                                    : index === 2 ? "bg-amber-600 text-black"
+                                    : "bg-muted text-muted-foreground";
+                                return (
+                                    <div key={team.id} className="rounded-[10px] border border-[#26252c] bg-[#16151a] overflow-hidden">
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (!currentDayBlurred) toggleTeamExpanded(team.id); }}
+                                            className={`w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors ${currentDayBlurred ? "cursor-default" : "hover:bg-white/[0.03]"}`}
+                                        >
+                                            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${medal}`}>
+                                                {index + 1}
+                                            </span>
+                                            {TEAM_TAGS[displayTag] && (
+                                                <Image src={TEAM_TAGS[displayTag]} alt={displayTag} width={32} height={32} className="object-contain shrink-0" />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-prototype truncate text-base">{displayName}</p>
+                                                {!currentDayBlurred && (
+                                                    <p className="text-xs text-muted-foreground font-prototype">{members.length} joueur{members.length !== 1 ? "s" : ""}</p>
+                                                )}
+                                            </div>
+                                            <span className="font-prototype text-lg text-primary tabular-nums px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 shrink-0">
+                                                {totalScore}<span className="text-xs text-muted-foreground ml-1">pts</span>
+                                            </span>
+                                            {!currentDayBlurred && (
+                                                <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                                            )}
+                                        </button>
+                                        {isExpanded && (
+                                            <div className="divide-y divide-white/5 border-t border-white/5">
+                                                {members
+                                                    .slice()
+                                                    .sort((a, b) => calculateSwissTotalPoints(teamScoreMatches, b.id) - calculateSwissTotalPoints(teamScoreMatches, a.id))
+                                                    .map((p) => (
+                                                        <div key={p.id} className="pl-14 pr-4 py-2.5 flex items-center gap-3">
+                                                            <span className={`font-prototype truncate text-sm ${p.dnf ? "line-through text-muted-foreground" : ""}`}>
+                                                                {playerDisplayName(p, false)}
+                                                            </span>
+                                                            {p.dnf && (
+                                                                <span className="text-[10px] font-prototype px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500 border border-orange-500/30 shrink-0">DNF</span>
+                                                            )}
+                                                            <span className="ml-auto font-prototype text-sm text-muted-foreground tabular-nums shrink-0">
+                                                                {calculateSwissTotalPoints(teamScoreMatches, p.id)} pts
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                {members.length === 0 && (
+                                                    <p className="pl-14 pr-4 py-2.5 text-sm text-muted-foreground font-prototype">Aucun joueur assigné.</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
                 )}
             </div>
         </div>
