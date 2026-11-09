@@ -25,14 +25,16 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
   const isGuest = user?.role === "guest";
+  const isStreamer = user?.role === "streamer";
 
-  // Guest home: the authenticated /api/tournaments list is ownership-filtered
-  // (and guests have no JWT anyway), so browse via the public stats metadata
-  // endpoint instead — read-only links to the public /t/* pages.
+  // Guest/streamer home: the authenticated /api/tournaments list is
+  // ownership-filtered (and guests have no JWT anyway), so browse via the
+  // public stats metadata endpoint instead — read-only links to the public
+  // /t/* pages.
   const [publicTournaments, setPublicTournaments] = useState<PublicTournamentItem[]>([]);
   const [publicLoaded, setPublicLoaded] = useState(false);
   useEffect(() => {
-    if (!isGuest) return;
+    if (!isGuest && !isStreamer) return;
     let cancelled = false;
     fetch(`${getApiUrl()}/api/public/stats?meta=1`)
       .then((res) => res.json())
@@ -40,7 +42,7 @@ export default function Dashboard() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setPublicLoaded(true); });
     return () => { cancelled = true; };
-  }, [isGuest]);
+  }, [isGuest, isStreamer]);
 
   // Finale tournaments always pinned first; the rest sorted by event date (newest first).
   const sortByDate = <T extends { name: string; eventDate: string }>(list: T[]) =>
@@ -53,7 +55,7 @@ export default function Dashboard() {
   const sortedTournaments = sortByDate(tournaments);
   const sortedPublic = sortByDate(publicTournaments);
 
-  const effectiveLoaded = isGuest ? publicLoaded : isLoaded;
+  const effectiveLoaded = (isGuest || isStreamer) ? publicLoaded : isLoaded;
 
   if (!effectiveLoaded) {
     return (
@@ -61,6 +63,74 @@ export default function Dashboard() {
         <div className="animate-pulse flex flex-col items-center gap-4">
           <Trophy className="w-12 h-12 text-primary opacity-50" />
           <p className="text-muted-foreground font-prototype">Chargement des tournois...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Streamer home — broadcast-only account: sees live Finale tournaments and
+  // nothing else. Cards open the dedicated stream view (/t/.../stream).
+  if (isStreamer) {
+    const liveFinales = sortedPublic.filter(
+      (t) => t.status === "en_cours" && isFinaleTournament(t.name)
+    );
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center py-10 px-4">
+        <div className="w-full max-w-lg space-y-8">
+          <div className="text-center space-y-2">
+            <div className="flex items-center justify-center gap-4">
+              <div className="w-16 h-16 relative">
+                <Image
+                  src="/cdf-logo.png"
+                  alt="CdF Logo"
+                  width={64}
+                  height={64}
+                  className="object-contain"
+                />
+              </div>
+            </div>
+            <h1 className="text-3xl font-prototype tracking-tight">Espace Streamer</h1>
+            <p className="text-muted-foreground font-prototype">Vue broadcast des finales en cours.</p>
+            <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+              <button
+                type="button"
+                onClick={logout}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card/50 hover:bg-accent/50 text-sm font-prototype text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Quitter
+              </button>
+            </div>
+          </div>
+
+          {liveFinales.length === 0 ? (
+            <Card className="p-6 text-center">
+              <p className="text-muted-foreground font-prototype">Aucune finale en cours pour le moment.</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {liveFinales.map((tournament) => (
+                <Link key={tournament.id} href={`/t/${tournament.id}/stream`}>
+                  <Card className="p-4 flex items-center gap-4 hover:border-primary/50 transition-colors cursor-pointer border-yellow-500/40">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Trophy className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-prototype truncate">{tournament.name}</h3>
+                      <p className="text-xs text-muted-foreground font-prototype">
+                        {new Date(tournament.eventDate).toLocaleDateString()}
+                        {tournament.ownerName ? ` · ${tournament.ownerName}` : ""}
+                      </p>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-prototype shrink-0 bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                      EN COURS
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );

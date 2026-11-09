@@ -10,7 +10,7 @@ export interface User {
   email: string;
   name: string;
   city?: string;
-  role: "organizer" | "admin" | "guest";
+  role: "organizer" | "admin" | "guest" | "streamer";
 }
 
 interface AuthContextType {
@@ -19,7 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginAsGuest: (redirectTo?: string) => void;
-  createOrganizer: (email: string, password: string, name: string, city?: string) => Promise<void>;
+  createOrganizer: (email: string, password: string, name: string, city?: string, role?: "organizer" | "streamer") => Promise<void>;
   logout: () => void;
 }
 
@@ -92,15 +92,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push(redirectTo ?? "/stats");
   };
 
-  // Admin-only: creates an organizer account without switching the current session.
-  const createOrganizer = async (email: string, password: string, name: string, city?: string) => {
+  // Admin-only: creates an account (organizer by default, or streamer)
+  // without switching the current session.
+  const createOrganizer = async (email: string, password: string, name: string, city?: string, role?: "organizer" | "streamer") => {
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ email, password, name, city }),
+      body: JSON.stringify({ email, password, name, city, role }),
     });
 
     if (!res.ok) {

@@ -39,6 +39,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     ) {
       router.push("/stats");
     }
+    // Streamer accounts are read-only broadcast viewers: their world is the
+    // dashboard (live Finales only) and the public /t/* pages — nothing else.
+    if (
+      !isLoading &&
+      user?.role === "streamer" &&
+      pathname !== "/" &&
+      !pathname.startsWith("/t/") &&
+      pathname !== "/login"
+    ) {
+      router.push("/");
+    }
   }, [isLoading, user, pathname, router]);
 
   // Public pages (login, public tournament view /t/..., chrono standalone window)
@@ -49,7 +60,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     pathname === "/login" ||
     pathname.startsWith("/t/") ||
     pathname === "/chrono" ||
-    (pathname === "/" && user?.role === "guest")
+    (pathname === "/" && (user?.role === "guest" || user?.role === "streamer"))
   ) {
     return <>{children}</>;
   }
@@ -193,7 +204,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group text-left"
             >
               <UserPlus className="w-5 h-5 group-hover:text-primary transition-colors" />
-              <span className="font-prototype">Ajouter un organisateur</span>
+              <span className="font-prototype">Ajouter un compte</span>
             </button>
           )}
           <div className="flex items-center gap-3 px-2 pt-3 border-t border-border/50">
@@ -314,6 +325,7 @@ function AddOrganizerModal({ onClose }: { onClose: () => void }) {
   const [city, setCity] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"organizer" | "streamer">("organizer");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -323,7 +335,7 @@ function AddOrganizerModal({ onClose }: { onClose: () => void }) {
     setError("");
     setLoading(true);
     try {
-      await createOrganizer(email, password, name, city || undefined);
+      await createOrganizer(email, password, name, city || undefined, role);
       setSuccess(true);
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue");
@@ -356,13 +368,13 @@ function AddOrganizerModal({ onClose }: { onClose: () => void }) {
           <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
             <UserPlus className="w-6 h-6 text-primary" />
           </div>
-          <h2 className="text-xl font-prototype">Ajouter un organisateur</h2>
+          <h2 className="text-xl font-prototype">Ajouter un compte</h2>
         </div>
 
         {success ? (
           <div className="space-y-4">
             <p className="text-sm font-prototype text-green-400 bg-green-500/10 border border-green-500/20 rounded-md p-3">
-              Compte organisateur créé avec succès.
+              Compte créé avec succès.
             </p>
             <button
               onClick={onClose}
@@ -374,8 +386,31 @@ function AddOrganizerModal({ onClose }: { onClose: () => void }) {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
+              <label className="text-sm font-medium">Type de compte</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: "organizer" as const, label: "Organisateur", hint: "Crée et gère des tournois" },
+                  { value: "streamer" as const, label: "Streamer", hint: "Vue broadcast en lecture seule" },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setRole(opt.value)}
+                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                      role === opt.value
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <p className="text-sm font-prototype">{opt.label}</p>
+                    <p className="text-[11px] text-muted-foreground">{opt.hint}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
               <label htmlFor="org-name" className="text-sm font-medium">
-                Nom de la boutique / association
+                {role === "streamer" ? "Nom du streamer / chaîne" : "Nom de la boutique / association"}
               </label>
               <input
                 id="org-name"
@@ -389,7 +424,7 @@ function AddOrganizerModal({ onClose }: { onClose: () => void }) {
             </div>
             <div className="space-y-2">
               <label htmlFor="org-city" className="text-sm font-medium">
-                Ville
+                Ville {role === "streamer" && <span className="text-muted-foreground font-normal">(optionnel)</span>}
               </label>
               <input
                 id="org-city"
@@ -442,7 +477,7 @@ function AddOrganizerModal({ onClose }: { onClose: () => void }) {
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-primary text-primary-foreground font-prototype text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <UserPlus className="w-4 h-4" />
-              {loading ? "Création..." : "Créer le compte"}
+              {loading ? "Création..." : role === "streamer" ? "Créer le compte streamer" : "Créer le compte"}
             </button>
           </form>
         )}
