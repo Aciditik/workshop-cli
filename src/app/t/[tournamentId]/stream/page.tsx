@@ -245,8 +245,14 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
         `px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-prototype transition-colors ${on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"}`;
 
     return (
-        <div className="min-h-screen bg-background">
-            <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        <div className="min-h-screen relative">
+            {/* Mars canyon artwork backdrop — dimmed so the broadcast cards
+                stay readable; lighter dim in ?stream=1 scene mode. */}
+            <div className="fixed inset-0 z-0">
+                <Image src="/background.png" alt="" fill className="object-cover" priority />
+                <div className={`absolute inset-0 ${streamMode ? "bg-black/55" : "bg-background/80"}`} />
+            </div>
+            <div className="relative z-10 max-w-6xl mx-auto px-4 py-6 space-y-6">
                 {/* Header — hidden entirely in ?stream=1 scenes (no nav chrome) */}
                 {!streamMode && (
                     <div className="flex flex-col items-center gap-3 text-center">
