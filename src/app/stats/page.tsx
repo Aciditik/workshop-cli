@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { BarChart3, ChevronLeft } from "lucide-react";
+import { BarChart3, Users, Layers, Map as MapIcon, CalendarDays, Trophy } from "lucide-react";
 import { canonicalCorporation } from "@/lib/corporations";
 import { OverviewStats, OverviewEntry } from "@/components/stats/OverviewStats";
 
@@ -75,6 +75,7 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tournamentFilter, setTournamentFilter] = useState("");
+  const [tournamentLogo, setTournamentLogo] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -99,6 +100,22 @@ export default function StatsPage() {
       .then(setMeta)
       .catch(() => {});
   }, [isAdmin, isGuest, router, apiUrl]);
+
+  // Banner logo — the stats meta endpoint doesn't carry logoUrl, so the
+  // public tournament endpoint is hit once per selection for the emblem.
+  useEffect(() => {
+    if (!tournamentFilter) {
+      const id = setTimeout(() => setTournamentLogo(null), 0);
+      return () => clearTimeout(id);
+    }
+    const id = setTimeout(() => {
+      fetch(`${apiUrl}/api/public/tournaments/${tournamentFilter}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((d) => setTournamentLogo(d.logoUrl || null))
+        .catch(() => setTournamentLogo(null));
+    }, 0);
+    return () => clearTimeout(id);
+  }, [tournamentFilter, apiUrl]);
 
   // Data fetch — one query param (tournament), cached per value fetched.
   useEffect(() => {
@@ -153,14 +170,35 @@ export default function StatsPage() {
       }));
   }, [data]);
 
-  const tournamentOptions = useMemo(
+  const tournamentList = useMemo(
     () =>
       (meta?.tournaments ?? data?.tournaments ?? [])
         .slice()
-        .sort((a, b) => (b.eventDate || "").localeCompare(a.eventDate || ""))
-        .map((t) => ({ value: t.id, label: shortTournamentName(t.name, t.eventDate) })),
+        .sort((a, b) => (b.eventDate || "").localeCompare(a.eventDate || "")),
     [meta, data]
   );
+  const tournamentOptions = useMemo(
+    () => tournamentList.map((t) => ({ value: t.id, label: shortTournamentName(t.name, t.eventDate) })),
+    [tournamentList]
+  );
+  const selectedTournament = tournamentList.find((t) => t.id === tournamentFilter);
+
+  // Banner counters, computed over the currently filtered entries.
+  const bannerPlayers = new Set(entries.map((e) => e.playerId)).size;
+  const bannerTables = new Set(entries.map((e) => e.matchId)).size;
+  const bannerBoards = new Set(entries.map((e) => e.board).filter(Boolean)).size;
+
+  const statusChip = (status?: string) =>
+    status === "fini"
+      ? "bg-green-500/10 text-green-500 border border-green-500/20"
+      : status === "en_cours"
+        ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+        : "bg-orange-500/10 text-orange-500 border border-orange-500/20";
+
+  const chip = (on: boolean) =>
+    `shrink-0 px-3 py-1.5 rounded-md text-xs font-prototype whitespace-nowrap transition-colors ${
+      on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+    }`;
 
   if (loading && !data) {
     return (
@@ -183,34 +221,86 @@ export default function StatsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start gap-2">
-        {!isGuest && (
+      {/* Event nav — one chip per tournament, scrollable like league tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 bg-card/40 border border-border/50 rounded-lg p-1.5">
+        <button type="button" onClick={() => setTournamentFilter("")} className={chip(!tournamentFilter)}>
+          <Trophy className="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" />Tous
+        </button>
+        {tournamentOptions.map((t) => (
           <button
-            onClick={() => router.back()}
-            className="md:hidden mt-1 p-2 -ml-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            aria-label="Retour"
+            key={t.value}
+            type="button"
+            onClick={() => setTournamentFilter(t.value)}
+            className={chip(tournamentFilter === t.value)}
+            title={t.label}
           >
-            <ChevronLeft className="w-5 h-5" />
+            {t.label}
           </button>
-        )}
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-prototype tracking-tight mb-2">Statistiques</h1>
-          <p className="text-muted-foreground font-prototype text-base">
-            Explorez les données de toutes les parties disputées.
-          </p>
-        </div>
+        ))}
       </div>
 
-      <select
-        value={tournamentFilter}
-        onChange={(e) => setTournamentFilter(e.target.value)}
-        className="bg-background border border-border rounded-md px-3 py-2 text-sm font-prototype text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-      >
-        <option value="">Tous les tournois</option>
-        {tournamentOptions.map((t) => (
-          <option key={t.value} value={t.value}>{t.label}</option>
-        ))}
-      </select>
+      {/* Event banner — logo, name, date, and headline counters */}
+      <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] px-5 py-4 flex items-center gap-5 flex-wrap">
+        {selectedTournament ? (
+          tournamentLogo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={tournamentLogo} alt="" className="w-14 h-14 object-contain shrink-0" />
+          ) : (
+            <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Trophy className="w-7 h-7 text-primary" />
+            </div>
+          )
+        ) : (
+          <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <BarChart3 className="w-7 h-7 text-primary" />
+          </div>
+        )}
+
+        <div className="flex-1 min-w-[200px]">
+          <h1 className="text-xl sm:text-2xl font-prototype tracking-tight">
+            {selectedTournament ? selectedTournament.name : "Statistiques — tous les tournois"}
+          </h1>
+          <p className="text-sm text-muted-foreground font-prototype mt-0.5 flex items-center gap-2 flex-wrap">
+            {selectedTournament ? (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  {new Date(selectedTournament.eventDate).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-prototype ${statusChip(selectedTournament.status)}`}>
+                  {selectedTournament.status === "fini" ? "FINI" : selectedTournament.status === "en_cours" ? "EN COURS" : "BROUILLON"}
+                </span>
+                {selectedTournament.ownerName && <span>· organisé par {selectedTournament.ownerName}</span>}
+              </>
+            ) : (
+              "Explorez les données de toutes les parties disputées du circuit."
+            )}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-6 sm:gap-8">
+          <div className="text-center">
+            <p className="text-xl font-prototype font-bold flex items-center justify-center gap-1.5">
+              <Users className="w-4 h-4 text-primary" />{bannerPlayers}
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-prototype">Joueurs</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl font-prototype font-bold flex items-center justify-center gap-1.5">
+              <Layers className="w-4 h-4 text-primary" />{bannerTables}
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-prototype">Tables</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl font-prototype font-bold flex items-center justify-center gap-1.5">
+              <MapIcon className="w-4 h-4 text-primary" />{selectedTournament ? bannerBoards : tournamentList.length}
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-prototype">
+              {selectedTournament ? "Plateaux" : "Tournois"}
+            </p>
+          </div>
+        </div>
+      </div>
 
       <OverviewStats entries={entries} />
     </div>
