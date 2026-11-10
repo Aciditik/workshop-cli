@@ -41,21 +41,20 @@ const SCORE_BUCKETS: { label: string; min: number; max: number }[] = [
     { label: "100+", min: 100, max: Infinity },
 ];
 
-type ColKey = "parties" | "total" | "winPct" | "avgPlace" | "avgScore" | "record" | "forets" | "villes" | "cartes";
+type ColKey = "parties" | "winPct" | "avgPlace" | "avgScore" | "record" | "forets" | "villes" | "cartes";
 
 const COLUMN_DEFS: { key: ColKey; label: string; lowerIsBetter?: boolean; format: (v: number) => string }[] = [
     { key: "parties", label: "Parties", format: (v) => String(v) },
-    { key: "total", label: "Score total", format: (v) => String(v) },
+    { key: "record", label: "Record", format: (v) => String(v) },
     { key: "winPct", label: "% Victoire", format: (v) => `${Math.round(v)}%` },
     { key: "avgPlace", label: "Place moy.", lowerIsBetter: true, format: (v) => v.toFixed(2) },
     { key: "avgScore", label: "Moy.", format: (v) => Math.round(v).toString() },
-    { key: "record", label: "Record", format: (v) => String(v) },
     { key: "forets", label: "Forêts", format: (v) => v.toFixed(1) },
     { key: "villes", label: "Villes", format: (v) => v.toFixed(1) },
     { key: "cartes", label: "Cartes", format: (v) => v.toFixed(1) },
 ];
 
-const DEFAULT_COLUMNS: ColKey[] = ["parties", "total", "winPct", "avgPlace", "avgScore", "record"];
+const DEFAULT_COLUMNS: ColKey[] = ["parties", "record", "winPct", "avgPlace", "avgScore"];
 // Clicking a column for the first time starts it sorted in whichever
 // direction shows the "best" players first (lower is better for Place moy.).
 const defaultSortDir = (key: ColKey): "asc" | "desc" =>
@@ -79,9 +78,9 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [search, setSearch] = useState("");
     const [minGames, setMinGames] = useState(5);
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
-    // Classement order: most points first by default; clicking a column
-    // header sorts by it, toggling asc/desc on repeated clicks.
-    const [sortCol, setSortCol] = useState<ColKey>("total");
+    // Classement order: best single-game score first by default; clicking a
+    // column header sorts by it, toggling asc/desc on repeated clicks.
+    const [sortCol, setSortCol] = useState<ColKey>("record");
     const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
     const handleSort = (key: ColKey) => {
         if (key === sortCol) {
@@ -164,7 +163,6 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             name: a.name,
             games: a.games,
             parties: a.games,
-            total: a.totalScore,
             winPct: a.games > 0 ? (a.wins / a.games) * 100 : 0,
             avgPlace: a.games > 0 ? a.placementSum / a.games : 0,
             avgScore: a.games > 0 ? a.totalScore / a.games : 0,
