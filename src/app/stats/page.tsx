@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { BarChart3, Users, Layers, Map as MapIcon, CalendarDays, Trophy } from "lucide-react";
+import { BarChart3, Users, Layers, Map as MapIcon, CalendarDays, Trophy, ChevronDown } from "lucide-react";
 import { canonicalCorporation } from "@/lib/corporations";
 import { OverviewStats, OverviewEntry } from "@/components/stats/OverviewStats";
 
@@ -31,7 +31,7 @@ type Entry = {
   board: string;
 };
 
-type TournamentMeta = { id: string; name: string; eventDate: string; status?: string; ownerId: string; ownerName: string };
+type TournamentMeta = { id: string; name: string; eventDate: string; status?: string; ownerId: string; ownerName: string; logoUrl?: string };
 
 type StatsData = {
   entries: Entry[];
@@ -75,7 +75,7 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tournamentFilter, setTournamentFilter] = useState("");
-  const [tournamentLogo, setTournamentLogo] = useState<string | null>(null);
+  const [selectorOpen, setSelectorOpen] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -100,22 +100,6 @@ export default function StatsPage() {
       .then(setMeta)
       .catch(() => {});
   }, [isAdmin, isGuest, router, apiUrl]);
-
-  // Banner logo — the stats meta endpoint doesn't carry logoUrl, so the
-  // public tournament endpoint is hit once per selection for the emblem.
-  useEffect(() => {
-    if (!tournamentFilter) {
-      const id = setTimeout(() => setTournamentLogo(null), 0);
-      return () => clearTimeout(id);
-    }
-    const id = setTimeout(() => {
-      fetch(`${apiUrl}/api/public/tournaments/${tournamentFilter}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((d) => setTournamentLogo(d.logoUrl || null))
-        .catch(() => setTournamentLogo(null));
-    }, 0);
-    return () => clearTimeout(id);
-  }, [tournamentFilter, apiUrl]);
 
   // Data fetch — one query param (tournament), cached per value fetched.
   useEffect(() => {
@@ -177,10 +161,6 @@ export default function StatsPage() {
         .sort((a, b) => (b.eventDate || "").localeCompare(a.eventDate || "")),
     [meta, data]
   );
-  const tournamentOptions = useMemo(
-    () => tournamentList.map((t) => ({ value: t.id, label: shortTournamentName(t.name, t.eventDate) })),
-    [tournamentList]
-  );
   const selectedTournament = tournamentList.find((t) => t.id === tournamentFilter);
 
   // Banner counters, computed over the currently filtered entries.
@@ -194,11 +174,6 @@ export default function StatsPage() {
       : status === "en_cours"
         ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
         : "bg-orange-500/10 text-orange-500 border border-orange-500/20";
-
-  const chip = (on: boolean) =>
-    `shrink-0 px-3 py-1.5 rounded-md text-xs font-prototype whitespace-nowrap transition-colors ${
-      on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-    }`;
 
   if (loading && !data) {
     return (
@@ -221,30 +196,78 @@ export default function StatsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Event nav — one chip per tournament, scrollable like league tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 bg-card/40 border border-border/50 rounded-lg p-1.5">
-        <button type="button" onClick={() => setTournamentFilter("")} className={chip(!tournamentFilter)}>
-          <Trophy className="w-3.5 h-3.5 inline-block mr-1.5 -mt-0.5" />Tous
+      {/* Event selector — compact button opening an emblem grid, like
+          the league switcher on esports stats pages */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setSelectorOpen((v) => !v)}
+          className="flex items-center gap-2.5 px-3.5 py-2 rounded-md bg-card/60 border border-border text-sm font-prototype hover:bg-accent/50 transition-colors"
+        >
+          {selectedTournament?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={selectedTournament.logoUrl} alt="" className="w-5 h-5 object-contain" />
+          ) : (
+            <Trophy className="w-4 h-4 text-primary" />
+          )}
+          <span>{selectedTournament ? shortTournamentName(selectedTournament.name, selectedTournament.eventDate) : "Tous les tournois"}</span>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${selectorOpen ? "rotate-180" : ""}`} />
         </button>
-        {tournamentOptions.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setTournamentFilter(t.value)}
-            className={chip(tournamentFilter === t.value)}
-            title={t.label}
-          >
-            {t.label}
-          </button>
-        ))}
+
+        {selectorOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setSelectorOpen(false)} />
+            <div className="absolute left-0 top-full mt-2 z-50 w-[min(560px,90vw)] rounded-[10px] border border-[#26252c] bg-[#141318] p-3 shadow-2xl">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {/* "All tournaments" cell */}
+                <button
+                  type="button"
+                  onClick={() => { setTournamentFilter(""); setSelectorOpen(false); }}
+                  className={`flex flex-col items-center justify-center gap-2 h-20 rounded-lg border text-center transition-colors ${
+                    !tournamentFilter
+                      ? "border-primary bg-primary/10"
+                      : "border-transparent hover:bg-white/5"
+                  }`}
+                >
+                  <Trophy className="w-6 h-6 text-primary" />
+                  <span className="text-[11px] font-prototype leading-tight">Tous les tournois</span>
+                </button>
+                {tournamentList.map((t) => {
+                  const active = tournamentFilter === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => { setTournamentFilter(t.id); setSelectorOpen(false); }}
+                      title={t.name}
+                      className={`flex flex-col items-center justify-center gap-2 h-20 rounded-lg border px-1 transition-colors ${
+                        active ? "border-primary bg-primary/10" : "border-transparent hover:bg-white/5"
+                      }`}
+                    >
+                      {t.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={t.logoUrl} alt="" className="w-8 h-8 object-contain" />
+                      ) : (
+                        <Trophy className="w-6 h-6 text-muted-foreground/60" />
+                      )}
+                      <span className={`text-[11px] font-prototype leading-tight line-clamp-2 ${active ? "text-primary" : ""}`}>
+                        {shortTournamentName(t.name, t.eventDate)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Event banner — logo, name, date, and headline counters */}
       <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] px-5 py-4 flex items-center gap-5 flex-wrap">
         {selectedTournament ? (
-          tournamentLogo ? (
+          selectedTournament.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={tournamentLogo} alt="" className="w-14 h-14 object-contain shrink-0" />
+            <img src={selectedTournament.logoUrl} alt="" className="w-14 h-14 object-contain shrink-0" />
           ) : (
             <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <Trophy className="w-7 h-7 text-primary" />
