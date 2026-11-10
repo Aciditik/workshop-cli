@@ -76,7 +76,7 @@ function BarRow({ label, value, max, color, dotColor }: { label: string; value: 
 export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [selectedCols, setSelectedCols] = useState<Set<ColKey>>(new Set(DEFAULT_COLUMNS));
     const [search, setSearch] = useState("");
-    const [minGames, setMinGames] = useState(5);
+    const [minGames, setMinGames] = useState(1);
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
     // Classement order: best single-game score first by default; clicking a
     // column header sorts by it, toggling asc/desc on repeated clicks.
