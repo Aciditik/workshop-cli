@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
-import { Trophy } from "lucide-react";
+import { Trophy, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 
 // A single flattened scorecard row — the common shape both the single-
 // tournament streamer view and the cross-tournament /stats page reduce their
@@ -41,10 +41,11 @@ const SCORE_BUCKETS: { label: string; min: number; max: number }[] = [
     { label: "100+", min: 100, max: Infinity },
 ];
 
-type ColKey = "parties" | "winPct" | "avgPlace" | "avgScore" | "record" | "forets" | "villes" | "cartes";
+type ColKey = "parties" | "total" | "winPct" | "avgPlace" | "avgScore" | "record" | "forets" | "villes" | "cartes";
 
 const COLUMN_DEFS: { key: ColKey; label: string; lowerIsBetter?: boolean; format: (v: number) => string }[] = [
     { key: "parties", label: "Parties", format: (v) => String(v) },
+    { key: "total", label: "Score total", format: (v) => String(v) },
     { key: "winPct", label: "% Victoire", format: (v) => `${Math.round(v)}%` },
     { key: "avgPlace", label: "Place moy.", lowerIsBetter: true, format: (v) => v.toFixed(2) },
     { key: "avgScore", label: "Moy.", format: (v) => Math.round(v).toString() },
@@ -54,7 +55,11 @@ const COLUMN_DEFS: { key: ColKey; label: string; lowerIsBetter?: boolean; format
     { key: "cartes", label: "Cartes", format: (v) => v.toFixed(1) },
 ];
 
-const DEFAULT_COLUMNS: ColKey[] = ["parties", "winPct", "avgPlace", "avgScore", "record"];
+const DEFAULT_COLUMNS: ColKey[] = ["parties", "total", "winPct", "avgPlace", "avgScore", "record"];
+// Clicking a column for the first time starts it sorted in whichever
+// direction shows the "best" players first (lower is better for Place moy.).
+const defaultSortDir = (key: ColKey): "asc" | "desc" =>
+    COLUMN_DEFS.find((c) => c.key === key)?.lowerIsBetter ? "asc" : "desc";
 
 function BarRow({ label, value, max, color, dotColor }: { label: string; value: number; max: number; color: string; dotColor?: string }) {
     return (
@@ -74,6 +79,18 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [search, setSearch] = useState("");
     const [minGames, setMinGames] = useState(5);
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
+    // Classement order: most points first by default; clicking a column
+    // header sorts by it, toggling asc/desc on repeated clicks.
+    const [sortCol, setSortCol] = useState<ColKey>("total");
+    const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+    const handleSort = (key: ColKey) => {
+        if (key === sortCol) {
+            setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+        } else {
+            setSortCol(key);
+            setSortDir(defaultSortDir(key));
+        }
+    };
 
     const toggleCol = (key: ColKey) =>
         setSelectedCols((prev) => {
@@ -147,6 +164,7 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             name: a.name,
             games: a.games,
             parties: a.games,
+            total: a.totalScore,
             winPct: a.games > 0 ? (a.wins / a.games) * 100 : 0,
             avgPlace: a.games > 0 ? a.placementSum / a.games : 0,
             avgScore: a.games > 0 ? a.totalScore / a.games : 0,
@@ -188,7 +206,10 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
         .filter((p) => p.games >= minGames)
         .filter((p) => !searchQuery || p.name.toLowerCase().includes(searchQuery))
         .filter((p) => boardFilter === "Tous" || p.boards.has(boardFilter))
-        .sort((a, b) => b.winPct - a.winPct || b.games - a.games);
+        .sort((a, b) => {
+            const diff = (a[sortCol] as number) - (b[sortCol] as number);
+            return sortDir === "desc" ? -diff || b.games - a.games : diff || b.games - a.games;
+        });
 
     const columnRanges = new Map<ColKey, { min: number; max: number }>();
     for (const col of COLUMN_DEFS) {
@@ -353,9 +374,25 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                         <thead>
                             <tr className="bg-white/[0.04] text-[11px] uppercase tracking-wider text-muted-foreground">
                                 <th className="px-3 py-3 text-left sticky left-0 bg-[#16151a] z-10">Joueur</th>
-                                {COLUMN_DEFS.filter((c) => selectedCols.has(c.key)).map((c) => (
-                                    <th key={c.key} className="px-3 py-3 text-center">{c.label}</th>
-                                ))}
+                                {COLUMN_DEFS.filter((c) => selectedCols.has(c.key)).map((c) => {
+                                    const active = sortCol === c.key;
+                                    return (
+                                        <th key={c.key} className="px-3 py-3 text-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSort(c.key)}
+                                                className={`inline-flex items-center gap-1 transition-colors ${active ? "text-[#e8743b]" : "hover:text-foreground"}`}
+                                            >
+                                                {c.label}
+                                                {active ? (
+                                                    sortDir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />
+                                                ) : (
+                                                    <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                                                )}
+                                            </button>
+                                        </th>
+                                    );
+                                })}
                             </tr>
                         </thead>
                         <tbody>
