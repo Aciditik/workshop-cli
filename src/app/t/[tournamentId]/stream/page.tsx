@@ -12,10 +12,11 @@ import {
 } from "@/lib/qualifier-rules";
 import { SwissRounds } from "@/components/SwissRounds";
 import { TeamsStreamView, TeamStreamEntry } from "@/components/TeamsStreamView";
+import { StreamStatsView } from "@/components/StreamStatsView";
 import { TEAM_TAGS } from "@/lib/team-tags";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { canonicalCorporation, CORPORATION_PLACEHOLDER } from "@/lib/corporations";
-import { ListOrdered, Users, Lock } from "lucide-react";
+import { ListOrdered, Users, Lock, BarChart3 } from "lucide-react";
 import Image from "next/image";
 
 // Read-only broadcast view for the streamer account: large, self-explanatory
@@ -42,11 +43,12 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
     const rotateParam = parseInt(searchParams.get("rotate") || "", 10);
     const rotateSeconds = Number.isFinite(rotateParam) && rotateParam > 0 ? rotateParam : undefined;
     const viewParam = searchParams.get("view");
-    const initialView = viewParam === "rounds" || viewParam === "teams" || viewParam === "classement" ? viewParam : "classement";
+    const initialView = viewParam === "rounds" || viewParam === "teams" || viewParam === "classement" || viewParam === "stats"
+        ? viewParam : "classement";
 
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
-    const [mainView, setMainView] = useState<"rounds" | "classement" | "teams">(initialView);
+    const [mainView, setMainView] = useState<"rounds" | "classement" | "teams" | "stats">(initialView);
     const [activeDayOverride, setActiveDayOverride] = useState<1 | 2 | null>(null);
 
     useEffect(() => {
@@ -109,6 +111,17 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
     // Équipes is a Day 1-only view: while Day 2 is active, fall back to the
     // classement instead of leaving a tab selected with no content.
     const effectiveMainView = mainView === "teams" && activeDay === 2 ? "classement" : mainView;
+
+    // ─── Statistiques ───────────────────────────────────────────────────
+    // Tournament-wide aggregate, independent of the Jour 1/Jour 2 toggle, but
+    // still suspense-safe: strip out whichever day's final round is hidden
+    // (Day 1 and Day 2 are gated independently) so corp picks / best score /
+    // distribution can't leak a result before the organizer publishes it.
+    const day1HiddenRound = isTwoDayFinale && !tournament.day1ResultsPublished ? day1Rounds : null;
+    const day2HiddenRound = isTwoDayFinale && day2StartRound && !tournament.day2ResultsPublished ? maxRounds : null;
+    const statsMatches = tournament.matches.filter(
+        (m) => m.round !== day1HiddenRound && m.round !== day2HiddenRound
+    );
 
     // ─── Round stat cards ────────────────────────────────────────────────
     // "Current round" = the most recent round of the displayed day that has
@@ -290,6 +303,9 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                     <Users className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Équipes
                                 </button>
                             )}
+                            <button type="button" onClick={() => setMainView("stats")} className={pill(effectiveMainView === "stats")}>
+                                <BarChart3 className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Statistiques
+                            </button>
                         </div>
                     </div>
                 )}
@@ -508,6 +524,14 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                         initialRostersOpen={initialRostersOpen}
                         streamMode={streamMode}
                         rotateSeconds={rotateSeconds}
+                    />
+                )}
+
+                {effectiveMainView === "stats" && (
+                    <StreamStatsView
+                        participants={tournament.participants}
+                        matches={statsMatches}
+                        roundBoards={tournament.roundBoards}
                     />
                 )}
             </div>
