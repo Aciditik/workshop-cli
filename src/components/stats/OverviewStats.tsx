@@ -231,8 +231,6 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-lg sm:text-xl font-prototype">Aperçu</h2>
-
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4">

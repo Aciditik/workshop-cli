@@ -436,7 +436,7 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                                 <th className="px-3 py-3 text-center w-12 sticky left-12 bg-[#16151a] z-10">Équipe</th>
                                                 <th className="px-3 py-3 text-left sticky left-24 bg-[#16151a] z-10 min-w-[160px]">Nom</th>
                                                 <th className="px-3 py-3 text-center">Parties</th>
-                                                <th className="px-3 py-3 text-center">VP moy.</th>
+                                                <th className="px-3 py-3 text-center">NT moy.</th>
                                                 <th className="px-3 py-3 text-center">Diff</th>
                                                 <th className="px-3 py-3 text-center">NT total</th>
                                                 <th className="px-3 py-3 text-center">Pts de ronde</th>
@@ -466,10 +466,10 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                                             </td>
                                                             <td className="px-3 py-2 sticky left-24 bg-[#16151a] z-10 min-w-[160px]">
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="truncate">{playerDisplayName(r.p, false)}{r.p.dnf ? " (DNF)" : ""}</span>
                                                                     {qualified && (
                                                                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/25 uppercase tracking-wide shrink-0">Qualifié</span>
                                                                     )}
+                                                                    <span className="truncate">{playerDisplayName(r.p, false)}{r.p.dnf ? " (DNF)" : ""}</span>
                                                                 </div>
                                                             </td>
                                                             <td className="px-3 py-2 text-center tabular-nums">{r.games}</td>
@@ -481,11 +481,11 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-3 py-2 text-center tabular-nums">{r.diff}</td>
-                                                            <td className="px-3 py-2 text-center tabular-nums">{r.nt}</td>
+                                                            <td className="px-3 py-2 text-center tabular-nums text-[#e8743b]">{r.diff}</td>
+                                                            <td className="px-3 py-2 text-center tabular-nums text-blue-400">{r.nt}</td>
                                                             <td className="px-3 py-2 text-center">
                                                                 <span
-                                                                    className="inline-block px-2.5 py-1 rounded-md text-xs tabular-nums border"
+                                                                    className="inline-block px-3.5 py-1.5 rounded-md text-sm font-bold tabular-nums border"
                                                                     style={{
                                                                         backgroundColor: `rgba(34, 197, 94, ${0.08 + green * 0.35})`,
                                                                         borderColor: `rgba(34, 197, 94, ${0.2 + green * 0.4})`,
@@ -497,9 +497,9 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                                         {showCutLine && rows.length > 32 && rank === 32 && (
                                                             <tr aria-hidden="true">
                                                                 <td colSpan={8} className="p-0">
-                                                                    <div className="border-t-2 border-dashed border-green-500/40 relative">
-                                                                        <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#16151a] px-3 text-[10px] uppercase tracking-wider text-green-400 font-prototype whitespace-nowrap">
-                                                                            Top 32 — qualifiés pour le Jour 2
+                                                                    <div className="border-y-2 border-dashed border-green-500/70 bg-green-500/10 relative">
+                                                                        <span className="block text-center py-1.5 text-[11px] uppercase tracking-wider text-green-300 font-prototype whitespace-nowrap">
+                                                                            — Top 32 · qualifiés pour le Jour 2 —
                                                                         </span>
                                                                     </div>
                                                                 </td>
