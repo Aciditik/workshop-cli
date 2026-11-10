@@ -265,7 +265,7 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                 <Image src="/background.png" alt="" fill className="object-cover" priority />
                 <div className={`absolute inset-0 ${streamMode ? "bg-black/55" : "bg-background/80"}`} />
             </div>
-            <div className="relative z-10 max-w-6xl mx-auto px-4 py-6 space-y-6">
+            <div className={`relative z-10 mx-auto px-4 py-6 space-y-6 ${streamMode ? "max-w-[1800px]" : "max-w-6xl 2xl:max-w-7xl"}`}>
                 {/* Header — hidden entirely in ?stream=1 scenes (no nav chrome) */}
                 {!streamMode && (
                     <div className="flex flex-col items-center gap-3 text-center">
