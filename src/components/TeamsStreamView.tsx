@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { StaticImageData } from "next/image";
 import { TEAM_TAGS } from "@/lib/team-tags";
-import { Eye, EyeOff, Lock, Pin, X } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 
 export interface TeamStreamPlayer {
     id: string;
@@ -29,8 +29,6 @@ interface Props {
     initialRostersOpen?: boolean; // ?rosters=1
     streamMode?: boolean; // ?stream=1 — caps the grid to top 9, optional auto-rotation
     rotateSeconds?: number; // ?rotate=12 — only used when streamMode and there's more than 9 teams
-    pinnedIds?: string[]; // up to 3 pinned team ids — highlighted on the card front
-    onTogglePin?: (teamId: string) => void;
 }
 
 function getInitials(name: string): string {
@@ -75,15 +73,11 @@ function TeamCard({
     variant,
     rosterForcedOpen,
     blurred,
-    pinned,
-    onTogglePin,
 }: {
     entry: TeamStreamEntry;
     variant: "podium-1" | "podium-2" | "podium-3" | "grid";
     rosterForcedOpen: boolean;
     blurred: boolean;
-    pinned?: boolean;
-    onTogglePin?: (teamId: string) => void;
 }) {
     const [tapped, setTapped] = useState(false);
     const [hovered, setHovered] = useState(false);
@@ -110,28 +104,14 @@ function TeamCard({
             onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
             }}
-            className={`group/card relative rounded-xl border overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer select-none ${
-                pinned ? "border-[#e8743b] ring-1 ring-[#e8743b]/50" : isFirst ? "border-[#e8b400]" : "border-[#232229]"
+            className={`relative rounded-xl border overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer select-none ${
+                isFirst ? "border-[#e8b400]" : "border-[#232229]"
             }`}
             style={{
                 height,
                 backgroundColor: isFirst ? "#1a1710" : "#141318",
             }}
         >
-            {/* Pin button — own stopPropagation so it doesn't flip the card */}
-            {onTogglePin && (
-                <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onTogglePin(entry.id); }}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    title={pinned ? "Désépingler" : "Épingler"}
-                    className={`absolute top-2 right-2 z-20 p-1 rounded-md transition-colors ${
-                        pinned ? "text-[#e8743b]" : "text-muted-foreground/40 hover:text-[#e8743b] opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100"
-                    }`}
-                >
-                    <Pin className="w-3.5 h-3.5" />
-                </button>
-            )}
             {/* Front face */}
             <div
                 className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 transition-opacity duration-[180ms]"
@@ -193,7 +173,7 @@ function TeamCard({
     );
 }
 
-export function TeamsStreamView({ teams, blurred, roundLabel, initialRostersOpen, streamMode, rotateSeconds, pinnedIds, onTogglePin }: Props) {
+export function TeamsStreamView({ teams, blurred, roundLabel, initialRostersOpen, streamMode, rotateSeconds }: Props) {
     const [rostersOpen, setRostersOpen] = useState(!!initialRostersOpen);
     const [page, setPage] = useState(0);
 
@@ -245,28 +225,6 @@ export function TeamsStreamView({ teams, blurred, roundLabel, initialRostersOpen
                 </p>
             )}
 
-            {pinnedIds && pinnedIds.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap mb-4">
-                    {pinnedIds.map((id) => {
-                        const entry = teams.find((t) => t.id === id);
-                        if (!entry) return null;
-                        return (
-                            <button
-                                key={id}
-                                type="button"
-                                onClick={() => onTogglePin?.(id)}
-                                title="Désépingler"
-                                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#e8743b]/15 border border-[#e8743b]/30 text-[#e8743b] text-[11px] font-prototype hover:bg-[#e8743b]/25 transition-colors"
-                            >
-                                <Pin className="w-3 h-3" />
-                                {entry.name}
-                                <X className="w-3 h-3 opacity-60" />
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-
             {teams.length === 0 ? (
                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-10 text-center">
                     <p className="text-muted-foreground font-prototype">Aucune équipe pour l&apos;instant.</p>
@@ -277,7 +235,7 @@ export function TeamsStreamView({ teams, blurred, roundLabel, initialRostersOpen
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                             {podium.map((entry) => (
                                 <div key={entry.id} className={`sm:flex-1 ${podiumOrderClass(entry.rank)}`}>
-                                    <TeamCard entry={entry} variant={podiumVariant(entry.rank)} rosterForcedOpen={rostersOpen} blurred={blurred} pinned={pinnedIds?.includes(entry.id)} onTogglePin={onTogglePin} />
+                                    <TeamCard entry={entry} variant={podiumVariant(entry.rank)} rosterForcedOpen={rostersOpen} blurred={blurred} />
                                 </div>
                             ))}
                         </div>
@@ -285,7 +243,7 @@ export function TeamsStreamView({ teams, blurred, roundLabel, initialRostersOpen
                     {visibleRest.length > 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             {visibleRest.map((entry) => (
-                                <TeamCard key={entry.id} entry={entry} variant="grid" rosterForcedOpen={rostersOpen} blurred={blurred} pinned={pinnedIds?.includes(entry.id)} onTogglePin={onTogglePin} />
+                                <TeamCard key={entry.id} entry={entry} variant="grid" rosterForcedOpen={rostersOpen} blurred={blurred} />
                             ))}
                         </div>
                     )}
