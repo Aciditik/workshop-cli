@@ -28,6 +28,7 @@ import {
     getFormatLabel,
     generateRound1,
     generateDay2Round1,
+    findDefendingChampionId,
     getFormat,
     getMaxRounds,
     getQualifiedCount,
@@ -1011,9 +1012,14 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         // Below that threshold the format is always the fixed 2-round elimination.
         const format = playerCount >= 29 ? selectedFormat : getFormat(playerCount);
         const maxRounds = getMaxRounds(playerCount);
+        // Finale only: the defending champion (winner of the previous
+        // finished Finale) is always seated at Table 1 of Day 1 Round 1.
+        const championId = isFinaleTournament
+            ? findDefendingChampionId(tournament.participants, tournaments, tournament.id)
+            : undefined;
         const round1Matches = format === "bracket"
             ? generateBracketRound1(tournament.id, tournament.participants, playerCount)
-            : generateRound1(tournament.id, tournament.participants, playerCount);
+            : generateRound1(tournament.id, tournament.participants, playerCount, championId);
 
         updateTournament({
             ...tournament,
