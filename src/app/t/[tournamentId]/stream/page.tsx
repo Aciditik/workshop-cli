@@ -249,10 +249,13 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
     const hasCompletedMatch = scopedMatches.some((m) => m.isCompleted);
     const maxAvg = Math.max(1, ...rows.map((r) => r.avg));
     const maxPts = Math.max(1, ...rows.map((r) => r.pts));
-    // Top-32 cut line: Day 1 of a two-day finale only. Once Day 2 exists the
-    // actual qualifiers are known, so badge from day2ParticipantIds rather
-    // than rank alone (covers DNF/manual edits between the two days).
-    const showCutLine = isTwoDayFinale && activeDay === 1 && dayPublished;
+    // Top-32 cut line: Day 1 of a two-day finale only. Visible throughout
+    // Round 1/2 (and Round 3 once published) — only hidden while the
+    // classement itself is suspense-locked behind an unpublished Round 3.
+    // Once Day 2 exists the actual qualifiers are known, so badge from
+    // day2ParticipantIds rather than rank alone (covers DNF/manual edits
+    // between the two days).
+    const showCutLine = isTwoDayFinale && activeDay === 1 && !currentDayBlurred;
 
     const pill = (on: boolean) =>
         `px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-prototype transition-colors ${on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"}`;
