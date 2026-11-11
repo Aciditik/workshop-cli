@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
-import { Trophy, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Trophy, ChevronUp, ChevronDown, ChevronsUpDown, X, Medal } from "lucide-react";
 
 // A single flattened scorecard row — the common shape both the single-
 // tournament streamer view and the cross-tournament /stats page reduce their
@@ -20,6 +20,9 @@ export interface OverviewEntry {
     cartes: number;
     matchId: string; // unique per table — used to count distinct tables, not scorecards
     board?: string;
+    round?: number; // within-tournament round number, used to order a player's recent games
+    tournamentName?: string;
+    eventDate?: string;
 }
 
 const BOARD_COLORS: Record<string, string> = {
@@ -78,6 +81,7 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [search, setSearch] = useState("");
     const [minGames, setMinGames] = useState(1);
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
+    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
     // Classement order: best single-game score first by default; clicking a
     // column header sorts by it, toggling asc/desc on repeated clicks.
     const [sortCol, setSortCol] = useState<ColKey>("record");
@@ -98,14 +102,56 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             return next;
         });
 
-    const { tablesValidated, scorecardCount, bestScore, bestScorePlayerName, boardCounts, corpCounts, scoreBuckets, perPlayer } = useMemo(() => {
+    // Global KPIs/charts — always computed over every entry, independent of
+    // the "Joueurs" table's board filter below.
+    const { tablesValidated, scorecardCount, bestScore, bestScorePlayerName, boardCounts, corpCounts, scoreBuckets, allBoards } = useMemo(() => {
         const boardCounts = new Map<string, number>();
         const corpCounts = new Map<string, number>();
         const seenMatchIds = new Set<string>();
         const matchBoardSeen = new Set<string>();
         const buckets = SCORE_BUCKETS.map((b) => ({ ...b, count: 0 }));
+        const boards = new Set<string>();
         let bestScore = -Infinity;
         let bestScorePlayerName = "";
+
+        for (const e of entries) {
+            seenMatchIds.add(e.matchId);
+            if (e.board) {
+                boards.add(e.board);
+                if (!matchBoardSeen.has(e.matchId)) {
+                    matchBoardSeen.add(e.matchId);
+                    boardCounts.set(e.board, (boardCounts.get(e.board) || 0) + 1);
+                }
+            }
+            if (e.totalScore > bestScore) {
+                bestScore = e.totalScore;
+                bestScorePlayerName = e.playerName;
+            }
+            const bucket = buckets.find((b) => e.totalScore >= b.min && e.totalScore <= b.max);
+            if (bucket) bucket.count++;
+            if (e.corporation && e.corporation !== CORPORATION_PLACEHOLDER && e.corporation !== "Pas de corporation") {
+                corpCounts.set(e.corporation, (corpCounts.get(e.corporation) || 0) + 1);
+            }
+        }
+
+        return {
+            tablesValidated: seenMatchIds.size,
+            scorecardCount: entries.length,
+            bestScore: bestScore === -Infinity ? 0 : bestScore,
+            bestScorePlayerName,
+            boardCounts,
+            corpCounts,
+            scoreBuckets: buckets,
+            allBoards: [...boards].sort(),
+        };
+    }, [entries]);
+
+    // "Joueurs" table stats — scoped to the selected board, so switching the
+    // "Plateau" filter actually recomputes each player's numbers from only
+    // their games on that board, instead of just hiding players who never
+    // played it while leaving everyone else's all-boards stats unchanged.
+    const perPlayer = useMemo(() => {
+        const scoped = boardFilter === "Tous" ? entries : entries.filter((e) => e.board === boardFilter);
 
         interface Agg {
             id: string;
@@ -118,34 +164,18 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             forets: number;
             villes: number;
             cartes: number;
-            boards: Set<string>;
         }
         const aggByPlayer = new Map<string, Agg>();
         const getAgg = (id: string, name: string): Agg => {
             let a = aggByPlayer.get(id);
             if (!a) {
-                a = { id, name, games: 0, totalScore: 0, best: -Infinity, wins: 0, placementSum: 0, forets: 0, villes: 0, cartes: 0, boards: new Set() };
+                a = { id, name, games: 0, totalScore: 0, best: -Infinity, wins: 0, placementSum: 0, forets: 0, villes: 0, cartes: 0 };
                 aggByPlayer.set(id, a);
             }
             return a;
         };
 
-        for (const e of entries) {
-            seenMatchIds.add(e.matchId);
-            if (e.board && !matchBoardSeen.has(e.matchId)) {
-                matchBoardSeen.add(e.matchId);
-                boardCounts.set(e.board, (boardCounts.get(e.board) || 0) + 1);
-            }
-            if (e.totalScore > bestScore) {
-                bestScore = e.totalScore;
-                bestScorePlayerName = e.playerName;
-            }
-            const bucket = buckets.find((b) => e.totalScore >= b.min && e.totalScore <= b.max);
-            if (bucket) bucket.count++;
-            if (e.corporation && e.corporation !== CORPORATION_PLACEHOLDER && e.corporation !== "Pas de corporation") {
-                corpCounts.set(e.corporation, (corpCounts.get(e.corporation) || 0) + 1);
-            }
-
+        for (const e of scoped) {
             const a = getAgg(e.playerId, e.playerName);
             a.games++;
             a.totalScore += e.totalScore;
@@ -155,10 +185,9 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             a.forets += e.forets || 0;
             a.villes += e.villes || 0;
             a.cartes += e.cartes || 0;
-            if (e.board) a.boards.add(e.board);
         }
 
-        const perPlayer = [...aggByPlayer.values()].map((a) => ({
+        return [...aggByPlayer.values()].map((a) => ({
             id: a.id,
             name: a.name,
             games: a.games,
@@ -170,20 +199,8 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             forets: a.games > 0 ? a.forets / a.games : 0,
             villes: a.games > 0 ? a.villes / a.games : 0,
             cartes: a.games > 0 ? a.cartes / a.games : 0,
-            boards: a.boards,
         }));
-
-        return {
-            tablesValidated: seenMatchIds.size,
-            scorecardCount: entries.length,
-            bestScore: bestScore === -Infinity ? 0 : bestScore,
-            bestScorePlayerName,
-            boardCounts,
-            corpCounts,
-            scoreBuckets: buckets,
-            perPlayer,
-        };
-    }, [entries]);
+    }, [entries, boardFilter]);
 
     const boardEntries = [...boardCounts.entries()].sort((a, b) => b[1] - a[1]);
     const topBoard = boardEntries[0];
@@ -198,12 +215,10 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
         .slice(0, 3);
 
     // ─── Joueurs table ──────────────────────────────────────────────────
-    const allBoards = [...new Set(perPlayer.flatMap((p) => [...p.boards]))].sort();
     const searchQuery = search.trim().toLowerCase();
     const filteredRows = perPlayer
         .filter((p) => p.games >= minGames)
         .filter((p) => !searchQuery || p.name.toLowerCase().includes(searchQuery))
-        .filter((p) => boardFilter === "Tous" || p.boards.has(boardFilter))
         .sort((a, b) => {
             const diff = (a[sortCol] as number) - (b[sortCol] as number);
             return sortDir === "desc" ? -diff || b.games - a.games : diff || b.games - a.games;
@@ -228,6 +243,52 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             color: ratio > 0.55 ? "#fff" : "#d4d4d4",
         };
     };
+
+    // ─── Player detail drawer ──────────────────────────────────────────
+    // Always built from the player's full history (ignores the "Joueurs"
+    // table's board filter — this is the player's overall profile).
+    const selectedPlayerGames = useMemo(() => {
+        if (!selectedPlayerId) return [];
+        return entries
+            .map((e, idx) => ({ e, idx }))
+            .filter(({ e }) => e.playerId === selectedPlayerId)
+            .sort((a, b) => {
+                const key = (x: typeof a) => x.e.round ?? (x.e.eventDate ? Date.parse(x.e.eventDate) : x.idx);
+                return key(a) - key(b); // chronological, oldest first
+            })
+            .map(({ e }) => e);
+    }, [entries, selectedPlayerId]);
+
+    const selectedPlayerStats = useMemo(() => {
+        if (selectedPlayerGames.length === 0) return null;
+        let totalScore = 0, best = -Infinity, wins = 0, placementSum = 0;
+        const corpCounts = new Map<string, number>();
+        for (const e of selectedPlayerGames) {
+            totalScore += e.totalScore;
+            best = Math.max(best, e.totalScore);
+            placementSum += e.rank;
+            if (e.rank === 1) wins++;
+            if (e.corporation && e.corporation !== CORPORATION_PLACEHOLDER && e.corporation !== "Pas de corporation") {
+                corpCounts.set(e.corporation, (corpCounts.get(e.corporation) || 0) + 1);
+            }
+        }
+        const games = selectedPlayerGames.length;
+        return {
+            name: selectedPlayerGames[0].playerName,
+            games,
+            record: best,
+            avgScore: totalScore / games,
+            avgPlace: placementSum / games,
+            winPct: (wins / games) * 100,
+            corpEntries: [...corpCounts.entries()].sort((a, b) => b[1] - a[1]),
+        };
+    }, [selectedPlayerGames]);
+
+    const maxPlayerGameScore = Math.max(1, ...selectedPlayerGames.map((e) => e.totalScore));
+    const rankBadgeColor = (rank: number) =>
+        rank === 1 ? "#e8b400" : rank === 2 ? "#cfd6de" : rank === 3 ? "#e06a00" : "#e8743b";
+    const initials = (name: string) =>
+        name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 
     return (
         <div className="space-y-6">
@@ -396,9 +457,13 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                                 <tr><td colSpan={1 + selectedCols.size} className="px-3 py-8 text-center text-muted-foreground">Aucun joueur ne correspond aux filtres.</td></tr>
                             )}
                             {filteredRows.map((r) => (
-                                <tr key={r.id} className="border-t border-white/5 h-12">
+                                <tr
+                                    key={r.id}
+                                    onClick={() => setSelectedPlayerId(r.id)}
+                                    className="border-t border-white/5 h-12 cursor-pointer hover:bg-white/[0.03] transition-colors"
+                                >
                                     <td className="px-3 py-2 sticky left-0 bg-[#16151a] z-10 min-w-[160px]">
-                                        <span className="truncate">{r.name}</span>
+                                        <span className="truncate text-[#e8743b] hover:underline">{r.name}</span>
                                     </td>
                                     {COLUMN_DEFS.filter((c) => selectedCols.has(c.key)).map((c) => (
                                         <td key={c.key} className="px-3 py-2 text-center tabular-nums">
@@ -423,6 +488,118 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                     <span>Meilleur (Place moy. : plus bas = meilleur)</span>
                 </div>
             </div>
+
+            {/* Player detail drawer */}
+            {selectedPlayerId && selectedPlayerStats && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                    <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedPlayerId(null)} />
+                    <div className="relative w-full max-w-md h-full bg-[#141318] border-l border-[#26252c] overflow-y-auto p-5 space-y-5">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-14 h-14 rounded-full bg-[#e8743b]/15 border border-[#e8743b]/40 flex items-center justify-center text-lg font-prototype text-[#e8743b] shrink-0">
+                                    {initials(selectedPlayerStats.name)}
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-prototype leading-tight">{selectedPlayerStats.name}</h3>
+                                    <p className="text-xs text-muted-foreground font-prototype mt-0.5">
+                                        {selectedPlayerStats.games} partie{selectedPlayerStats.games > 1 ? "s" : ""}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedPlayerId(null)}
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* KPI cards */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-3">
+                                <p className="text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">Record</p>
+                                <p className="text-xl font-prototype mt-0.5">{selectedPlayerStats.record}</p>
+                            </div>
+                            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-3">
+                                <p className="text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">Moyenne</p>
+                                <p className="text-xl font-prototype mt-0.5">{Math.round(selectedPlayerStats.avgScore)}</p>
+                            </div>
+                            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-3">
+                                <p className="text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">Place moy.</p>
+                                <p className="text-xl font-prototype mt-0.5">{selectedPlayerStats.avgPlace.toFixed(2)}</p>
+                            </div>
+                            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-3">
+                                <p className="text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">% Victoire</p>
+                                <p className="text-xl font-prototype mt-0.5 text-[#e8743b]">{Math.round(selectedPlayerStats.winPct)}%</p>
+                            </div>
+                        </div>
+
+                        {/* Performance chart */}
+                        <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-3">
+                            <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Performance — parties dans l&apos;ordre</p>
+                            <div className="flex items-end gap-1.5 h-28 overflow-x-auto">
+                                {selectedPlayerGames.map((g, i) => (
+                                    <div key={i} className="flex flex-col items-center justify-end gap-1 h-full shrink-0 w-7" title={`${g.totalScore} pts · ${g.corporation || "?"} · rang ${g.rank}`}>
+                                        <span className="text-[10px] font-prototype tabular-nums">{g.totalScore}</span>
+                                        <div
+                                            className="w-full rounded-t-sm"
+                                            style={{
+                                                height: `${(g.totalScore / maxPlayerGameScore) * 100}%`,
+                                                minHeight: 4,
+                                                backgroundColor: rankBadgeColor(g.rank),
+                                            }}
+                                        />
+                                        <Medal className="w-3 h-3" style={{ color: rankBadgeColor(g.rank) }} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Corporations */}
+                        <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-2.5">
+                            <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
+                            {selectedPlayerStats.corpEntries.length === 0 ? (
+                                <p className="text-sm text-muted-foreground font-prototype">Aucune donnée.</p>
+                            ) : selectedPlayerStats.corpEntries.map(([corp, count]) => (
+                                <div key={corp} className="flex items-center gap-3">
+                                    {CORPORATION_LOGOS[corp] && <Image src={CORPORATION_LOGOS[corp]} alt={corp} width={18} height={18} className="shrink-0" />}
+                                    <span className="text-xs font-prototype text-muted-foreground flex-1 truncate">{corp}</span>
+                                    <span className="text-sm font-prototype tabular-nums shrink-0">{count}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Recent games */}
+                        <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-2.5">
+                            <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
+                            <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                                {[...selectedPlayerGames].reverse().map((g, i) => (
+                                    <div key={i} className="flex items-center gap-2.5 py-1.5 border-t border-white/5 first:border-t-0">
+                                        <span
+                                            className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold font-prototype shrink-0 text-black"
+                                            style={{ backgroundColor: rankBadgeColor(g.rank) }}
+                                        >
+                                            {g.rank}
+                                        </span>
+                                        {CORPORATION_LOGOS[g.corporation] && (
+                                            <Image src={CORPORATION_LOGOS[g.corporation]} alt={g.corporation} width={16} height={16} className="shrink-0" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-prototype truncate">
+                                                {g.tournamentName || (g.round ? `Ronde ${g.round}` : "Partie")}
+                                                {g.tournamentName && g.round ? ` · Ronde ${g.round}` : ""}
+                                            </p>
+                                            {g.board && <p className="text-[10px] text-muted-foreground font-prototype truncate">{g.board}</p>}
+                                        </div>
+                                        <span className="text-sm font-prototype tabular-nums text-[#e8743b] shrink-0">{g.totalScore}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

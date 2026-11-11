@@ -535,6 +535,7 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                         participants={tournament.participants}
                         matches={statsMatches}
                         roundBoards={tournament.roundBoards}
+                        tournamentName={tournament.name}
                     />
                 )}
             </div>

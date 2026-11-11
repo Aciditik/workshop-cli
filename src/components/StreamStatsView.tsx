@@ -11,12 +11,13 @@ interface Props {
     participants: Participant[];
     matches: TableMatch[]; // already suspense-scoped by the caller (hidden final round excluded)
     roundBoards?: Record<number, string>; // round number -> board, one board per round
+    tournamentName?: string;
 }
 
 // Thin adapter: flattens this tournament's completed matches into the
 // generic OverviewEntry shape so the streamer's "Statistiques" tab and the
 // cross-tournament /stats page share one overview + heatmap implementation.
-export function StreamStatsView({ participants, matches, roundBoards }: Props) {
+export function StreamStatsView({ participants, matches, roundBoards, tournamentName }: Props) {
     const entries = useMemo<OverviewEntry[]>(() => {
         const participantById = new Map(participants.map((p) => [p.id, p]));
         const rows: OverviewEntry[] = [];
@@ -38,11 +39,13 @@ export function StreamStatsView({ participants, matches, roundBoards }: Props) {
                     cartes: sc.cartes || 0,
                     matchId: m.id,
                     board,
+                    round: m.round,
+                    tournamentName,
                 });
             }
         }
         return rows;
-    }, [participants, matches, roundBoards]);
+    }, [participants, matches, roundBoards, tournamentName]);
 
     return <OverviewStats entries={entries} />;
 }

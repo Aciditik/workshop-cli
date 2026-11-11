@@ -151,6 +151,8 @@ export default function StatsPage() {
         cartes: e.cartes,
         matchId: e.matchId,
         board: e.board || undefined,
+        tournamentName: e.tournamentName || undefined,
+        eventDate: e.eventDate || undefined,
       }));
   }, [data]);
 
