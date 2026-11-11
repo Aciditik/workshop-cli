@@ -28,7 +28,6 @@ import {
     getFormatLabel,
     generateRound1,
     generateDay2Round1,
-    findDefendingChampionId,
     getFormat,
     getMaxRounds,
     getQualifiedCount,
@@ -302,6 +301,18 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const [creatingFinale, setCreatingFinale] = useState(false);
 
     const tournament = isLoaded ? getTournament(id) : null;
+
+    // Finale only, draft stage: mark last year's champion so Round 1 of
+    // Day 1 seats them at Table 1. Only one player can hold the title at a
+    // time — toggling it on for someone clears it from anyone else.
+    const toggleDefendingChampion = (participantId: string) => {
+        if (!tournament) return;
+        const updatedParticipants = tournament.participants.map(p => ({
+            ...p,
+            isDefendingChampion: p.id === participantId ? !p.isDefendingChampion : false,
+        }));
+        updateTournament({ ...tournament, participants: updatedParticipants });
+    };
 
     // Board-selection modal: shown before generating a round (round 1 launch,
     // or "Générer Ronde X"). `pendingRound` is the round number about to be
@@ -1012,14 +1023,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         // Below that threshold the format is always the fixed 2-round elimination.
         const format = playerCount >= 29 ? selectedFormat : getFormat(playerCount);
         const maxRounds = getMaxRounds(playerCount);
-        // Finale only: the defending champion (winner of the previous
-        // finished Finale) is always seated at Table 1 of Day 1 Round 1.
-        const championId = isFinaleTournament
-            ? findDefendingChampionId(tournament.participants, tournaments, tournament.id)
-            : undefined;
         const round1Matches = format === "bracket"
             ? generateBracketRound1(tournament.id, tournament.participants, playerCount)
-            : generateRound1(tournament.id, tournament.participants, playerCount, championId);
+            : generateRound1(tournament.id, tournament.participants, playerCount);
 
         updateTournament({
             ...tournament,
@@ -1654,8 +1660,26 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                     <Image src={TEAM_TAGS[t.tag]} alt={t.tag} title={t.name} width={24} height={24} className="object-contain shrink-0" />
                                                 ) : null; })()}
                                                 <span className={`font-prototype truncate ${isCheckedIn ? "" : "text-muted-foreground"}`}>{playerDisplayName(p, showPseudos)}</span>
+                                                {p.isDefendingChampion && (
+                                                    <span className="flex items-center gap-1 text-[10px] font-prototype px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 shrink-0" title="Champion en titre — sera placé à la Table 1 de la Ronde 1">
+                                                        <Trophy className="w-3 h-3" /> Champion
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
+                                                {isAdmin && isFinaleTournament && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); toggleDefendingChampion(p.id); }}
+                                                        className={`p-1 rounded-md transition-colors ${p.isDefendingChampion
+                                                            ? "text-yellow-500 bg-yellow-500/10"
+                                                            : "text-muted-foreground hover:text-yellow-500 hover:bg-yellow-500/10 opacity-0 group-hover:opacity-100"
+                                                            }`}
+                                                        title={p.isDefendingChampion ? "Retirer le titre de champion en titre" : "Marquer comme champion en titre (Table 1, Ronde 1)"}
+                                                    >
+                                                        <Trophy className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 {isAdmin && (
                                                     <button
                                                         type="button"

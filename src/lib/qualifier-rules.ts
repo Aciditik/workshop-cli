@@ -1,4 +1,4 @@
-import { TableMatch, Participant, Tournament, TournamentFormat } from "./types";
+import { TableMatch, Participant, TournamentFormat } from "./types";
 
 // Raw scorecard total (NT + Objectifs + Récompenses + Forêts + Villes +
 // Cartes) for a player at a given table. This is the "real" score used to
@@ -236,13 +236,9 @@ function getSwissTableSizes(n: number): number[] {
 // them into the first table with room and no teammate already seated; if
 // every table with room would create a conflict (e.g. a team bigger than
 // the number of tables), fall back to whichever has the fewest teammates.
-function distributeAvoidingTeammates(pool: Participant[], tableSizes: number[], preSeated?: Participant): Participant[][] {
-    const shuffled = pool.filter(p => p.id !== preSeated?.id).sort(() => Math.random() - 0.5);
+function distributeAvoidingTeammates(pool: Participant[], tableSizes: number[]): Participant[][] {
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
     const tables: Participant[][] = tableSizes.map(() => []);
-    // A pre-seated player (e.g. the defending champion fixed at Table 1)
-    // occupies their seat before distribution: table 1 keeps one less free
-    // seat and their teammates will avoid it like any occupied table.
-    if (preSeated) tables[0].push(preSeated);
 
     for (const p of shuffled) {
         let target = -1;
@@ -272,8 +268,7 @@ function distributeAvoidingTeammates(pool: Participant[], tableSizes: number[], 
 export function generateRound1(
     tournamentId: string,
     participants: Participant[],
-    size: number,
-    championId?: string
+    size: number
 ): TableMatch[] {
     const format = getFormat(size);
 
@@ -284,21 +279,35 @@ export function generateRound1(
         tableSizes = getSwissTableSizes(participants.length);
     }
 
-    const champion = championId ? participants.find(p => p.id === championId) : undefined;
-    const rest = participants.filter(p => p.id !== championId);
-
     const seatedTables = participants.some(p => p.teamId)
-        ? distributeAvoidingTeammates(participants, tableSizes, champion)
+        ? distributeAvoidingTeammates(participants, tableSizes)
         : (() => {
-            const pool = [...rest].sort(() => Math.random() - 0.5);
-            const result: Participant[][] = tableSizes.map(() => []);
-            if (champion) result[0].push(champion);
+            const pool = [...participants].sort(() => Math.random() - 0.5);
+            const result: Participant[][] = [];
             let cursor = 0;
-            for (let i = 0; i < tableSizes.length; i++) {
-                while (result[i].length < tableSizes[i]) result[i].push(pool[cursor++]);
+            for (const n of tableSizes) {
+                result.push(pool.slice(cursor, cursor + n));
+                cursor += n;
             }
             return result;
         })();
+
+    // Finale only: the defending (last year's) champion is marked via
+    // Participant.isDefendingChampion and must always sit at Table 1 for
+    // Day 1's Round 1. Swap them in if seating put them elsewhere —
+    // preferring to swap with a non-teammate so we don't accidentally seat
+    // two players from the same team together.
+    const championId = participants.find(p => p.isDefendingChampion)?.id;
+    if (championId && seatedTables.length > 0 && !seatedTables[0].some(p => p.id === championId)) {
+        const champIdx = seatedTables.findIndex(table => table.some(p => p.id === championId));
+        if (champIdx > 0) {
+            const champ = seatedTables[champIdx].find(p => p.id === championId)!;
+            const swapIdx = Math.max(0, seatedTables[0].findIndex(p => p.teamId !== champ.teamId));
+            const other = seatedTables[0][swapIdx];
+            seatedTables[0][swapIdx] = champ;
+            seatedTables[champIdx][seatedTables[champIdx].findIndex(p => p.id === championId)] = other;
+        }
+    }
 
     const matches: TableMatch[] = [];
 
@@ -814,45 +823,4 @@ export function determineQualifiedPlayers(
         const ranked = rankSwissPlayers(matches, participants).filter(p => !p.dnf);
         return ranked.slice(0, qualifiedCount).map(p => p.id);
     }
-}
-
-// ─── Defending Champion (Finale only) ───────────────────────────────
-// CdF tradition: the reigning champion — winner of the previous finished
-// tournament whose name marks it as a Finale — is always seated at
-// Table 1 of Day 1 Round 1. Participants are re-created per tournament so
-// the champion is matched into the current roster by identity (email →
-// firstname+name → pseudo), not by id.
-export function findDefendingChampionId(
-    participants: Participant[],
-    allTournaments: Tournament[],
-    currentTournamentId?: string
-): string | undefined {
-    const previousFinales = allTournaments
-        .filter(t =>
-            t.id !== currentTournamentId &&
-            t.status === "fini" &&
-            /finale/i.test(t.name) &&
-            t.matches.some(m => m.isCompleted)
-        )
-        .sort((a, b) => String(b.eventDate || b.createdAt || "").localeCompare(String(a.eventDate || a.createdAt || "")));
-    const prev = previousFinales[0];
-    if (!prev) return undefined;
-
-    // Winner of a two-day Finale = Day 2 ranking; otherwise overall ranking.
-    const day2Ids = new Set(prev.day2ParticipantIds || []);
-    const ranked = rankSwissPlayers(
-        prev.day2StartRound ? prev.matches.filter(m => m.round >= prev.day2StartRound!) : prev.matches,
-        prev.day2StartRound ? prev.participants.filter(p => day2Ids.has(p.id)) : prev.participants
-    ).filter(p => !p.dnf);
-    const champion = ranked[0];
-    if (!champion) return undefined;
-
-    const norm = (s?: string) => (s || "").trim().toLowerCase();
-    const byEmail = norm(champion.email)
-        ? participants.find(p => norm(p.email) === norm(champion.email))
-        : undefined;
-    const match = byEmail
-        || participants.find(p => norm(p.firstname) === norm(champion.firstname) && norm(p.name) === norm(champion.name))
-        || (norm(champion.pseudo) ? participants.find(p => norm(p.pseudo) === norm(champion.pseudo)) : undefined);
-    return match?.id;
 }

@@ -14,6 +14,7 @@ export interface Participant {
     phone: string;
     score: number; // Accrued points
     dnf?: boolean; // Dropped / Did Not Finish — permanent, admin only
+    isDefendingChampion?: boolean; // Finale only: last year's champion — seated at Table 1 for Day 1 Round 1
     sourceTournamentId?: string; // Finale only: qualifier tournament this player came from (persisted server-side)
     teamId?: string; // Finale only: references a Team in Tournament.teams
 }

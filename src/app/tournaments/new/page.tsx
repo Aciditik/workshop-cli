@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTournaments } from "@/lib/store";
 import { useAuth, getApiUrl } from "@/lib/auth";
 import { Tournament, Participant, TournamentFormat } from "@/lib/types";
-import { getFormat, getMaxRounds, getQualifiedCount, getFormatLabel, isRecommendedSize, generateRound1, generateBracketRound1, findDefendingChampionId } from "@/lib/qualifier-rules";
+import { getFormat, getMaxRounds, getQualifiedCount, getFormatLabel, isRecommendedSize, generateRound1, generateBracketRound1 } from "@/lib/qualifier-rules";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Trophy, ChevronLeft, Upload, Info, Plus, X, Play, Users } from "lucide-react";
@@ -15,7 +15,7 @@ import Link from "next/link";
 
 export default function NewTournament() {
     const router = useRouter();
-    const { addTournament, tournaments } = useTournaments();
+    const { addTournament } = useTournaments();
     const { user, token } = useAuth();
     const [name, setName] = useState("");
     const [logoUrl, setLogoUrl] = useState("");
@@ -139,14 +139,9 @@ export default function NewTournament() {
         // Below that threshold the format is always the fixed 2-round elimination.
         const format = size >= 29 ? selectedFormat : getFormat(size);
         const maxRounds = getMaxRounds(size);
-        // Finale only: the defending champion (winner of the previous
-        // finished Finale) is always seated at Table 1 of Day 1 Round 1.
-        const championId = /finale/i.test(name)
-            ? findDefendingChampionId(participants, tournaments, tournamentId)
-            : undefined;
         const round1Matches = format === "bracket"
             ? generateBracketRound1(tournamentId, participants, size)
-            : generateRound1(tournamentId, participants, size, championId);
+            : generateRound1(tournamentId, participants, size);
 
         const newTournament: Tournament = {
             id: tournamentId,
