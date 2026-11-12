@@ -87,7 +87,10 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
     const [showAllSmallCard, setShowAllSmallCard] = useState(false);
-    const [smallCardMode, setSmallCardMode] = useState<"players" | "corps">("players");
+    // Which dataset fills the big "colonnes au choix" table — the small
+    // bar card automatically shows the other one.
+    const [mainTableMode, setMainTableMode] = useState<"corps" | "players">("corps");
+    const smallCardMode = mainTableMode === "corps" ? "players" : "corps";
     // Classement order: best single-game score first by default; clicking a
     // column header sorts by it, toggling asc/desc on repeated clicks.
     const [sortCol, setSortCol] = useState<ColKey>("record");
@@ -282,9 +285,10 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const cardRowsShown = showAllSmallCard ? allCardRows : allCardRows.slice(0, 5);
     const maxCardRowGames = Math.max(1, ...cardRowsShown.map((r) => r.games));
 
-    // ─── Corporations table ─────────────────────────────────────────────
+    // ─── Main table (Corporations or Joueurs, per the header toggle) ─────
+    const tableRows = mainTableMode === "corps" ? perCorp : perPlayer;
     const searchQuery = search.trim().toLowerCase();
-    const filteredRows = perCorp
+    const filteredRows = tableRows
         .filter((p) => p.games >= minGames)
         .filter((p) => !searchQuery || p.name.toLowerCase().includes(searchQuery))
         .sort((a, b) => {
@@ -408,22 +412,6 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                                 showAllSmallCard ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             )}
                         </button>
-                        <div className="flex rounded-md border border-border overflow-hidden shrink-0">
-                            {([["players", "Joueurs"], ["corps", "Corporations"]] as const).map(([mode, label]) => (
-                                <button
-                                    key={mode}
-                                    type="button"
-                                    onClick={() => setSmallCardMode(mode)}
-                                    className={`px-2 py-1 text-[10px] font-prototype transition-colors ${
-                                        smallCardMode === mode
-                                            ? "bg-[#e8743b] text-black"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
-                                    }`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
                     </div>
                     {cardRowsShown.length === 0 ? (
                         <p className="text-sm text-muted-foreground font-prototype">Aucune donnée pour l&apos;instant.</p>
@@ -499,16 +487,36 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                 </div>
             </div>
 
-            {/* Corporations table */}
+            {/* Main table — Corporations or Joueurs */}
             <div className="space-y-3">
-                <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations · colonnes au choix</p>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">
+                        {mainTableMode === "corps" ? "Corporations" : "Joueurs"} · colonnes au choix
+                    </p>
+                    <div className="flex rounded-md border border-border overflow-hidden">
+                        {([["players", "Joueurs"], ["corps", "Corporations"]] as const).map(([mode, label]) => (
+                            <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setMainTableMode(mode)}
+                                className={`px-2.5 py-1 text-[10px] font-prototype transition-colors ${
+                                    mainTableMode === mode
+                                        ? "bg-[#e8743b] text-black"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Rechercher une corporation..."
+                        placeholder={mainTableMode === "corps" ? "Rechercher une corporation..." : "Rechercher un joueur..."}
                         className="h-9 rounded-md border border-input bg-card/60 px-3 text-xs font-prototype placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-48"
                     />
                     <select
@@ -551,7 +559,7 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                     <table className="w-full text-sm font-prototype border-collapse min-w-[560px]">
                         <thead>
                             <tr className="bg-white/[0.04] text-[11px] uppercase tracking-wider text-muted-foreground">
-                                <th className="px-3 py-3 text-left sticky left-0 bg-[#16151a] z-10">Corporation</th>
+                                <th className="px-3 py-3 text-left sticky left-0 bg-[#16151a] z-10">{mainTableMode === "corps" ? "Corporation" : "Joueur"}</th>
                                 {COLUMN_DEFS.filter((c) => selectedCols.has(c.key)).map((c) => {
                                     const active = sortCol === c.key;
                                     return (
@@ -575,14 +583,22 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                         </thead>
                         <tbody>
                             {filteredRows.length === 0 && (
-                                <tr><td colSpan={1 + selectedCols.size} className="px-3 py-8 text-center text-muted-foreground">Aucune corporation ne correspond aux filtres.</td></tr>
+                                <tr><td colSpan={1 + selectedCols.size} className="px-3 py-8 text-center text-muted-foreground">{mainTableMode === "corps" ? "Aucune corporation" : "Aucun joueur"} ne correspond aux filtres.</td></tr>
                             )}
                             {filteredRows.map((r) => (
                                 <tr key={r.id} className="border-t border-white/5 h-12">
                                     <td className="px-3 py-2 sticky left-0 bg-[#16151a] z-10 min-w-[160px]">
                                         <span className="flex items-center gap-2 truncate">
-                                            {CORPORATION_LOGOS[r.name] && <Image src={CORPORATION_LOGOS[r.name]} alt="" width={18} height={18} className="shrink-0" />}
-                                            {r.name}
+                                            {mainTableMode === "corps" && CORPORATION_LOGOS[r.name] && <Image src={CORPORATION_LOGOS[r.name]} alt="" width={18} height={18} className="shrink-0" />}
+                                            {mainTableMode === "players" ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedPlayerId(r.id)}
+                                                    className="hover:text-[#e8743b] transition-colors truncate text-left"
+                                                >
+                                                    {r.name}
+                                                </button>
+                                            ) : r.name}
                                         </span>
                                     </td>
                                     {COLUMN_DEFS.filter((c) => selectedCols.has(c.key)).map((c) => (
