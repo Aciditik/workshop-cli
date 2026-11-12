@@ -82,6 +82,7 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [minGames, setMinGames] = useState(1);
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const [showAllCorps, setShowAllCorps] = useState(false);
     // Classement order: best single-game score first by default; clicking a
     // column header sorts by it, toggling asc/desc on repeated clicks.
     const [sortCol, setSortCol] = useState<ColKey>("record");
@@ -205,7 +206,8 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const boardEntries = [...boardCounts.entries()].sort((a, b) => b[1] - a[1]);
     const topBoard = boardEntries[0];
     const maxBoardCount = Math.max(1, ...boardEntries.map(([, c]) => c));
-    const corpEntries = [...corpCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const allCorpEntries = [...corpCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const corpEntries = showAllCorps ? allCorpEntries : allCorpEntries.slice(0, 5);
     const maxCorpBarCount = Math.max(1, ...corpEntries.map(([, c]) => c));
     const maxBucketCount = Math.max(1, ...scoreBuckets.map((b) => b.count));
 
@@ -325,19 +327,35 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                     ))}
                 </div>
                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-3">
-                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
+                    <button
+                        type="button"
+                        onClick={() => allCorpEntries.length > 5 && setShowAllCorps((v) => !v)}
+                        disabled={allCorpEntries.length <= 5}
+                        className="flex items-center gap-1.5 w-full text-left disabled:cursor-default"
+                    >
+                        <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground flex-1">
+                            Corporations jouées{allCorpEntries.length > 5 && !showAllCorps ? ` (top 5 / ${allCorpEntries.length})` : ""}
+                        </p>
+                        {allCorpEntries.length > 5 && (
+                            showAllCorps ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                        )}
+                    </button>
                     {corpEntries.length === 0 ? (
                         <p className="text-sm text-muted-foreground font-prototype">Aucune donnée pour l&apos;instant.</p>
-                    ) : corpEntries.map(([corp, count]) => (
-                        <div key={corp} className="flex items-center gap-3">
-                            {CORPORATION_LOGOS[corp] && <Image src={CORPORATION_LOGOS[corp]} alt={corp} width={18} height={18} className="shrink-0" />}
-                            <span className="text-xs font-prototype text-muted-foreground w-36 shrink-0 truncate">{corp}</span>
-                            <div className="flex-1 h-5 rounded-sm bg-white/5 overflow-hidden">
-                                <div className="h-full rounded-sm bg-[#e8743b]" style={{ width: `${(count / maxCorpBarCount) * 100}%` }} />
-                            </div>
-                            <span className="text-sm font-prototype tabular-nums w-10 text-right shrink-0">{count}</span>
+                    ) : (
+                        <div className={showAllCorps ? "space-y-3 max-h-80 overflow-y-auto pr-1" : "space-y-3"}>
+                            {corpEntries.map(([corp, count]) => (
+                                <div key={corp} className="flex items-center gap-3">
+                                    {CORPORATION_LOGOS[corp] && <Image src={CORPORATION_LOGOS[corp]} alt={corp} width={18} height={18} className="shrink-0" />}
+                                    <span className="text-xs font-prototype text-muted-foreground w-36 shrink-0 truncate">{corp}</span>
+                                    <div className="flex-1 h-5 rounded-sm bg-white/5 overflow-hidden">
+                                        <div className="h-full rounded-sm bg-[#e8743b]" style={{ width: `${(count / maxCorpBarCount) * 100}%` }} />
+                                    </div>
+                                    <span className="text-sm font-prototype tabular-nums w-10 text-right shrink-0">{count}</span>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    )}
                 </div>
             </div>
 
