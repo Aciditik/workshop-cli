@@ -86,7 +86,8 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [minGames, setMinGames] = useState(1);
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
-    const [showAllPlayersCard, setShowAllPlayersCard] = useState(false);
+    const [showAllSmallCard, setShowAllSmallCard] = useState(false);
+    const [smallCardMode, setSmallCardMode] = useState<"players" | "corps">("players");
     // Classement order: best single-game score first by default; clicking a
     // column header sorts by it, toggling asc/desc on repeated clicks.
     const [sortCol, setSortCol] = useState<ColKey>("record");
@@ -273,11 +274,13 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
         .sort((a, b) => b.winPct - a.winPct || b.games - a.games)
         .slice(0, 3);
 
-    // Small "Joueurs les plus actifs" card — top players by games played,
-    // same top-5-then-expand pattern the corporations card used to have.
-    const allActivePlayersSorted = [...perPlayer].sort((a, b) => b.games - a.games);
-    const activePlayersShown = showAllPlayersCard ? allActivePlayersSorted : allActivePlayersSorted.slice(0, 5);
-    const maxActivePlayerGames = Math.max(1, ...activePlayersShown.map((p) => p.games));
+    // Small card — toggleable between "Joueurs les plus actifs" and
+    // "Corporations jouées", both top-5-then-expand bar lists by games.
+    const allCardRows = smallCardMode === "players"
+        ? [...perPlayer].sort((a, b) => b.games - a.games)
+        : [...perCorp].sort((a, b) => b.games - a.games);
+    const cardRowsShown = showAllSmallCard ? allCardRows : allCardRows.slice(0, 5);
+    const maxCardRowGames = Math.max(1, ...cardRowsShown.map((r) => r.games));
 
     // ─── Corporations table ─────────────────────────────────────────────
     const searchQuery = search.trim().toLowerCase();
@@ -390,37 +393,70 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                     ))}
                 </div>
                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-3">
-                    <button
-                        type="button"
-                        onClick={() => allActivePlayersSorted.length > 5 && setShowAllPlayersCard((v) => !v)}
-                        disabled={allActivePlayersSorted.length <= 5}
-                        className="flex items-center gap-1.5 w-full text-left disabled:cursor-default"
-                    >
-                        <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground flex-1">
-                            Joueurs les plus actifs{allActivePlayersSorted.length > 5 && !showAllPlayersCard ? ` (top 5 / ${allActivePlayersSorted.length})` : ""}
-                        </p>
-                        {allActivePlayersSorted.length > 5 && (
-                            showAllPlayersCard ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                        )}
-                    </button>
-                    {activePlayersShown.length === 0 ? (
-                        <p className="text-sm text-muted-foreground font-prototype">Aucune donnée pour l&apos;instant.</p>
-                    ) : (
-                        <div className={showAllPlayersCard ? "space-y-3 max-h-80 overflow-y-auto pr-1" : "space-y-3"}>
-                            {activePlayersShown.map((p) => (
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => allCardRows.length > 5 && setShowAllSmallCard((v) => !v)}
+                            disabled={allCardRows.length <= 5}
+                            className="flex items-center gap-1.5 flex-1 min-w-0 text-left disabled:cursor-default"
+                        >
+                            <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground truncate">
+                                {smallCardMode === "players" ? "Joueurs les plus actifs" : "Corporations jouées"}
+                                {allCardRows.length > 5 && !showAllSmallCard ? ` (top 5 / ${allCardRows.length})` : ""}
+                            </p>
+                            {allCardRows.length > 5 && (
+                                showAllSmallCard ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            )}
+                        </button>
+                        <div className="flex rounded-md border border-border overflow-hidden shrink-0">
+                            {([["players", "Joueurs"], ["corps", "Corporations"]] as const).map(([mode, label]) => (
                                 <button
-                                    key={p.id}
+                                    key={mode}
                                     type="button"
-                                    onClick={() => setSelectedPlayerId(p.id)}
-                                    className="flex items-center gap-3 w-full text-left group"
+                                    onClick={() => setSmallCardMode(mode)}
+                                    className={`px-2 py-1 text-[10px] font-prototype transition-colors ${
+                                        smallCardMode === mode
+                                            ? "bg-[#e8743b] text-black"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+                                    }`}
                                 >
-                                    <span className="text-xs font-prototype text-muted-foreground w-36 shrink-0 truncate group-hover:text-[#e8743b] transition-colors">{p.name}</span>
-                                    <div className="flex-1 h-5 rounded-sm bg-white/5 overflow-hidden">
-                                        <div className="h-full rounded-sm bg-[#e8743b]" style={{ width: `${(p.games / maxActivePlayerGames) * 100}%` }} />
-                                    </div>
-                                    <span className="text-sm font-prototype tabular-nums w-10 text-right shrink-0">{p.games}</span>
+                                    {label}
                                 </button>
                             ))}
+                        </div>
+                    </div>
+                    {cardRowsShown.length === 0 ? (
+                        <p className="text-sm text-muted-foreground font-prototype">Aucune donnée pour l&apos;instant.</p>
+                    ) : (
+                        <div className={showAllSmallCard ? "space-y-3 max-h-80 overflow-y-auto pr-1" : "space-y-3"}>
+                            {cardRowsShown.map((r) => {
+                                const inner = (
+                                    <>
+                                        {smallCardMode === "corps" && CORPORATION_LOGOS[r.name] && (
+                                            <Image src={CORPORATION_LOGOS[r.name]} alt="" width={18} height={18} className="shrink-0" />
+                                        )}
+                                        <span className="text-xs font-prototype text-muted-foreground w-36 shrink-0 truncate group-hover:text-[#e8743b] transition-colors">{r.name}</span>
+                                        <div className="flex-1 h-5 rounded-sm bg-white/5 overflow-hidden">
+                                            <div className="h-full rounded-sm bg-[#e8743b]" style={{ width: `${(r.games / maxCardRowGames) * 100}%` }} />
+                                        </div>
+                                        <span className="text-sm font-prototype tabular-nums w-10 text-right shrink-0">{r.games}</span>
+                                    </>
+                                );
+                                return smallCardMode === "players" ? (
+                                    <button
+                                        key={r.id}
+                                        type="button"
+                                        onClick={() => setSelectedPlayerId(r.id)}
+                                        className="flex items-center gap-3 w-full text-left group"
+                                    >
+                                        {inner}
+                                    </button>
+                                ) : (
+                                    <div key={r.id} className="flex items-center gap-3">
+                                        {inner}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
