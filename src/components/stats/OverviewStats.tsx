@@ -5,6 +5,7 @@ import Image from "next/image";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
 import { Trophy, ChevronUp, ChevronDown, ChevronsUpDown, X, Medal } from "lucide-react";
+import { CorpCompare } from "./CorpCompare";
 
 // A single flattened scorecard row — the common shape both the single-
 // tournament streamer view and the cross-tournament /stats page reduce their
@@ -15,6 +16,9 @@ export interface OverviewEntry {
     totalScore: number;
     rank: number; // table placement, 1 = won the table
     corporation: string;
+    nt?: number;
+    objectifs?: number;
+    recompenses?: number;
     forets: number;
     villes: number;
     cartes: number;
@@ -142,13 +146,20 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
         };
     }, [entries]);
 
+    // Entries scoped to the selected board — shared by the per-player /
+    // per-corporation aggregates and the corporation comparator below, so
+    // switching "Plateau" recomputes numbers from only games on that board
+    // instead of just hiding rows that never played it.
+    const scopedEntries = useMemo(
+        () => (boardFilter === "Tous" ? entries : entries.filter((e) => e.board === boardFilter)),
+        [entries, boardFilter]
+    );
+
     // Per-player stats (small "Joueurs les plus actifs" card, the "Top
     // joueurs" podium, and the player detail drawer) and per-corporation
-    // stats (the main "Corporations" table) — both scoped to the selected
-    // board, so switching "Plateau" actually recomputes numbers from only
-    // games on that board, instead of just hiding rows that never played it.
+    // stats (the main "Corporations" table).
     const perPlayer = useMemo(() => {
-        const scoped = boardFilter === "Tous" ? entries : entries.filter((e) => e.board === boardFilter);
+        const scoped = scopedEntries;
 
         interface Agg {
             id: string;
@@ -197,10 +208,10 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             villes: a.games > 0 ? a.villes / a.games : 0,
             cartes: a.games > 0 ? a.cartes / a.games : 0,
         }));
-    }, [entries, boardFilter]);
+    }, [scopedEntries]);
 
     const perCorp = useMemo(() => {
-        const scoped = (boardFilter === "Tous" ? entries : entries.filter((e) => e.board === boardFilter))
+        const scoped = scopedEntries
             .filter((e) => e.corporation && e.corporation !== CORPORATION_PLACEHOLDER && e.corporation !== "Pas de corporation");
 
         interface Agg {
@@ -250,7 +261,7 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             villes: a.games > 0 ? a.villes / a.games : 0,
             cartes: a.games > 0 ? a.cartes / a.games : 0,
         }));
-    }, [entries, boardFilter]);
+    }, [scopedEntries]);
 
     const boardEntries = [...boardCounts.entries()].sort((a, b) => b[1] - a[1]);
     const topBoard = boardEntries[0];
@@ -561,6 +572,9 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                     <span>Meilleur (Place moy. : plus bas = meilleur)</span>
                 </div>
             </div>
+
+            {/* Corporation comparator — logo picker, 2-3 corps side by side */}
+            <CorpCompare entries={scopedEntries} />
 
             {/* Player detail drawer */}
             {selectedPlayerId && selectedPlayerStats && (

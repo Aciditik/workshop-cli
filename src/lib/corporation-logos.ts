@@ -2,6 +2,7 @@ import { StaticImageData } from "next/image";
 
 import arcadian from "@/assets/corpos/Communautés_Arcadiennes.png";
 import astrodrill from "@/assets/corpos/AstroDrill.png";
+import athenades from "@/assets/corpos/Athenades.png";
 import cheungshing from "@/assets/corpos/Cheung_Shing_Mars.png";
 import credicor from "@/assets/corpos/credicor.png";
 import desertron from "@/assets/corpos/Desertron.png";
@@ -35,13 +36,13 @@ import unionpharma from "@/assets/corpos/Union_Pharmaceutique.png";
 import unmi from "@/assets/corpos/unmi.png";
 import valleytrust from "@/assets/corpos/Valley_Trust.png";
 import vitor from "@/assets/corpos/Vitor.png";
-import wsm from "@/assets/corpos/World_Series_Mars.png";
 
 // Maps corporation display names to their logo asset. Corporations missing
 // from this map render as plain text via <CorpLabel />.
 export const CORPORATION_LOGOS: Record<string, StaticImageData> = {
     "Communautés Arcadiennes": arcadian,
     "AstroDrill": astrodrill,
+    "Athénadès": athenades,
     "Cheung Shing Mars": cheungshing,
     "Credicor": credicor,
     "Desertron": desertron,
@@ -75,5 +76,4 @@ export const CORPORATION_LOGOS: Record<string, StaticImageData> = {
     "United Nations Mars Initiative": unmi,
     "Valley Trust": valleytrust,
     "Vitor": vitor,
-    "World Series Mars": wsm,
 };
