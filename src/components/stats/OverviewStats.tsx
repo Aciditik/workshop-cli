@@ -82,7 +82,7 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [minGames, setMinGames] = useState(1);
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
-    const [showAllCorps, setShowAllCorps] = useState(false);
+    const [showAllPlayersCard, setShowAllPlayersCard] = useState(false);
     // Classement order: best single-game score first by default; clicking a
     // column header sorts by it, toggling asc/desc on repeated clicks.
     const [sortCol, setSortCol] = useState<ColKey>("record");
@@ -104,10 +104,9 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
         });
 
     // Global KPIs/charts — always computed over every entry, independent of
-    // the "Joueurs" table's board filter below.
-    const { tablesValidated, scorecardCount, bestScore, bestScorePlayerName, boardCounts, corpCounts, scoreBuckets, allBoards } = useMemo(() => {
+    // the Corporations table's board filter below.
+    const { tablesValidated, scorecardCount, bestScore, bestScorePlayerName, boardCounts, scoreBuckets, allBoards } = useMemo(() => {
         const boardCounts = new Map<string, number>();
-        const corpCounts = new Map<string, number>();
         const seenMatchIds = new Set<string>();
         const matchBoardSeen = new Set<string>();
         const buckets = SCORE_BUCKETS.map((b) => ({ ...b, count: 0 }));
@@ -130,9 +129,6 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             }
             const bucket = buckets.find((b) => e.totalScore >= b.min && e.totalScore <= b.max);
             if (bucket) bucket.count++;
-            if (e.corporation && e.corporation !== CORPORATION_PLACEHOLDER && e.corporation !== "Pas de corporation") {
-                corpCounts.set(e.corporation, (corpCounts.get(e.corporation) || 0) + 1);
-            }
         }
 
         return {
@@ -141,16 +137,16 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             bestScore: bestScore === -Infinity ? 0 : bestScore,
             bestScorePlayerName,
             boardCounts,
-            corpCounts,
             scoreBuckets: buckets,
             allBoards: [...boards].sort(),
         };
     }, [entries]);
 
-    // "Joueurs" table stats — scoped to the selected board, so switching the
-    // "Plateau" filter actually recomputes each player's numbers from only
-    // their games on that board, instead of just hiding players who never
-    // played it while leaving everyone else's all-boards stats unchanged.
+    // Per-player stats (small "Joueurs les plus actifs" card, the "Top
+    // joueurs" podium, and the player detail drawer) and per-corporation
+    // stats (the main "Corporations" table) — both scoped to the selected
+    // board, so switching "Plateau" actually recomputes numbers from only
+    // games on that board, instead of just hiding rows that never played it.
     const perPlayer = useMemo(() => {
         const scoped = boardFilter === "Tous" ? entries : entries.filter((e) => e.board === boardFilter);
 
@@ -166,12 +162,12 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             villes: number;
             cartes: number;
         }
-        const aggByPlayer = new Map<string, Agg>();
+        const aggByKey = new Map<string, Agg>();
         const getAgg = (id: string, name: string): Agg => {
-            let a = aggByPlayer.get(id);
+            let a = aggByKey.get(id);
             if (!a) {
                 a = { id, name, games: 0, totalScore: 0, best: -Infinity, wins: 0, placementSum: 0, forets: 0, villes: 0, cartes: 0 };
-                aggByPlayer.set(id, a);
+                aggByKey.set(id, a);
             }
             return a;
         };
@@ -188,7 +184,60 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             a.cartes += e.cartes || 0;
         }
 
-        return [...aggByPlayer.values()].map((a) => ({
+        return [...aggByKey.values()].map((a) => ({
+            id: a.id,
+            name: a.name,
+            games: a.games,
+            parties: a.games,
+            winPct: a.games > 0 ? (a.wins / a.games) * 100 : 0,
+            avgPlace: a.games > 0 ? a.placementSum / a.games : 0,
+            avgScore: a.games > 0 ? a.totalScore / a.games : 0,
+            record: a.best === -Infinity ? 0 : a.best,
+            forets: a.games > 0 ? a.forets / a.games : 0,
+            villes: a.games > 0 ? a.villes / a.games : 0,
+            cartes: a.games > 0 ? a.cartes / a.games : 0,
+        }));
+    }, [entries, boardFilter]);
+
+    const perCorp = useMemo(() => {
+        const scoped = (boardFilter === "Tous" ? entries : entries.filter((e) => e.board === boardFilter))
+            .filter((e) => e.corporation && e.corporation !== CORPORATION_PLACEHOLDER && e.corporation !== "Pas de corporation");
+
+        interface Agg {
+            id: string;
+            name: string;
+            games: number;
+            totalScore: number;
+            best: number;
+            wins: number;
+            placementSum: number;
+            forets: number;
+            villes: number;
+            cartes: number;
+        }
+        const aggByKey = new Map<string, Agg>();
+        const getAgg = (id: string, name: string): Agg => {
+            let a = aggByKey.get(id);
+            if (!a) {
+                a = { id, name, games: 0, totalScore: 0, best: -Infinity, wins: 0, placementSum: 0, forets: 0, villes: 0, cartes: 0 };
+                aggByKey.set(id, a);
+            }
+            return a;
+        };
+
+        for (const e of scoped) {
+            const a = getAgg(e.corporation, e.corporation);
+            a.games++;
+            a.totalScore += e.totalScore;
+            a.best = Math.max(a.best, e.totalScore);
+            a.placementSum += e.rank;
+            if (e.rank === 1) a.wins++;
+            a.forets += e.forets || 0;
+            a.villes += e.villes || 0;
+            a.cartes += e.cartes || 0;
+        }
+
+        return [...aggByKey.values()].map((a) => ({
             id: a.id,
             name: a.name,
             games: a.games,
@@ -206,9 +255,6 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const boardEntries = [...boardCounts.entries()].sort((a, b) => b[1] - a[1]);
     const topBoard = boardEntries[0];
     const maxBoardCount = Math.max(1, ...boardEntries.map(([, c]) => c));
-    const allCorpEntries = [...corpCounts.entries()].sort((a, b) => b[1] - a[1]);
-    const corpEntries = showAllCorps ? allCorpEntries : allCorpEntries.slice(0, 5);
-    const maxCorpBarCount = Math.max(1, ...corpEntries.map(([, c]) => c));
     const maxBucketCount = Math.max(1, ...scoreBuckets.map((b) => b.count));
 
     const topPlayersByWinPct = [...perPlayer]
@@ -216,9 +262,15 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
         .sort((a, b) => b.winPct - a.winPct || b.games - a.games)
         .slice(0, 3);
 
-    // ─── Joueurs table ──────────────────────────────────────────────────
+    // Small "Joueurs les plus actifs" card — top players by games played,
+    // same top-5-then-expand pattern the corporations card used to have.
+    const allActivePlayersSorted = [...perPlayer].sort((a, b) => b.games - a.games);
+    const activePlayersShown = showAllPlayersCard ? allActivePlayersSorted : allActivePlayersSorted.slice(0, 5);
+    const maxActivePlayerGames = Math.max(1, ...activePlayersShown.map((p) => p.games));
+
+    // ─── Corporations table ─────────────────────────────────────────────
     const searchQuery = search.trim().toLowerCase();
-    const filteredRows = perPlayer
+    const filteredRows = perCorp
         .filter((p) => p.games >= minGames)
         .filter((p) => !searchQuery || p.name.toLowerCase().includes(searchQuery))
         .sort((a, b) => {
@@ -329,30 +381,34 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-3">
                     <button
                         type="button"
-                        onClick={() => allCorpEntries.length > 5 && setShowAllCorps((v) => !v)}
-                        disabled={allCorpEntries.length <= 5}
+                        onClick={() => allActivePlayersSorted.length > 5 && setShowAllPlayersCard((v) => !v)}
+                        disabled={allActivePlayersSorted.length <= 5}
                         className="flex items-center gap-1.5 w-full text-left disabled:cursor-default"
                     >
                         <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground flex-1">
-                            Corporations jouées{allCorpEntries.length > 5 && !showAllCorps ? ` (top 5 / ${allCorpEntries.length})` : ""}
+                            Joueurs les plus actifs{allActivePlayersSorted.length > 5 && !showAllPlayersCard ? ` (top 5 / ${allActivePlayersSorted.length})` : ""}
                         </p>
-                        {allCorpEntries.length > 5 && (
-                            showAllCorps ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                        {allActivePlayersSorted.length > 5 && (
+                            showAllPlayersCard ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                         )}
                     </button>
-                    {corpEntries.length === 0 ? (
+                    {activePlayersShown.length === 0 ? (
                         <p className="text-sm text-muted-foreground font-prototype">Aucune donnée pour l&apos;instant.</p>
                     ) : (
-                        <div className={showAllCorps ? "space-y-3 max-h-80 overflow-y-auto pr-1" : "space-y-3"}>
-                            {corpEntries.map(([corp, count]) => (
-                                <div key={corp} className="flex items-center gap-3">
-                                    {CORPORATION_LOGOS[corp] && <Image src={CORPORATION_LOGOS[corp]} alt={corp} width={18} height={18} className="shrink-0" />}
-                                    <span className="text-xs font-prototype text-muted-foreground w-36 shrink-0 truncate">{corp}</span>
+                        <div className={showAllPlayersCard ? "space-y-3 max-h-80 overflow-y-auto pr-1" : "space-y-3"}>
+                            {activePlayersShown.map((p) => (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => setSelectedPlayerId(p.id)}
+                                    className="flex items-center gap-3 w-full text-left group"
+                                >
+                                    <span className="text-xs font-prototype text-muted-foreground w-36 shrink-0 truncate group-hover:text-[#e8743b] transition-colors">{p.name}</span>
                                     <div className="flex-1 h-5 rounded-sm bg-white/5 overflow-hidden">
-                                        <div className="h-full rounded-sm bg-[#e8743b]" style={{ width: `${(count / maxCorpBarCount) * 100}%` }} />
+                                        <div className="h-full rounded-sm bg-[#e8743b]" style={{ width: `${(p.games / maxActivePlayerGames) * 100}%` }} />
                                     </div>
-                                    <span className="text-sm font-prototype tabular-nums w-10 text-right shrink-0">{count}</span>
-                                </div>
+                                    <span className="text-sm font-prototype tabular-nums w-10 text-right shrink-0">{p.games}</span>
+                                </button>
                             ))}
                         </div>
                     )}
@@ -396,16 +452,16 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                 </div>
             </div>
 
-            {/* Joueurs table */}
+            {/* Corporations table */}
             <div className="space-y-3">
-                <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Joueurs · colonnes au choix</p>
+                <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations · colonnes au choix</p>
 
                 <div className="flex items-center gap-2 flex-wrap">
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Rechercher un joueur..."
+                        placeholder="Rechercher une corporation..."
                         className="h-9 rounded-md border border-input bg-card/60 px-3 text-xs font-prototype placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-48"
                     />
                     <select
@@ -448,7 +504,7 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                     <table className="w-full text-sm font-prototype border-collapse min-w-[560px]">
                         <thead>
                             <tr className="bg-white/[0.04] text-[11px] uppercase tracking-wider text-muted-foreground">
-                                <th className="px-3 py-3 text-left sticky left-0 bg-[#16151a] z-10">Joueur</th>
+                                <th className="px-3 py-3 text-left sticky left-0 bg-[#16151a] z-10">Corporation</th>
                                 {COLUMN_DEFS.filter((c) => selectedCols.has(c.key)).map((c) => {
                                     const active = sortCol === c.key;
                                     return (
@@ -472,16 +528,15 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
                         </thead>
                         <tbody>
                             {filteredRows.length === 0 && (
-                                <tr><td colSpan={1 + selectedCols.size} className="px-3 py-8 text-center text-muted-foreground">Aucun joueur ne correspond aux filtres.</td></tr>
+                                <tr><td colSpan={1 + selectedCols.size} className="px-3 py-8 text-center text-muted-foreground">Aucune corporation ne correspond aux filtres.</td></tr>
                             )}
                             {filteredRows.map((r) => (
-                                <tr
-                                    key={r.id}
-                                    onClick={() => setSelectedPlayerId(r.id)}
-                                    className="border-t border-white/5 h-12 cursor-pointer hover:bg-white/[0.03] transition-colors"
-                                >
+                                <tr key={r.id} className="border-t border-white/5 h-12">
                                     <td className="px-3 py-2 sticky left-0 bg-[#16151a] z-10 min-w-[160px]">
-                                        <span className="truncate text-[#e8743b] hover:underline">{r.name}</span>
+                                        <span className="flex items-center gap-2 truncate">
+                                            {CORPORATION_LOGOS[r.name] && <Image src={CORPORATION_LOGOS[r.name]} alt="" width={18} height={18} className="shrink-0" />}
+                                            {r.name}
+                                        </span>
                                     </td>
                                     {COLUMN_DEFS.filter((c) => selectedCols.has(c.key)).map((c) => (
                                         <td key={c.key} className="px-3 py-2 text-center tabular-nums">
