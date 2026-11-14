@@ -259,6 +259,7 @@ export default function Dashboard() {
                     tournamentName={tournament.name}
                     tournamentLogoUrl={tournament.logoUrl}
                     eventDate={tournament.eventDate}
+                    scoreAccessToken={tournament.scoreAccessToken}
                     trigger={
                       <Button
                         variant="ghost"
