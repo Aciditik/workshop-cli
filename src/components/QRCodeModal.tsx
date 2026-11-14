@@ -11,9 +11,6 @@ interface QRCodeModalProps {
     tournamentName: string;
     tournamentLogoUrl?: string;
     eventDate?: string;
-    // Embedded in the QR URL as ?key=... — the backend requires it before
-    // accepting a scorecard, so only scanned codes can enter scores.
-    scoreAccessToken?: string;
     // Optional custom trigger (e.g. a small hover-reveal icon button on a
     // dashboard card) — defaults to the labeled "Voir le QR code" button.
     trigger?: ReactNode;
@@ -27,13 +24,12 @@ function formatEventDate(iso?: string): string {
     return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
 
-export function QRCodeModal({ tournamentId, tournamentName, tournamentLogoUrl, eventDate, scoreAccessToken, trigger }: QRCodeModalProps) {
+export function QRCodeModal({ tournamentId, tournamentName, tournamentLogoUrl, eventDate, trigger }: QRCodeModalProps) {
     const qrRef = useRef<HTMLDivElement>(null);
 
-    const path = `/t/${tournamentId}${scoreAccessToken ? `?key=${scoreAccessToken}` : ""}`;
     const url = typeof window !== "undefined"
-        ? `${window.location.origin}${path}`
-        : path;
+        ? `${window.location.origin}/t/${tournamentId}`
+        : `/t/${tournamentId}`;
 
     const cdfLogoAbsolute = typeof window !== "undefined"
         ? `${window.location.origin}/cdf-logo.png`

@@ -24,7 +24,6 @@ interface SwissRoundsProps {
     tournamentName: string;
     tournamentLogoUrl?: string;
     eventDate?: string;
-    scoreAccessToken?: string;
     maxRounds?: number;
     qualifiedIds?: string[];
     isAdmin?: boolean;
@@ -82,7 +81,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, scoreAccessToken, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams, roundLabelOffset = 0, hiddenResultRounds }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams, roundLabelOffset = 0, hiddenResultRounds }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1 + roundLabelOffset);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -207,7 +206,6 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                                             tournamentName={tournamentName}
                                             tournamentLogoUrl={tournamentLogoUrl}
                                             eventDate={eventDate}
-                                            scoreAccessToken={scoreAccessToken}
                                         />
                                     </div>
                                 )}

@@ -1919,7 +1919,6 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     tournamentName={tournament.name}
                                     tournamentLogoUrl={tournament.logoUrl}
                                     eventDate={tournament.eventDate}
-                                    scoreAccessToken={tournament.scoreAccessToken}
                                     maxRounds={dayMaxRounds}
                                     roundLabelOffset={dayRoundLabelOffset}
                                     qualifiedIds={isFinaleTournament ? undefined : tournament.qualifiedIds}

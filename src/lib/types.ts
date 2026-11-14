@@ -81,7 +81,4 @@ export interface Tournament {
     // until the organizer explicitly publishes it.
     day1ResultsPublished?: boolean;
     day2ResultsPublished?: boolean;
-    // QR-code secret — only present in authenticated owner/admin payloads,
-    // never in public data; embedded in the printed QR URL as ?key=...
-    scoreAccessToken?: string;
 }

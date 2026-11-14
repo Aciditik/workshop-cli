@@ -1,24 +1,16 @@
 "use client";
 
-import { use, useState, useEffect, Suspense } from "react";
+import { use, useState, useEffect } from "react";
 import { Tournament } from "@/lib/types";
 import { playerDisplayName } from "@/lib/playerName";
 import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/Card";
-import { Users, Search, X, Map as MapIcon, BarChart3, ListOrdered, Lock } from "lucide-react";
+import { Users, Search, X, Map as MapIcon, BarChart3, ListOrdered } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
-export default function TournamentLandingPage({ params }: { params: Promise<{ tournamentId: string }> }) {
-    return (
-        <Suspense fallback={<div className="p-8 text-center animate-pulse">Loading tournament...</div>}>
-            <TournamentLanding params={params} />
-        </Suspense>
-    );
-}
-
-function TournamentLanding({ params }: { params: Promise<{ tournamentId: string }> }) {
+export default function TournamentLanding({ params }: { params: Promise<{ tournamentId: string }> }) {
     const { tournamentId } = use(params);
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
@@ -27,11 +19,6 @@ function TournamentLanding({ params }: { params: Promise<{ tournamentId: string 
     const [showPseudos, setShowPseudos] = useState(false);
     const { user, loginAsGuest } = useAuth();
     const router = useRouter();
-    const searchParams = useSearchParams();
-    // Secret carried by the printed QR code (?key=...) — the backend requires
-    // it for score submission, so we thread it through to the table links.
-    // No key (public link, edited URL) → tables stay visible read-only.
-    const accessKey = searchParams.get("key") || "";
 
     useEffect(() => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -243,7 +230,7 @@ function TournamentLanding({ params }: { params: Promise<{ tournamentId: string 
                                 {activeMatches.map(match => (
                                     <Link
                                         key={match.id}
-                                        href={`/t/${tournamentId}/table/${match.id}${accessKey ? `?key=${encodeURIComponent(accessKey)}` : ""}`}
+                                        href={`/t/${tournamentId}/table/${match.id}`}
                                         className="block"
                                     >
                                         <Card className={`p-4 transition-all cursor-pointer ${matchContainsSearched(match) ? "border-primary bg-primary/10 ring-2 ring-primary/40" : "border-primary/30 hover:border-primary hover:bg-primary/5"}`}>
@@ -260,14 +247,7 @@ function TournamentLanding({ params }: { params: Promise<{ tournamentId: string 
                                                         </p>
                                                     </div>
                                                 </div>
-                                                {accessKey ? (
-                                                    <span className="text-primary text-sm font-prototype">→ Entrer vos scores</span>
-                                                ) : (
-                                                    <span className="text-muted-foreground text-xs font-prototype inline-flex items-center gap-1.5">
-                                                        <Lock className="w-3.5 h-3.5" />
-                                                        QR requis
-                                                    </span>
-                                                )}
+                                                <span className="text-primary text-sm font-prototype">→ Entrer vos scores</span>
                                             </div>
                                         </Card>
                                     </Link>

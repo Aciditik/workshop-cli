@@ -1,15 +1,14 @@
 "use client";
 
-import { use, useState, useEffect, Suspense } from "react";
+import { use, useState, useEffect } from "react";
 import { Tournament } from "@/lib/types";
 import { playerDisplayName } from "@/lib/playerName";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Trophy, CheckCircle2, ChevronUp, ChevronDown, ArrowLeft, AlertTriangle, Lock } from "lucide-react";
+import { Trophy, CheckCircle2, ChevronUp, ChevronDown, ArrowLeft, AlertTriangle } from "lucide-react";
 import { CORPORATIONS, CORPORATION_PLACEHOLDER } from "@/lib/corporations";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 // Form state uses null to distinguish "not yet entered" from a real 0
 type FormPlayerScore = {
@@ -73,21 +72,8 @@ const CATEGORIES: { key: keyof PlayerScore; label: string }[] = [
     { key: "megacredits", label: "Megacredits" },
 ];
 
-export default function MobileScorecardPage({ params }: { params: Promise<{ tournamentId: string, tableId: string }> }) {
-    return (
-        <Suspense fallback={<div className="p-8 text-center animate-pulse font-prototype">Chargement...</div>}>
-            <MobileScorecard params={params} />
-        </Suspense>
-    );
-}
-
-function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, tableId: string }> }) {
+export default function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, tableId: string }> }) {
     const { tournamentId, tableId } = use(params);
-    const searchParams = useSearchParams();
-    // QR-secret: required by the backend to accept a scorecard. No key in the
-    // URL → this page renders read-only (reached by editing a link, not by
-    // scanning the tournament's QR code).
-    const accessKey = searchParams.get("key") || "";
 
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
@@ -137,24 +123,6 @@ function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, t
     if (!tournament) return <div className="p-8 text-center font-prototype text-red-500">Tournoi non trouvé.</div>;
     if (!match) return <div className="p-8 text-center font-prototype text-red-500">Table non trouvée.</div>;
 
-    if (!accessKey) {
-        return (
-            <div className="min-h-screen bg-background p-4 flex flex-col items-center justify-center">
-                <Card className="w-full max-w-sm border-border text-center p-8">
-                    <Lock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                    <h2 className="text-2xl font-prototype mb-2">Saisie verrouillée</h2>
-                    <p className="font-prototype text-muted-foreground mb-6">Scannez le QR code du tournoi pour saisir les scores.</p>
-                    <Link href={`/t/${tournamentId}`} className="inline-block w-full">
-                        <Button className="w-full gap-2 font-prototype" variant="outline">
-                            <ArrowLeft className="w-4 h-4" />
-                            Retour
-                        </Button>
-                    </Link>
-                </Card>
-            </div>
-        );
-    }
-
     if (match.isCompleted || submitted) {
         return (
             <div className="min-h-screen bg-background p-4 flex flex-col items-center justify-center">
@@ -162,7 +130,7 @@ function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, t
                     <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-prototype mb-2">Scores envoyés!</h2>
                     <p className="font-prototype text-muted-foreground mb-6">Merci. L&apos;admin vérifiera ces résultats sous peu.</p>
-                    <Link href={`/t/${tournamentId}?key=${encodeURIComponent(accessKey)}`} className="inline-block w-full">
+                    <Link href={`/t/${tournamentId}`} className="inline-block w-full">
                         <Button className="w-full gap-2 font-prototype" variant="outline">
                             <ArrowLeft className="w-4 h-4" />
                             Retour aux tables
@@ -272,16 +240,11 @@ function MobileScorecard({ params }: { params: Promise<{ tournamentId: string, t
             });
 
             const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-            const res = await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}/table/${tableId}`, {
+            await fetch(`${apiUrl}/api/public/tournaments/${tournamentId}/table/${tableId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ results: pointsToSubmit, scorecards: scorecardsToSubmit, key: accessKey })
+                body: JSON.stringify({ results: pointsToSubmit, scorecards: scorecardsToSubmit })
             });
-            if (!res.ok) {
-                const err = await res.json().catch(() => null);
-                alert(err?.error || "Échec de l'envoi des scores. Réessayez ou prévenez l'admin.");
-                return;
-            }
             setSubmitted(true);
         } catch (e) {
             console.error(e);
