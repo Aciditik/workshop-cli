@@ -69,6 +69,7 @@ export default function StatsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const isGuest = user?.role === "guest";
+  const isStreamer = user?.role === "streamer";
 
   const [meta, setMeta] = useState<StatsData | null>(null);
   const [data, setData] = useState<StatsData | null>(null);
@@ -91,7 +92,7 @@ export default function StatsPage() {
 
   // Guard + one-time metadata fetch for the tournament dropdown.
   useEffect(() => {
-    if (!isAdmin && !isGuest) {
+    if (!isAdmin && !isGuest && !isStreamer) {
       router.push("/");
       return;
     }
@@ -99,11 +100,11 @@ export default function StatsPage() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setMeta)
       .catch(() => {});
-  }, [isAdmin, isGuest, router, apiUrl]);
+  }, [isAdmin, isGuest, isStreamer, router, apiUrl]);
 
   // Data fetch — one query param (tournament), cached per value fetched.
   useEffect(() => {
-    if (!isAdmin && !isGuest) return;
+    if (!isAdmin && !isGuest && !isStreamer) return;
     const qs = tournamentFilter ? `?tournament=${tournamentFilter}` : "";
     const url = `${apiUrl}/api/public/stats${qs}`;
 
@@ -130,7 +131,7 @@ export default function StatsPage() {
         .finally(() => setLoading(false));
     }, 0);
     return () => clearTimeout(id);
-  }, [isAdmin, isGuest, apiUrl, tournamentFilter]);
+  }, [isAdmin, isGuest, isStreamer, apiUrl, tournamentFilter]);
 
   const entries = useMemo<OverviewEntry[]>(() => {
     if (!data) return [];

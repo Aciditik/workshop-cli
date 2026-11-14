@@ -136,12 +136,11 @@ export default function Dashboard() {
     );
   }
 
-  // Guest home — same bare black-background style as the public /t/* pages.
+  // Guest home — bare black-background style like the public /t/* pages.
+  // Guests only pick among live ("en_cours") tournaments, opened in the
+  // read-only streamer view (/t/.../stream).
   if (isGuest) {
-    const statusOrder: Record<string, number> = { en_cours: 0, fini: 1, brouillon: 2 };
-    const sorted = [...sortedPublic].sort(
-      (a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3)
-    );
+    const liveTournaments = sortedPublic.filter((t) => t.status === "en_cours");
     return (
       <div className="min-h-screen bg-background flex flex-col items-center py-10 px-4">
         <div className="w-full max-w-lg space-y-8">
@@ -157,8 +156,8 @@ export default function Dashboard() {
                 />
               </div>
             </div>
-            <h1 className="text-3xl font-prototype tracking-tight">Tournois</h1>
-            <p className="text-muted-foreground font-prototype">Suivez les tournois en direct ou consultez leurs résultats.</p>
+            <h1 className="text-3xl font-prototype tracking-tight">Tournois en direct</h1>
+            <p className="text-muted-foreground font-prototype">Choisissez un tournoi en cours pour le suivre en direct.</p>
             <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
               <Link
                 href="/stats"
@@ -178,16 +177,16 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {sorted.length === 0 ? (
+          {liveTournaments.length === 0 ? (
             <Card className="p-6 text-center">
-              <p className="text-muted-foreground font-prototype">Aucun tournoi disponible.</p>
+              <p className="text-muted-foreground font-prototype">Aucun tournoi en cours pour le moment.</p>
             </Card>
           ) : (
             <div className="space-y-3">
-              {sorted.map((tournament) => {
+              {liveTournaments.map((tournament) => {
                 const isFinale = isFinaleTournament(tournament.name);
                 return (
-                  <Link key={tournament.id} href={`/t/${tournament.id}`}>
+                  <Link key={tournament.id} href={`/t/${tournament.id}/stream`}>
                     <Card className={`p-4 flex items-center gap-4 hover:border-primary/50 transition-colors cursor-pointer ${isFinale ? "border-yellow-500/40" : ""}`}>
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                         <Trophy className="w-5 h-5 text-primary" />
@@ -199,15 +198,8 @@ export default function Dashboard() {
                           {tournament.ownerName ? ` · ${tournament.ownerName}` : ""}
                         </p>
                       </div>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-prototype shrink-0 ${tournament.status === "fini"
-                          ? "bg-green-500/10 text-green-500 border border-green-500/20"
-                          : tournament.status === "en_cours"
-                            ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
-                            : "bg-orange-500/10 text-orange-500 border border-orange-500/20"
-                          }`}
-                      >
-                        {tournament.status === "fini" ? "FINI" : tournament.status === "en_cours" ? "EN COURS" : "BROUILLON"}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-prototype shrink-0 bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                        EN COURS
                       </span>
                       <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                     </Card>

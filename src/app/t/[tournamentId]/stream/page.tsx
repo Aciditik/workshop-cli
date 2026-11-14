@@ -18,6 +18,7 @@ import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { canonicalCorporation, CORPORATION_PLACEHOLDER } from "@/lib/corporations";
 import { ListOrdered, Users, Lock, BarChart3 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 // Read-only broadcast view for the streamer account: large, self-explanatory
 // numbers for the finale. Same suspense rules as the spectator view — a day's
@@ -310,6 +311,13 @@ function TournamentStream({ params }: { params: Promise<{ tournamentId: string }
                                 <BarChart3 className="w-4 h-4 inline-block mr-1.5 -mt-0.5" />Statistiques
                             </button>
                         </div>
+                        <Link
+                            href={`/stats?tournament=${tournament.id}`}
+                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md border border-border bg-card/50 hover:bg-accent/50 text-xs sm:text-sm font-prototype text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <BarChart3 className="w-4 h-4" />
+                            Page de statistiques
+                        </Link>
                     </div>
                 )}
 
