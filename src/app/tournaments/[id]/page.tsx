@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { SwissRounds } from "@/components/SwissRounds";
 import { BracketTreeView } from "@/components/BracketTreeView";
 import { BoardSelectModal } from "@/components/BoardSelectModal";
-import { Participant, Tournament, TournamentFormat } from "@/lib/types";
+import { Participant, Tournament, TournamentFormat, TableMatch } from "@/lib/types";
 import { playerDisplayName } from "@/lib/playerName";
 import {
     generateEliminationRound2,
@@ -886,6 +886,51 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         );
 
         updateTournament({ ...tournament, matches: cleanedMatches });
+    };
+
+    // Drag & drop onto the "+ Nouvelle table" zone: move the player out of
+    // their table into a brand-new table appended at the end of the round.
+    // Their submitted scorecard/result follows them, same as handleSwapPlayers.
+    const handleMoveToNewTable = (fromMatchId: string, fromPid: string, round: number) => {
+        if (tournament.status !== "en_cours") return;
+
+        const fromMatch = tournament.matches.find(m => m.id === fromMatchId);
+        if (!fromMatch || fromMatch.isCompleted) return;
+
+        const nextTableNumber = Math.max(0, ...tournament.matches.filter(m => m.round === round).map(m => m.tableNumber)) + 1;
+        const newMatch: TableMatch = {
+            id: crypto.randomUUID(),
+            tournamentId: tournament.id,
+            round,
+            tableNumber: nextTableNumber,
+            participantIds: [fromPid],
+            results: fromMatch.results?.[fromPid] !== undefined ? { [fromPid]: fromMatch.results[fromPid] } : {},
+            scorecards: fromMatch.scorecards?.[fromPid] ? { [fromPid]: fromMatch.scorecards[fromPid] } : undefined,
+            isCompleted: false,
+        };
+
+        const updatedMatches = tournament.matches.map(m => {
+            if (m.id !== fromMatchId) return m;
+            const newIds = m.participantIds.map(id => (id === fromPid ? null : id));
+            const newResults = { ...(m.results || {}) };
+            const newCards = { ...(m.scorecards || {}) };
+            delete newResults[fromPid];
+            delete newCards[fromPid];
+            return {
+                ...m,
+                participantIds: newIds,
+                results: newResults,
+                scorecards: Object.keys(newCards).length > 0 ? newCards : m.scorecards,
+            };
+        });
+
+        // Remove the source table if the move left it completely empty
+        // (non-validated), then append the new one.
+        const cleanedMatches = updatedMatches.filter(
+            m => m.isCompleted || m.participantIds.filter(Boolean).length > 0
+        );
+
+        updateTournament({ ...tournament, matches: [...cleanedMatches, newMatch] });
     };
 
     // ── Finale CdF ────────────────────────────────────────────────────────────
@@ -1913,6 +1958,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     onDeclineResults={declineMatchResults}
                                     onEditScorecards={editMatchScorecards}
                                     onSwapPlayers={handleSwapPlayers}
+                                    onMoveToNewTable={handleMoveToNewTable}
                                     isAdmin={isAdmin}
                                     currentRound={tournament.currentRound || 0}
                                     tournamentId={tournament.id}

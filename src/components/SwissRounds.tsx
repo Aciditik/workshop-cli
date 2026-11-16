@@ -19,6 +19,9 @@ interface SwissRoundsProps {
     onDeclineResults?: (matchId: string) => void;
     onEditScorecards?: (matchId: string, results: Record<string, number>, scorecards: Record<string, PlayerScore>) => void;
     onSwapPlayers?: (fromMatchId: string, fromPid: string, toMatchId: string, toPid: string | null) => void;
+    // Drag & drop onto the "+ Nouvelle table" zone at the end of a round:
+    // pulls the player out of their table and creates a fresh table for them.
+    onMoveToNewTable?: (fromMatchId: string, pid: string, round: number) => void;
     currentRound: number;
     tournamentId: string;
     tournamentName: string;
@@ -81,7 +84,7 @@ function computePlacementPoints(scorecards: Record<string, PlayerScore>): Record
     return out;
 }
 
-export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams, roundLabelOffset = 0, hiddenResultRounds }: SwissRoundsProps) {
+export function SwissRounds({ matches, participants, onSubmitResults, onDeclineResults, onEditScorecards, onSwapPlayers, onMoveToNewTable, currentRound, tournamentId, tournamentName, tournamentLogoUrl, eventDate, maxRounds = 3, qualifiedIds, isAdmin, roundBoards, onEditRoundBoard, usePseudo = false, readOnly = false, teams, roundLabelOffset = 0, hiddenResultRounds }: SwissRoundsProps) {
     const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1 + roundLabelOffset);
     const qualifiedSet = new Set(qualifiedIds || []);
     // By default, only the current round is expanded
@@ -216,6 +219,23 @@ export function SwissRounds({ matches, participants, onSubmitResults, onDeclineR
                             <div className="space-y-4 pl-2">
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {roundMatches.map(match => renderMatchCard(match, round, match.isFinalist || false))}
+                                    {/* Drop target shown next to the last table while dragging a
+                                        player of the active round: creates a brand-new table. */}
+                                    {!readOnly && !!onMoveToNewTable && round === currentRound && dragSource && (
+                                        <div
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                if (dragSource) onMoveToNewTable(dragSource.matchId, dragSource.pid, round);
+                                                setDragSource(null);
+                                                setDragOver(null);
+                                            }}
+                                            className="flex flex-col items-center justify-center gap-2 min-h-[120px] rounded-lg border-2 border-dashed border-primary/60 bg-primary/5 text-primary font-prototype text-sm hover:bg-primary/10 transition-colors"
+                                        >
+                                            <span className="text-2xl leading-none">+</span>
+                                            Nouvelle table
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
