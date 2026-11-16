@@ -53,7 +53,10 @@ function fullName(e: { firstname: string; name: string }) {
 function shortTournamentName(name: string, eventDate?: string): string {
   if (!name || !/\bqualif\w*/i.test(name)) return name;
   const suffix = name.split("-").slice(1).join("-").trim();
-  const year = (eventDate ?? "").match(/\d{4}/)?.[0] ?? name.match(/\b(19|20)\d{2}\b/)?.[0];
+  // Prefer the year written in the name — that's the CdF season year
+  // ("Qualifier CdF 2027" even when the event runs in late 2026);
+  // eventDate is only a fallback.
+  const year = name.match(/\b(19|20)\d{2}\b/)?.[0] ?? (eventDate ?? "").match(/\d{4}/)?.[0];
   if (!suffix || !year) return name;
   return `Q${year.slice(-2)} - ${suffix}`;
 }
