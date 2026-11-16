@@ -1013,16 +1013,25 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                 };
             });
 
-            // If a brouillon "CdF Finale 2026" already exists (e.g. created from
-            // another qualifier), merge new players into it instead of
+            // The Finale belongs to the qualifier's season year — read from the
+            // name ("Qualifier CdF 2027" -> "CdF Finale 2027") even when the
+            // event runs in late 2026; eventDate then current year are fallbacks.
+            const finaleYear =
+                Number(tournament.name.match(/\b(?:19|20)\d{2}\b/)?.[0]) ||
+                new Date(tournament.eventDate).getFullYear() ||
+                new Date().getFullYear();
+            const finaleName = `CdF Finale ${finaleYear}`;
+
+            // If a brouillon finale already exists for this season (e.g. created
+            // from another qualifier), merge new players into it instead of
             // creating a duplicate. Dedup by email (case-insensitive).
             const existingFinale = tournaments.find(
-                t => t.name === "CdF Finale 2026" && t.status === "brouillon"
+                t => t.name === finaleName && t.status === "brouillon"
             );
 
             // Non-admins cannot see the Finale in their list (ownership-filtered
             // on the API), so they call a dedicated endpoint that appends players
-            // to the shared "CdF Finale 2026" brouillon regardless of ownership.
+            // to the shared finale brouillon regardless of ownership.
             if (!isAdmin) {
                 const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
                 const res = await fetch(`${getApiUrl()}/api/tournaments/finale/add-players`, {
@@ -1031,7 +1040,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                         "Content-Type": "application/json",
                         ...(token ? { Authorization: `Bearer ${token}` } : {}),
                     },
-                    body: JSON.stringify({ participants: newParticipants }),
+                    body: JSON.stringify({ participants: newParticipants, year: finaleYear }),
                 });
                 if (!res.ok) {
                     const data = await res.json().catch(() => ({}));
@@ -1073,9 +1082,9 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             const size = newParticipants.length;
             const finale: Tournament = {
                 id: crypto.randomUUID(),
-                name: "CdF Finale 2026",
+                name: finaleName,
                 logoUrl: "/cdf-logo.png",
-                eventDate: "2026-11-14",
+                eventDate: `${finaleYear}-11-14`,
                 createdAt: new Date().toISOString(),
                 status: "brouillon",
                 format: getFormat(size),
