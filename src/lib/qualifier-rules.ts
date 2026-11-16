@@ -186,16 +186,37 @@ function getRound2Config(
     const resolve = (tokens: string[]) =>
         tokens.map(t => resolveToken(t, rankings)).filter(Boolean);
 
-    return {
-        finalistTables: layout.finalist.map((tokens, i) => ({
-            participantIds: resolve(tokens),
-            label: `Finale ${i + 1}`,
-        })),
-        consolationTables: layout.consolation.map((tokens, i) => ({
-            participantIds: resolve(tokens),
-            label: `Consolation ${i + 1}`,
-        })),
-    };
+    const finalistTables = layout.finalist.map((tokens, i) => ({
+        participantIds: resolve(tokens),
+        label: `Finale ${i + 1}`,
+    }));
+    const consolationTables = layout.consolation.map((tokens, i) => ({
+        participantIds: resolve(tokens),
+        label: `Consolation ${i + 1}`,
+    }));
+
+    // Safety net: seat every Round-1 player. The layouts assume the exact
+    // official table count, but admins can reshape Round 1 (extra tables
+    // via drag & drop, moved players) and DNF players change the layout key
+    // — in both cases some players wouldn't be covered by any token and
+    // would silently vanish from Round 2. Leftovers fill consolation seats
+    // up to 4, then spill into extra consolation tables.
+    const placed = new Set(
+        [...finalistTables, ...consolationTables].flatMap(t => t.participantIds)
+    );
+    const leftovers = sorted.flatMap(m =>
+        m.participantIds.filter((id): id is string => id !== null && !placed.has(id))
+    );
+    for (const pid of leftovers) {
+        const open = consolationTables.find(t => t.participantIds.length < 4);
+        if (open) open.participantIds.push(pid);
+        else consolationTables.push({
+            participantIds: [pid],
+            label: `Consolation ${consolationTables.length + 1}`,
+        });
+    }
+
+    return { finalistTables, consolationTables };
 }
 
 // ─── Swiss Round Table Distribution (28+ players) ───────────────────
