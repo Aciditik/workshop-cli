@@ -12,6 +12,11 @@ import { QRCodeModal } from "@/components/QRCodeModal";
 
 const isFinaleTournament = (name: string) => /finale/i.test(name);
 
+// Season year: the year written in the name wins ("Qualifier CdF 2027" can be
+// played in late 2026); eventDate is the fallback.
+const tournamentYear = (t: { name: string; eventDate: string }) =>
+  Number(t.name.match(/\b(?:19|20)\d{2}\b/)?.[0] ?? new Date(t.eventDate).getFullYear());
+
 type PublicTournamentItem = {
   id: string;
   name: string;
@@ -54,6 +59,15 @@ export default function Dashboard() {
     });
   const sortedTournaments = sortByDate(tournaments);
   const sortedPublic = sortByDate(publicTournaments);
+
+  // Year filter — defaults to the current year; "all" shows every season.
+  const [yearFilter, setYearFilter] = useState<number | "all">(new Date().getFullYear());
+  const availableYears = [
+    ...new Set([new Date().getFullYear(), ...tournaments.map(tournamentYear)]),
+  ].sort((a, b) => b - a);
+  const visibleTournaments = sortedTournaments.filter(
+    (t) => yearFilter === "all" || tournamentYear(t) === yearFilter
+  );
 
   const effectiveLoaded = (isGuest || isStreamer) ? publicLoaded : isLoaded;
 
@@ -230,6 +244,34 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {tournaments.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {availableYears.map((y) => (
+            <button
+              key={y}
+              type="button"
+              onClick={() => setYearFilter(y)}
+              className={`px-3 py-1.5 rounded-md border text-sm font-prototype transition-colors ${yearFilter === y
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-card/50 text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                }`}
+            >
+              {y}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setYearFilter("all")}
+            className={`px-3 py-1.5 rounded-md border text-sm font-prototype transition-colors ${yearFilter === "all"
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border bg-card/50 text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              }`}
+          >
+            Tous
+          </button>
+        </div>
+      )}
+
       {tournaments.length === 0 ? (
         <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed border-2">
           <div className="bg-primary/10 p-4 rounded-full mb-4">
@@ -243,9 +285,15 @@ export default function Dashboard() {
             <Button className="font-prototype">Créer votre premier tournoi</Button>
           </Link>
         </Card>
+      ) : visibleTournaments.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed border-2">
+          <p className="text-muted-foreground font-prototype">
+            Aucun tournoi en {yearFilter}.
+          </p>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedTournaments.map((tournament) => {
+          {visibleTournaments.map((tournament) => {
             const isFinale = isFinaleTournament(tournament.name);
             return (
             <Link key={tournament.id} href={`/tournaments/${tournament.id}`}>
