@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { BarChart3, Users, Layers, Map as MapIcon, CalendarDays, Trophy, ChevronDown } from "lucide-react";
+import { BarChart3, Users, Layers, Map as MapIcon, CalendarDays, Trophy, ChevronDown, Check } from "lucide-react";
 import { canonicalCorporation } from "@/lib/corporations";
 import { OverviewStats, OverviewEntry } from "@/components/stats/OverviewStats";
 
@@ -53,16 +53,18 @@ function fullName(e: { firstname: string; name: string }) {
 function shortTournamentName(name: string, eventDate?: string): string {
   if (!name || !/\bqualif\w*/i.test(name)) return name;
   const suffix = name.split("-").slice(1).join("-").trim();
-  // Prefer the year written in the name — that's the CdF season year
-  // ("Qualifier CdF 2027" even when the event runs in late 2026);
-  // eventDate is only a fallback.
   const year = name.match(/\b(19|20)\d{2}\b/)?.[0] ?? (eventDate ?? "").match(/\d{4}/)?.[0];
   if (!suffix || !year) return name;
   return `Q${year.slice(-2)} - ${suffix}`;
 }
 
-// Simple in-memory cache keyed by the (single) tournament filter — revisiting
-// a tournament doesn't re-hit the API.
+// Season year: read from the name first ("Qualifier CdF 2027" can run in
+// late 2026), eventDate is the fallback. Shared by the year filter.
+const seasonYear = (t: { name: string; eventDate?: string }) =>
+  Number(t.name.match(/\b(?:19|20)\d{2}\b/)?.[0]) ||
+  Number((t.eventDate ?? "").match(/\d{4}/)?.[0]) ||
+  new Date().getFullYear();
+
 const statsCache = new Map<string, StatsData>();
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -80,12 +82,11 @@ export default function StatsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tournamentFilter, setTournamentFilter] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-  // Preselect a tournament when arriving from a public tournament page
-  // ("Voir les statistiques" links to /stats?tournament=<id>). Deferred so
-  // the URL-param read doesn't setState synchronously in the effect body.
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tournament");
     if (!t) return;
@@ -93,7 +94,6 @@ export default function StatsPage() {
     return () => clearTimeout(id);
   }, []);
 
-  // Guard + one-time metadata fetch for the tournament dropdown.
   useEffect(() => {
     if (!isAdmin && !isGuest && !isStreamer) {
       router.push("/");
@@ -105,7 +105,6 @@ export default function StatsPage() {
       .catch(() => {});
   }, [isAdmin, isGuest, isStreamer, router, apiUrl]);
 
-  // Data fetch — one query param (tournament), cached per value fetched.
   useEffect(() => {
     if (!isAdmin && !isGuest && !isStreamer) return;
     const qs = tournamentFilter ? `?tournament=${tournamentFilter}` : "";
@@ -138,12 +137,12 @@ export default function StatsPage() {
 
   const entries = useMemo<OverviewEntry[]>(() => {
     if (!data) return [];
-    // Hide scorecards with 0 total score (incomplete/placeholder data). The
-    // API only ever returns scorecards from admin-validated tables
-    // (isCompleted), so guests can safely see en_cours tournaments too —
-    // pending-review tables never leak into stats.
     return data.entries
       .filter((e) => e.totalScore !== 0)
+      .filter(
+        (e) =>
+          seasonYear({ name: e.tournamentName ?? "", eventDate: e.eventDate }) === yearFilter
+      )
       .map((e): OverviewEntry => ({
         playerId: playerKey(e),
         playerName: fullName(e),
@@ -163,16 +162,35 @@ export default function StatsPage() {
       }));
   }, [data]);
 
-  const tournamentList = useMemo(
-    () =>
-      (meta?.tournaments ?? data?.tournaments ?? [])
-        .slice()
-        .sort((a, b) => (b.eventDate || "").localeCompare(a.eventDate || "")),
+  const allTournaments = useMemo(
+    () => meta?.tournaments ?? data?.tournaments ?? [],
     [meta, data]
   );
-  const selectedTournament = tournamentList.find((t) => t.id === tournamentFilter);
+  const tournamentList = useMemo(
+    () =>
+      allTournaments
+        .filter((t) => seasonYear(t) === yearFilter)
+        .slice()
+        .sort((a, b) => (b.eventDate || "").localeCompare(a.eventDate || "")),
+    [allTournaments, yearFilter]
+  );
+  const availableYears = useMemo(
+    () =>
+      [...new Set([new Date().getFullYear(), ...allTournaments.map(seasonYear)])].sort(
+        (a, b) => b - a
+      ),
+    [allTournaments]
+  );
+  const selectedTournament = allTournaments.find((t) => t.id === tournamentFilter);
 
-  // Banner counters, computed over the currently filtered entries.
+  // Deep links (?tournament=<id>) pull the year filter along so the selected
+  // event stays visible even if it belongs to another season.
+  useEffect(() => {
+    if (selectedTournament && seasonYear(selectedTournament) !== yearFilter) {
+      setYearFilter(seasonYear(selectedTournament));
+    }
+  }, [selectedTournament, yearFilter]);
+
   const bannerPlayers = new Set(entries.map((e) => e.playerId)).size;
   const bannerTables = new Set(entries.map((e) => e.matchId)).size;
   const bannerBoards = new Set(entries.map((e) => e.board).filter(Boolean)).size;
@@ -205,9 +223,42 @@ export default function StatsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Event selector — compact button opening an emblem grid, like
-          the league switcher on esports stats pages */}
-      <div className="relative">
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setYearMenuOpen((v) => !v)}
+            className="flex items-center gap-2.5 px-3.5 py-2 rounded-md bg-card/60 border border-border text-sm font-prototype hover:bg-accent/50 transition-colors"
+          >
+            <span>{yearFilter}</span>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${yearMenuOpen ? "rotate-180" : ""}`} />
+          </button>
+          {yearMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setYearMenuOpen(false)} />
+              <div className="absolute left-0 top-full mt-2 z-50 min-w-full rounded-md border border-[#26252c] bg-[#141318] py-1 shadow-2xl">
+                {availableYears.map((y) => (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => {
+                      setYearFilter(y);
+                      setYearMenuOpen(false);
+                      if (selectedTournament && seasonYear(selectedTournament) !== y) {
+                        setTournamentFilter("");
+                      }
+                    }}
+                    className="w-full px-3.5 py-1.5 text-sm font-prototype text-left hover:bg-white/5 flex items-center justify-between gap-6 transition-colors"
+                  >
+                    {y}
+                    {yearFilter === y && <Check className="w-4 h-4 text-primary" />}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <div className="relative">
         <button
           type="button"
           onClick={() => setSelectorOpen((v) => !v)}
@@ -269,6 +320,7 @@ export default function StatsPage() {
             </div>
           </>
         )}
+        </div>
       </div>
 
       {/* Event banner — logo, name, date, and headline counters */}
