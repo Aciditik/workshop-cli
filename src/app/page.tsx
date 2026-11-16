@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import Image from "next/image";
-import { Trophy, Calendar, Users, ChevronRight, ChevronDown, Trash2, BarChart3, LogOut, QrCode } from "lucide-react";
+import { Trophy, Calendar, Users, ChevronRight, ChevronDown, Check, Trash2, BarChart3, LogOut, QrCode } from "lucide-react";
 import { QRCodeModal } from "@/components/QRCodeModal";
 
 const isFinaleTournament = (name: string) => /finale/i.test(name);
@@ -62,6 +62,7 @@ export default function Dashboard() {
 
   // Year filter — defaults to the current year; "all" shows every season.
   const [yearFilter, setYearFilter] = useState<number | "all">(new Date().getFullYear());
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
   const availableYears = [
     ...new Set([new Date().getFullYear(), ...tournaments.map(tournamentYear)]),
   ].sort((a, b) => b - a);
@@ -239,19 +240,32 @@ export default function Dashboard() {
         <div className="flex items-center gap-3 shrink-0">
           {tournaments.length > 0 && (
             <div className="relative">
-              <select
-                value={yearFilter}
-                onChange={(e) =>
-                  setYearFilter(e.target.value === "all" ? "all" : Number(e.target.value))
-                }
-                className="appearance-none pl-3 pr-8 py-2 rounded-md border border-border bg-card/50 font-prototype text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
+              <button
+                type="button"
+                onClick={() => setYearMenuOpen((o) => !o)}
+                className="h-11 px-4 rounded-md border border-border bg-card/50 hover:bg-accent/50 font-prototype text-sm inline-flex items-center gap-2 transition-colors"
               >
-                {availableYears.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-                <option value="all">Tous</option>
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                {yearFilter === "all" ? "Tous" : yearFilter}
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              </button>
+              {yearMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setYearMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 min-w-full rounded-md border border-border bg-card shadow-lg py-1">
+                    {availableYears.map((y) => (
+                      <button
+                        key={y}
+                        type="button"
+                        onClick={() => { setYearFilter(y); setYearMenuOpen(false); }}
+                        className="w-full px-3 py-1.5 text-sm font-prototype text-left hover:bg-accent/50 flex items-center justify-between gap-6 transition-colors"
+                      >
+                        {y}
+                        {yearFilter === y && <Check className="w-4 h-4 text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
           <Link href="/tournaments/new">
