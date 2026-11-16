@@ -513,6 +513,48 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         console.log("=== ROUND GENERATION SENT ===");
     };
 
+    // Regenerate the CURRENT round from scratch (e.g. after fixing Round 1
+    // tables manually — the previous generation may have dropped players).
+    // Refused once any table of the round is validated: real results can't be
+    // reseeded. Pending player submissions are discarded — confirmed first.
+    // Not offered for round 1 (that IS the random draw) nor the Day-2 opener
+    // (its seeding comes from the Day-1 ranking, not the previous round).
+    const canRegenerateCurrentRound = () => {
+        if (tournament.status !== "en_cours") return false;
+        if (currentRound < 2) return false;
+        if (isTwoDayFinale && currentRound === day2StartRound) return false;
+        return !tournament.matches.some(m => m.round === currentRound && m.isCompleted);
+    };
+
+    const regenerateCurrentRound = () => {
+        if (!canRegenerateCurrentRound()) return;
+        const label = `Ronde ${isDay2Round(currentRound) ? currentRound - day1Rounds : currentRound}`;
+        if (!window.confirm(`Régénérer ${label} ? Les tables de cette ronde seront recréées et les scores en attente supprimés.`)) return;
+
+        let newMatches: TableMatch[];
+        if (format === "elimination" && currentRound === 2) {
+            const activePlayers = tournament.participants.filter(p => !p.dnf);
+            const round1Matches = tournament.matches.filter(m => m.round === 1);
+            newMatches = generateEliminationRound2(tournament.id, activePlayers.length, round1Matches);
+        } else if (format === "bracket") {
+            const previousRoundMatches = tournament.matches.filter(m => m.round === currentRound - 1);
+            newMatches = generateBracketNextRound(tournament.id, previousRoundMatches, currentRound);
+        } else {
+            const activePlayers = tournament.participants.filter(p =>
+                !p.dnf && (!isDay2Round(currentRound) || day2ParticipantIdSet.has(p.id))
+            );
+            newMatches = generateSwissRound(tournament.id, activePlayers, currentRound - 1);
+        }
+
+        updateTournament({
+            ...tournament,
+            matches: [
+                ...tournament.matches.filter(m => m.round !== currentRound),
+                ...newMatches,
+            ],
+        });
+    };
+
     // A participant's running score is the sum of their results across the
     // matches that belong to their current "stage": once Day 2 has started,
     // a Day 2 participant's score only counts Day 2 matches (round >=
@@ -1902,6 +1944,12 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                                 : `Générer Ronde ${isDay2Round(currentRound + 1) ? currentRound + 1 - day1Rounds : currentRound + 1}`}
                                         </Button>
                                     ) : null
+                                )}
+                                {effectiveMainView === "rounds" && activeDay === liveDay && canRegenerateCurrentRound() && (
+                                    <Button onClick={regenerateCurrentRound} className="gap-2 font-prototype" variant="ghost">
+                                        <RotateCcw className="w-4 h-4" />
+                                        Régénérer la ronde
+                                    </Button>
                                 )}
                             </div>
                         </div>
