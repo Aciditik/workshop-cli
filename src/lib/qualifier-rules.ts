@@ -52,30 +52,31 @@ function tableLetterLabel(index: number): string {
 }
 
 // ─── Round 1 Table Distribution (8-28 players) ──────────────────────
-// Exact sizes per the official regulations document.
+// Tables of 4 preferred, then 3 — never a table of 5 (ROUND2_LAYOUTS below
+// were rebuilt together with these sizes, so every token resolves).
 function getRound1TableSizes(n: number): number[] {
     const exact: Record<number, number[]> = {
         8:  [4, 4],
-        9:  [4, 5],
-        10: [5, 5],
+        9:  [3, 3, 3],
+        10: [4, 3, 3],
         11: [4, 4, 3],
         12: [3, 3, 3, 3],
         13: [4, 3, 3, 3],
         14: [4, 4, 3, 3],
         15: [4, 4, 4, 3],
         16: [4, 4, 4, 4],
-        17: [4, 4, 4, 5],
-        18: [4, 4, 5, 5],
-        19: [4, 5, 5, 5],
-        20: [5, 5, 5, 5],
-        21: [4, 4, 4, 4, 5],
-        22: [4, 4, 4, 5, 5],
-        23: [4, 4, 5, 5, 5],
+        17: [4, 4, 3, 3, 3],
+        18: [4, 4, 4, 3, 3],
+        19: [4, 4, 4, 4, 3],
+        20: [4, 4, 4, 4, 4],
+        21: [4, 4, 4, 3, 3, 3],
+        22: [4, 4, 4, 4, 3, 3],
+        23: [4, 4, 4, 4, 4, 3],
         24: [4, 4, 4, 4, 4, 4],
-        25: [4, 4, 4, 4, 4, 5],
-        26: [4, 4, 4, 4, 5, 5],
-        27: [4, 4, 4, 5, 5, 5],
-        28: [4, 4, 5, 5, 5, 5],
+        25: [4, 4, 4, 4, 3, 3, 3],
+        26: [4, 4, 4, 4, 4, 3, 3],
+        27: [4, 4, 4, 4, 4, 4, 3],
+        28: [4, 4, 4, 4, 4, 4, 4],
     };
 
     return exact[n] || [];
@@ -87,7 +88,9 @@ function getRound1TableSizes(n: number): number[] {
 //   - X is the Round 1 table letter (A = 1st table, B = 2nd, …)
 //   - # is the finishing placement at that table (1 = winner, 2 = second,
 //     3 = 3rd, 4 = 4th, 5 = 5th).
-// These layouts come directly from the official CdF specification.
+// These layouts follow the official CdF seeding pattern (table winners and
+// best runners-up reach the Finale tables; everyone else splits into
+// Consolation) — tuned so every table seats 3-4 players, never 5.
 //
 // To change the distribution for a given player count, edit the token lists
 // below — no other code needs to change.
@@ -102,10 +105,10 @@ type TokenLayout = { finalist: string[][]; consolation: string[][] };
 const ROUND2_LAYOUTS: Record<number, TokenLayout> = {
     8:  { finalist: [["A1","B1","A2","B2"]],
           consolation: [["A3","B3","A4","B4"]] },
-    9:  { finalist: [["A1","B1","A2","B2"]],
-          consolation: [["A3","B3","A4","B4","B5"]] },
-    10: { finalist: [["A1","B1","A2","B2"]],
-          consolation: [["A3","B3","A4"], ["B4","A5","B5"]] },
+    9:  { finalist: [["A1","B1","C1"]],
+          consolation: [["A2","B2","C2"], ["A3","B3","C3"]] },
+    10: { finalist: [["A1","B1","C1"]],
+          consolation: [["A2","B2","C2","A3"], ["B3","C3","A4"]] },
     11: { finalist: [["A1","B1","C1"]],
           consolation: [["A2","B2","C2","A3"], ["B3","C3","A4","B4"]] },
     12: { finalist: [["A1","B1","C1","D1"]],
@@ -118,30 +121,30 @@ const ROUND2_LAYOUTS: Record<number, TokenLayout> = {
           consolation: [["A3","B3","C3","D3"], ["C4","A4","B4"]] },
     16: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
           consolation: [["A3","B3","C4","D4"], ["C3","D3","A4","B4"]] },
-    17: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
-          consolation: [["A3","B3","C4","D4"], ["C3","D3","A4","B4","D5"]] },
-    18: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
-          consolation: [["A3","B3","C4","D4","C5"], ["C3","D3","A4","B4","D5"]] },
-    19: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
-          consolation: [["A3","B3","C3","D3"], ["C4","D4","A4","B4"], ["B5","C5","D5"]] },
-    20: { finalist: [["A1","B1","C2","D2"], ["C1","D1","A2","B2"]],
-          consolation: [["A3","B3","C3","D3"], ["A4","B4","C4","D4"], ["A5","B5","C5","D5"]] },
-    21: { finalist: [["A1","B1","C1","D2","E2"], ["A2","B2","C2","D1","E1"]],
-          consolation: [["A3","B3","C3","D3"], ["E3","A4","B4","C4"], ["D4","E4","E5"]] },
-    22: { finalist: [["A1","B1","C1","D2","E2"], ["A2","B2","C2","D1","E1"]],
-          consolation: [["A3","B3","C3","D3"], ["E3","A4","B4","C4"], ["D4","D5","E4","E5"]] },
-    23: { finalist: [["A1","B1","C1","D2","E2"], ["A2","B2","C2","D1","E1"]],
-          consolation: [["A3","B3","C3","D3","E3"], ["A4","B4","C4","D4","E4"], ["C5","D5","E5"]] },
+    17: { finalist: [["A1","B1","C2","D2"], ["C1","D1","E1","A2"]],
+          consolation: [["B2","E2","A3"], ["B3","C3","D3"], ["E3","A4","B4"]] },
+    18: { finalist: [["A1","B1","C2","D2"], ["C1","D1","E1","A2"]],
+          consolation: [["B2","E2","A3","B3"], ["C3","D3","E3"], ["A4","B4","C4"]] },
+    19: { finalist: [["A1","B1","C2","D2"], ["C1","D1","E1","A2"]],
+          consolation: [["B2","E2","A3","B3"], ["C3","D3","E3","A4"], ["B4","C4","D4"]] },
+    20: { finalist: [["A1","B1","C2","D2"], ["C1","D1","E1","A2"]],
+          consolation: [["B2","E2","A3","B3"], ["C3","D3","E3","A4"], ["B4","C4","D4","E4"]] },
+    21: { finalist: [["A1","B1","C1","D2"], ["D1","E1","F1","A2"]],
+          consolation: [["B2","C2","A3","B3"], ["E2","F2","C3"], ["D3","E3","F3"], ["A4","B4","C4"]] },
+    22: { finalist: [["A1","B1","C1","D2"], ["D1","E1","F1","A2"]],
+          consolation: [["B2","C2","A3","B3"], ["E2","F2","C3","D3"], ["E3","F3","A4"], ["B4","C4","D4"]] },
+    23: { finalist: [["A1","B1","C1","D2"], ["D1","E1","F1","A2"]],
+          consolation: [["B2","C2","A3","B3"], ["E2","F2","C3","D3"], ["E3","F3","A4","B4"], ["C4","D4","E4"]] },
     24: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
           consolation: [["A3","B3","C4","D4"], ["A4","B4","E3","F3"], ["C3","D3","E4","F4"]] },
-    25: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
-          consolation: [["A3","B3","C4","D4"], ["A4","B4","E3","F3"], ["C3","D3","E4","F4","F5"]] },
-    26: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
-          consolation: [["A3","B3","C4","D4"], ["A4","B4","E3","F3","E5"], ["C3","D3","E4","F4","F5"]] },
-    27: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
-          consolation: [["A3","B3","C3","D3","E3"], ["F3","A4","D4","E4","F4"], ["B4","C4","D5","E5","F5"]] },
-    28: { finalist: [["A1","B1","C2","D2"], ["A2","B2","E1","F1"], ["C1","D1","E2","F2"]],
-          consolation: [["A3","B3","C3","D3"], ["E3","F3","A4","B4"], ["D4","C4","E4","F4"], ["D5","C5","E5","F5"]] },
+    25: { finalist: [["A1","B1","C2","D2"], ["E1","F1","A2","B2"], ["C1","D1","G1","E2"]],
+          consolation: [["F2","G2","A3","B3"], ["C3","D3","E3"], ["F3","G3","A4"], ["B4","C4","D4"]] },
+    26: { finalist: [["A1","B1","C2","D2"], ["E1","F1","A2","B2"], ["C1","D1","G1","E2"]],
+          consolation: [["F2","G2","A3","B3"], ["C3","D3","E3","F3"], ["G3","A4","B4"], ["C4","D4","E4"]] },
+    27: { finalist: [["A1","B1","C2","D2"], ["E1","F1","A2","B2"], ["C1","D1","G1","E2"]],
+          consolation: [["F2","G2","A3","B3"], ["C3","D3","E3","F3"], ["G3","A4","B4","C4"], ["D4","E4","F4"]] },
+    28: { finalist: [["A1","B1","C2","D2"], ["E1","F1","A2","B2"], ["C1","D1","G1","E2"]],
+          consolation: [["F2","G2","A3","B3"], ["C3","D3","E3","F3"], ["G3","A4","B4","C4"], ["D4","E4","F4","G4"]] },
 };
 
 function getTableRankings(match: TableMatch): { winner: string; second: string; rest: string[] } {
@@ -199,30 +202,14 @@ function getRound2Config(
 function getSwissTableSizes(n: number): number[] {
     if (n < 6) return [n];
 
-    // Tables of 4 preferred, some tables of 5 if needed, NO tables of 3
-    // For 28+: 4a + 5b = n, prefer fewer 5s
+    // Tables of 4 preferred, then tables of 3 — never a table of 5.
+    // n = 4q + r → q+1 tables total, with (4 - r) of them seating 3 players.
     const remainder = n % 4;
     if (remainder === 0) {
         return Array(n / 4).fill(4);
     }
-    // remainder 1: one table of 5 instead of one table of 4 → (n/4 - 1) tables of 4 + 1 table of 5? No: 4*(T-1)+5 = 4T+1 → n = 4T+1 → T = (n-1)/4
-    // Actually: we need 4a + 5b = n. b = remainder when thinking modulo.
-    // r=1: one 5-player table → 4*(floor(n/4)-1) + 5*1 = n-4+5 = n+1 ≠ n. Nope.
-    // Let's think differently: 
-    // n = 4q + r where r ∈ {0,1,2,3}
-    // r=0: q tables of 4
-    // r=1: (q-1) tables of 4 + 1 table of 5 → 4(q-1)+5 = 4q+1 = n ✓
-    // r=2: (q-1) tables of 4 + 2 tables of 5 → 4(q-1)+10 = 4q+6 ≠ n. Hmm.
-    //       OR: (q) tables of 4 + ... no, 4q = n-2, need 2 more players somewhere
-    //       Actually: q-1 tables of 4 + 2 tables of 3? But we said no 3s for 28+.
-    //       For Swiss 28+: let's allow tables of 3 as fallback since the existing code did.
-    //       The original CdF rules say tables of 3 or 4. Let me re-check the document...
-    //       "Players will be distributed into tables of 3 or 4" was the old text.
-    //       For Swiss (28+), the doc says "Voir règlement de la CdF" so tables of 3-4 are fine.
-
-    // Use the original algorithm: tables of 3 and 4
-    const k = remainder === 0 ? 0 : (4 - remainder); // number of 3-player tables
-    const T = Math.floor(n / 4) + (remainder === 0 ? 0 : 1); // total tables
+    const k = 4 - remainder; // number of 3-player tables
+    const T = Math.floor(n / 4) + 1; // total tables
     return [
         ...Array(T - k).fill(4),
         ...Array(k).fill(3),
@@ -452,9 +439,9 @@ export function generateSwissRound(
 
 // ─── Bracket Format (29+, opt-in): 3-round table-based elimination tree ────
 // Quarterfinals → Semifinals → Finale, halving both the player pool and the
-// table count each round. Table sizes prefer 4, then 3, then 5 (never lower
-// than 3 except for the tiny leftover pools of 1-2 that can occur at the very
-// end of the tree).
+// table count each round. Table sizes prefer 4, then 3 — never a table of 5
+// (except the tiny leftover pools of ≤5 that can occur at the very end of
+// the tree, where splitting further isn't possible).
 export function getBracketTableSizes(n: number): number[] {
     if (n <= 0) return [];
     if (n <= 5) return [n];
@@ -463,8 +450,8 @@ export function getBracketTableSizes(n: number): number[] {
     if (r === 0) return Array(n / 4).fill(4);
     if (r === 3) return [...Array(Math.floor(n / 4)).fill(4), 3];
     if (r === 2) return [...Array(Math.floor(n / 4) - 1).fill(4), 3, 3];
-    // r === 1
-    return [...Array(Math.floor(n / 4) - 1).fill(4), 5];
+    // r === 1: give up two tables of 4 for three tables of 3 (4(q-2)+9 = n)
+    return [...Array(Math.floor(n / 4) - 2).fill(4), 3, 3, 3];
 }
 
 function bracketRoundLabel(round: number): string {
