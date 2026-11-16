@@ -160,7 +160,7 @@ export default function StatsPage() {
         tournamentName: e.tournamentName || undefined,
         eventDate: e.eventDate || undefined,
       }));
-  }, [data]);
+  }, [data, yearFilter]);
 
   const allTournaments = useMemo(
     () => meta?.tournaments ?? data?.tournaments ?? [],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import Image from "next/image";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
@@ -80,7 +80,7 @@ function BarRow({ label, value, max, color, dotColor }: { label: string; value: 
     );
 }
 
-export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
+export const OverviewStats = memo(function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
     const [selectedCols, setSelectedCols] = useState<Set<ColKey>>(new Set(DEFAULT_COLUMNS));
     const [search, setSearch] = useState("");
     const [minGames, setMinGames] = useState(1);
@@ -741,4 +741,4 @@ export function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
             )}
         </div>
     );
-}
+});
