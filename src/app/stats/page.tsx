@@ -173,6 +173,7 @@ export default function StatsPage() {
         cartes: e.cartes,
         matchId: e.matchId,
         round: e.round,
+        tournamentId: e.tournamentId,
         board: e.board || undefined,
         tournamentName: e.tournamentName || undefined,
         eventDate: e.eventDate || undefined,
@@ -182,6 +183,10 @@ export default function StatsPage() {
   const allTournaments = useMemo(
     () => meta?.tournaments ?? data?.tournaments ?? [],
     [meta, data]
+  );
+  const tournamentLogos = useMemo(
+    () => Object.fromEntries(allTournaments.filter((t) => t.logoUrl).map((t) => [t.id, t.logoUrl!])),
+    [allTournaments]
   );
   const tournamentList = useMemo(
     () =>
@@ -246,7 +251,7 @@ export default function StatsPage() {
   // top of them.
   if (playerFilter) {
     return (
-      <OverviewStats entries={entries} playerId={playerFilter} onPlayerChange={handlePlayerChange} />
+      <OverviewStats entries={entries} playerId={playerFilter} onPlayerChange={handlePlayerChange} tournamentLogos={tournamentLogos} />
     );
   }
 
@@ -415,7 +420,7 @@ export default function StatsPage() {
         </div>
       </div>
 
-      <OverviewStats entries={entries} playerId={playerFilter} onPlayerChange={handlePlayerChange} />
+      <OverviewStats entries={entries} playerId={playerFilter} onPlayerChange={handlePlayerChange} tournamentLogos={tournamentLogos} />
     </div>
   );
 }

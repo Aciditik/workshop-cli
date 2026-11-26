@@ -22,10 +22,11 @@ export interface CircuitPlayerAgg {
 }
 
 interface Props {
-    entries: OverviewEntry[]; // this player's full history, unfiltered by board
+    entries: OverviewEntry[]; // every table's entries — needed for table/board averages in the rating
     circuit: CircuitPlayerAgg[]; // every player, scoped the same way as the rest of the page
     playerId: string;
     onBack: () => void;
+    tournamentLogos?: Record<string, string>; // tournamentId → emblem URL for chart x-axis
 }
 
 const DONUT_COLORS = ["#e8743b", "#3b82f6", "#22c55e", "#e8b400", "#a855f7", "#64748b", "#ec4899", "#14b8a6"];
@@ -215,7 +216,7 @@ function CorpWheel({ segments, size = 112 }: { segments: { label: string; value:
     );
 }
 
-export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props) {
+export function PlayerProfileView({ entries, circuit, playerId, onBack, tournamentLogos }: Props) {
     const games = useMemo(() => {
         return entries
             .map((e, idx) => ({ e, idx }))
@@ -520,6 +521,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                     const perf = performanceOf(g);
                                     const color = perfBarColor(perf);
                                     const logo = CORPORATION_LOGOS[g.corporation];
+                                    const tLogo = g.tournamentId ? tournamentLogos?.[g.tournamentId] : undefined;
                                     // Group bars by tournament: extra gap at each
                                     // group start and the date label only on the
                                     // group's first bar, like the reference chart.
@@ -539,7 +541,10 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                                     style={{ height: `${perf}%`, minHeight: 4, background: `linear-gradient(to top, ${color}1a, ${color})` }}
                                                 />
                                             </div>
-                                            {logo ? (
+                                            {tLogo ? (
+                                                // eslint-disable-next-line @next/next/no-img-element -- remote emblem URL
+                                                <img src={tLogo} alt="" className="w-4 h-4 object-contain shrink-0" />
+                                            ) : logo ? (
                                                 <Image src={logo} alt="" width={16} height={16} className="rounded-full object-cover shrink-0" />
                                             ) : (
                                                 <span className="w-4 h-4 rounded-full bg-white/10 shrink-0" />

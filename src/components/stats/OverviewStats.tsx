@@ -24,6 +24,7 @@ export interface OverviewEntry {
     villes: number;
     cartes: number;
     matchId: string; // unique per table — used to count distinct tables, not scorecards
+    tournamentId?: string;
     board?: string;
     round?: number; // within-tournament round number, used to order a player's recent games
     tournamentName?: string;
@@ -85,6 +86,7 @@ export const OverviewStats = memo(function OverviewStats({
     entries,
     playerId,
     onPlayerChange,
+    tournamentLogos,
 }: {
     entries: OverviewEntry[];
     // Optional controlled player selection — lets a parent page (e.g. /stats)
@@ -92,6 +94,8 @@ export const OverviewStats = memo(function OverviewStats({
     // Uncontrolled (internal state) when omitted, e.g. the streamer tab.
     playerId?: string | null;
     onPlayerChange?: (id: string | null) => void;
+    // tournamentId → emblem URL, shown under each performance-chart bar.
+    tournamentLogos?: Record<string, string>;
 }) {
     const [selectedCols, setSelectedCols] = useState<Set<ColKey>>(new Set(DEFAULT_COLUMNS));
     const [search, setSearch] = useState("");
@@ -344,6 +348,7 @@ export const OverviewStats = memo(function OverviewStats({
                 circuit={perPlayer}
                 playerId={selectedPlayerId}
                 onBack={() => setSelectedPlayerId(null)}
+                tournamentLogos={tournamentLogos}
             />
         );
     }
