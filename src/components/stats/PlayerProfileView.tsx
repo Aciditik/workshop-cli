@@ -312,6 +312,29 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
             .slice(0, 3);
     }, [circuit, circuitAverages, playerId, stats]);
 
+    // Per-table winner score + average, and per-board averages — computed
+    // over ALL entries (every player at the table), needed for the rating.
+    const matchStats = useMemo(() => {
+        const scores = new Map<string, number[]>();
+        for (const e of entries) {
+            const list = scores.get(e.matchId) ?? [];
+            list.push(e.totalScore);
+            scores.set(e.matchId, list);
+        }
+        return new Map([...scores].map(([id, s]) => [id, { top: Math.max(...s), avg: s.reduce((a, b) => a + b, 0) / s.length }]));
+    }, [entries]);
+    const boardAvg = useMemo(() => {
+        const sums = new Map<string, { s: number; n: number }>();
+        for (const e of entries) {
+            if (!e.board) continue;
+            const acc = sums.get(e.board) ?? { s: 0, n: 0 };
+            acc.s += e.totalScore;
+            acc.n++;
+            sums.set(e.board, acc);
+        }
+        return new Map([...sums].map(([b, a]) => [b, a.s / a.n]));
+    }, [entries]);
+
     if (!stats) {
         return (
             <div className="space-y-4">
@@ -323,11 +346,22 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
         );
     }
 
-    const maxGameScore = Math.max(1, ...games.map((e) => e.totalScore));
-    // Bar color by table placement — green for the win down to red at the
-    // bottom, like the green/red rating bars in the reference chart.
-    const perfBarColor = (rank: number) =>
-        rank === 1 ? "#22c55e" : rank === 2 ? "#84cc16" : rank === 3 ? "#f59e0b" : "#ef4444";
+    // Performance rating /100: 40% placement (base by rank + bonus for
+    // finishing within 5 pts of the table winner), 35% score vs table
+    // average, 25% score vs board average.
+    const clamp100 = (v: number) => Math.max(0, Math.min(100, v));
+    const performanceOf = (e: OverviewEntry) => {
+        const ms = matchStats.get(e.matchId);
+        const gap = ms ? Math.max(0, ms.top - e.totalScore) : 0;
+        const base = e.rank === 2 ? 50 : e.rank === 3 ? 30 : e.rank === 4 ? 10 : 0;
+        const placement = e.rank === 1 ? 100 : base + Math.max(0, 40 - 5 * gap);
+        const vsTable = clamp100(50 + ((e.totalScore - (ms?.avg ?? e.totalScore)) / 30) * 50);
+        const vsBoard = clamp100(50 + ((e.totalScore - (boardAvg.get(e.board ?? "") ?? ms?.avg ?? e.totalScore)) / 40) * 50);
+        return Math.round(0.4 * placement + 0.35 * vsTable + 0.25 * vsBoard);
+    };
+    // Bar color by rating tier — green for a strong performance down to red.
+    const perfBarColor = (rating: number) =>
+        rating >= 75 ? "#22c55e" : rating >= 60 ? "#84cc16" : rating >= 45 ? "#f59e0b" : "#ef4444";
 
     const radarAxes = ["Score moy.", "Record", "% victoire", "Place moy.", "Régularité"];
     const regularityScore = stats.avgScore > 0 ? Math.max(0, 100 - (stats.stdev / stats.avgScore) * 100) : 0;
@@ -477,12 +511,13 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                     <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Performance</p>
-                            <span className="text-[10px] font-prototype text-muted-foreground">Score par partie</span>
+                            <span className="text-[10px] font-prototype text-muted-foreground">Note /100 par partie</span>
                         </div>
                         <div className="overflow-x-auto">
                             <div className="flex items-end gap-4 min-w-max px-1">
                                 {games.map((g, i) => {
-                                    const color = perfBarColor(g.rank);
+                                    const perf = performanceOf(g);
+                                    const color = perfBarColor(perf);
                                     const logo = CORPORATION_LOGOS[g.corporation];
                                     return (
                                         <div key={i} className="flex flex-col items-center gap-1.5 w-10 shrink-0" title={`${g.tournamentName || "Partie"}${g.round ? ` · Ronde ${g.round}` : ""} · ${g.totalScore} pts · ${g.corporation || "?"}`}>
@@ -490,12 +525,12 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                                 {g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : `R${g.round ?? "?"}`}
                                             </span>
                                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-prototype tabular-nums text-black" style={{ backgroundColor: color }}>
-                                                {g.totalScore}
+                                                {perf}
                                             </span>
                                             <div className="flex items-end h-24 w-5">
                                                 <div
                                                     className="w-full rounded-t-sm"
-                                                    style={{ height: `${(g.totalScore / maxGameScore) * 100}%`, minHeight: 4, background: `linear-gradient(to top, ${color}1a, ${color})` }}
+                                                    style={{ height: `${perf}%`, minHeight: 4, background: `linear-gradient(to top, ${color}1a, ${color})` }}
                                                 />
                                             </div>
                                             {logo ? (
