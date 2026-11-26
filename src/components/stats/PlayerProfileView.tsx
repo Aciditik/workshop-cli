@@ -316,6 +316,11 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
         );
     }
 
+    const maxGameScore = Math.max(1, ...games.map((e) => e.totalScore));
+    // Bar color by table placement — green for the win down to red at the
+    // bottom, like the green/red rating bars in the reference chart.
+    const perfBarColor = (rank: number) =>
+        rank === 1 ? "#22c55e" : rank === 2 ? "#84cc16" : rank === 3 ? "#f59e0b" : "#ef4444";
 
     const radarAxes = ["Score moy.", "Record", "% victoire", "Place moy.", "Régularité"];
     const regularityScore = stats.avgScore > 0 ? Math.max(0, 100 - (stats.stdev / stats.avgScore) * 100) : 0;
@@ -424,7 +429,96 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* Two-column layout: match-history sidebar on the left, everything
+                else in the main column — same skeleton as the esports profile */}
+            <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-3 items-start">
+                {/* Left sidebar — recent games, match-history style */}
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5">
+                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
+                    <div className="space-y-2 max-h-[46rem] overflow-y-auto pr-1">
+                        {[...games].reverse().map((g, i) => (
+                            <div key={i} className="rounded-md bg-white/[0.03] px-3 py-2 space-y-1.5">
+                                <div className="flex items-center justify-between gap-3 text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">
+                                    <span className="shrink-0">
+                                        {g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "—"}
+                                        {g.round ? ` · Ronde ${g.round}` : ""}
+                                    </span>
+                                    <span className="truncate">{g.tournamentName || "Tournoi"}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="inline-flex items-center gap-2 min-w-0">
+                                        {CORPORATION_LOGOS[g.corporation] ? (
+                                            <Image src={CORPORATION_LOGOS[g.corporation]} alt="" width={18} height={18} className="rounded-full object-cover shrink-0" />
+                                        ) : (
+                                            <span className="w-[18px] h-[18px] rounded-full bg-white/10 shrink-0" />
+                                        )}
+                                        <span className="text-xs font-prototype truncate">{g.corporation || "Corporation inconnue"}</span>
+                                    </span>
+                                    <span className="text-sm font-prototype tabular-nums text-[#e8743b] shrink-0">{g.totalScore}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="inline-flex items-center gap-2 min-w-0">
+                                        <span
+                                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold font-prototype shrink-0 text-black"
+                                            style={{ backgroundColor: rankBadgeColor(g.rank) }}
+                                        >
+                                            {g.rank}
+                                        </span>
+                                        <span className="text-xs font-prototype text-muted-foreground truncate">
+                                            Classement{g.board ? ` · ${g.board}` : ""}
+                                        </span>
+                                    </span>
+                                    <span className="text-sm font-prototype tabular-nums shrink-0" style={{ color: rankBadgeColor(g.rank) }}>
+                                        {g.rank === 1 ? "Victoire" : `${g.rank}e`}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Main column */}
+                <div className="space-y-3 min-w-0">
+                    {/* Performance — per-game score bars, date axis on top,
+                        corp logo + placement under each bar */}
+                    <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Performance</p>
+                            <span className="text-[10px] font-prototype text-muted-foreground">Score par partie</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <div className="flex items-end gap-4 min-w-max px-1">
+                                {games.map((g, i) => {
+                                    const color = perfBarColor(g.rank);
+                                    const logo = CORPORATION_LOGOS[g.corporation];
+                                    return (
+                                        <div key={i} className="flex flex-col items-center gap-1.5 w-10 shrink-0" title={`${g.tournamentName || "Partie"}${g.round ? ` · Ronde ${g.round}` : ""} · ${g.totalScore} pts · ${g.corporation || "?"}`}>
+                                            <span className="text-[9px] font-prototype uppercase tracking-wider text-muted-foreground">
+                                                {g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : `R${g.round ?? "?"}`}
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-prototype tabular-nums text-black" style={{ backgroundColor: color }}>
+                                                {g.totalScore}
+                                            </span>
+                                            <div className="flex items-end h-24 w-5">
+                                                <div
+                                                    className="w-full rounded-t-sm"
+                                                    style={{ height: `${(g.totalScore / maxGameScore) * 100}%`, minHeight: 4, background: `linear-gradient(to top, ${color}1a, ${color})` }}
+                                                />
+                                            </div>
+                                            {logo ? (
+                                                <Image src={logo} alt="" width={16} height={16} className="rounded-full object-cover shrink-0" />
+                                            ) : (
+                                                <span className="w-4 h-4 rounded-full bg-white/10 shrink-0" />
+                                            )}
+                                            <span className="text-[9px] font-prototype" style={{ color }}>{g.rank}e</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Circuit average compare */}
                 <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-4">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Comparaison à la moyenne du circuit</p>
@@ -454,7 +548,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {/* Corporations jouées — big centered wheel on top, win-rate list below */}
                 <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-5">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
@@ -495,50 +588,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                     )}
                 </div>
 
-                {/* Recent games — match-history style: date/round + tournament
-                    header, then corp/result rows like a match scoreline */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5">
-                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
-                    <div className="space-y-2 max-h-[26rem] overflow-y-auto">
-                        {[...games].reverse().map((g, i) => (
-                            <div key={i} className="rounded-md bg-white/[0.03] px-3 py-2 space-y-1.5">
-                                <div className="flex items-center justify-between gap-3 text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">
-                                    <span className="shrink-0">
-                                        {g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "—"}
-                                        {g.round ? ` · Ronde ${g.round}` : ""}
-                                    </span>
-                                    <span className="truncate">{g.tournamentName || "Tournoi"}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="inline-flex items-center gap-2 min-w-0">
-                                        {CORPORATION_LOGOS[g.corporation] ? (
-                                            <Image src={CORPORATION_LOGOS[g.corporation]} alt="" width={18} height={18} className="rounded-full object-cover shrink-0" />
-                                        ) : (
-                                            <span className="w-[18px] h-[18px] rounded-full bg-white/10 shrink-0" />
-                                        )}
-                                        <span className="text-xs font-prototype truncate">{g.corporation || "Corporation inconnue"}</span>
-                                    </span>
-                                    <span className="text-sm font-prototype tabular-nums text-[#e8743b] shrink-0">{g.totalScore}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="inline-flex items-center gap-2 min-w-0">
-                                        <span
-                                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold font-prototype shrink-0 text-black"
-                                            style={{ backgroundColor: rankBadgeColor(g.rank) }}
-                                        >
-                                            {g.rank}
-                                        </span>
-                                        <span className="text-xs font-prototype text-muted-foreground truncate">
-                                            Classement{g.board ? ` · ${g.board}` : ""}
-                                        </span>
-                                    </span>
-                                    <span className="text-sm font-prototype tabular-nums shrink-0" style={{ color: rankBadgeColor(g.rank) }}>
-                                        {g.rank === 1 ? "Victoire" : `${g.rank}e`}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             </div>
         </div>
