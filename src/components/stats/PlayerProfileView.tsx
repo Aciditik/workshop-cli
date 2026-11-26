@@ -137,22 +137,62 @@ function RadarChart({ axes, player, avg }: { axes: string[]; player: number[]; a
     );
 }
 
-function Donut({ segments }: { segments: { label: string; value: number; color: string }[] }) {
+// Pie wheel with each wedge filled by the corporation's own logo image
+// (clipped to the slice, like a champion/hero-pick wheel) instead of a flat
+// color — label text only lives in the legend next to it.
+function polarPoint(cx: number, cy: number, r: number, angleDeg: number) {
+    const rad = ((angleDeg - 90) * Math.PI) / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)] as const;
+}
+
+function CorpWheel({ segments }: { segments: { label: string; value: number; color: string; logo?: string }[] }) {
     const total = segments.reduce((a, s) => a + s.value, 0) || 1;
-    const stops = segments.reduce<{ acc: number; parts: string[] }>(
+    const size = 112;
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2;
+    const wedges = segments.reduce<{ acc: number; items: (typeof segments[number] & { path: string })[] }>(
         (state, s) => {
-            const start = (state.acc / total) * 100;
+            const startAngle = (state.acc / total) * 360;
             const acc = state.acc + s.value;
-            const end = (acc / total) * 100;
-            return { acc, parts: [...state.parts, `${s.color} ${start}% ${end}%`] };
+            const endAngle = (acc / total) * 360;
+            const large = endAngle - startAngle > 180 ? 1 : 0;
+            const [x1, y1] = polarPoint(cx, cy, r, startAngle);
+            const [x2, y2] = polarPoint(cx, cy, r, endAngle);
+            const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z`;
+            return { acc, items: [...state.items, { ...s, path }] };
         },
-        { acc: 0, parts: [] }
-    ).parts;
-    const gradient = stops.length > 0 ? `conic-gradient(${stops.join(", ")})` : "rgba(255,255,255,0.08)";
+        { acc: 0, items: [] }
+    ).items;
+
     return (
-        <div className="relative w-28 h-28 shrink-0 rounded-full" style={{ background: gradient }}>
-            <div className="absolute inset-[14px] rounded-full bg-[#16151a] flex items-center justify-center">
-                <span className="text-xl font-prototype">{segments.length}</span>
+        <div className="relative shrink-0" style={{ width: size, height: size }}>
+            <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
+                {wedges.map((w, i) => (
+                    <g key={i}>
+                        <clipPath id={`corp-wedge-${i}`}>
+                            <path d={w.path} />
+                        </clipPath>
+                        {w.logo ? (
+                            <image
+                                href={w.logo}
+                                x={0}
+                                y={0}
+                                width={size}
+                                height={size}
+                                preserveAspectRatio="xMidYMid slice"
+                                clipPath={`url(#corp-wedge-${i})`}
+                            />
+                        ) : (
+                            <path d={w.path} fill={w.color} />
+                        )}
+                        <path d={w.path} fill="none" stroke="#16151a" strokeWidth={2} />
+                    </g>
+                ))}
+            </svg>
+            <div className="absolute inset-[22px] rounded-full bg-[#16151a] flex flex-col items-center justify-center">
+                <span className="text-xl font-prototype leading-none">{segments.length}</span>
+                <span className="text-[9px] font-prototype uppercase tracking-wider text-muted-foreground mt-0.5">corpos</span>
             </div>
         </div>
     );
@@ -174,6 +214,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
         if (games.length === 0) return null;
         let totalScore = 0, best = -Infinity, wins = 0, placementSum = 0, objSum = 0, objCount = 0;
         const corpCounts = new Map<string, number>();
+        const corpWins = new Map<string, number>();
         const boardCounts = new Map<string, number>();
         for (const e of games) {
             totalScore += e.totalScore;
@@ -183,6 +224,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
             if (typeof e.objectifs === "number") { objSum += e.objectifs; objCount++; }
             if (e.corporation && e.corporation !== CORPORATION_PLACEHOLDER && e.corporation !== "Pas de corporation") {
                 corpCounts.set(e.corporation, (corpCounts.get(e.corporation) || 0) + 1);
+                if (e.rank === 1) corpWins.set(e.corporation, (corpWins.get(e.corporation) || 0) + 1);
             }
             if (e.board) boardCounts.set(e.board, (boardCounts.get(e.board) || 0) + 1);
         }
@@ -200,6 +242,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
             avgObjectifs: objCount > 0 ? objSum / objCount : null,
             stdev,
             corpEntries: [...corpCounts.entries()].sort((a, b) => b[1] - a[1]),
+            corpWins,
             boardEntries: [...boardCounts.entries()].sort((a, b) => b[1] - a[1]),
         };
     }, [games]);
@@ -280,6 +323,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
         label: corp,
         value: count,
         color: DONUT_COLORS[i % DONUT_COLORS.length],
+        logo: CORPORATION_LOGOS[corp]?.src,
     }));
 
     return (
@@ -375,17 +419,27 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                     {stats.corpEntries.length === 0 ? (
                         <p className="text-sm text-muted-foreground font-prototype">Aucune donnée.</p>
                     ) : (
-                        <div className="flex items-center gap-4">
-                            <Donut segments={donutSegments} />
-                            <div className="flex-1 min-w-0 space-y-1.5">
-                                {stats.corpEntries.map(([corp, count], i) => (
-                                    <div key={corp} className="flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
-                                        {CORPORATION_LOGOS[corp] && <Image src={CORPORATION_LOGOS[corp]} alt="" width={16} height={16} className="shrink-0" />}
-                                        <span className="text-xs font-prototype text-muted-foreground flex-1 truncate">{corp}</span>
-                                        <span className="text-sm font-prototype tabular-nums shrink-0">{count}</span>
-                                    </div>
-                                ))}
+                        <div className="flex items-start gap-4">
+                            <CorpWheel segments={donutSegments} />
+                            <div className="flex-1 min-w-0 space-y-2">
+                                {stats.corpEntries.map(([corp, count]) => {
+                                    const wins = stats.corpWins.get(corp) || 0;
+                                    const winPct = count > 0 ? Math.round((wins / count) * 100) : 0;
+                                    return (
+                                        <div key={corp} className="flex items-center gap-2.5">
+                                            {CORPORATION_LOGOS[corp] ? (
+                                                <Image src={CORPORATION_LOGOS[corp]} alt="" width={22} height={22} className="shrink-0 rounded-full object-cover" />
+                                            ) : (
+                                                <span className="w-[22px] h-[22px] rounded-full bg-white/10 shrink-0" />
+                                            )}
+                                            <span className="text-xs font-prototype text-muted-foreground flex-1 truncate">{corp}</span>
+                                            <span className={`text-xs font-prototype tabular-nums shrink-0 ${winPct >= 50 ? "text-emerald-400" : "text-muted-foreground"}`}>
+                                                {winPct}%
+                                            </span>
+                                            <span className="text-sm font-prototype tabular-nums shrink-0 w-6 text-right">{count}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
