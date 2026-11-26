@@ -150,7 +150,7 @@ function CorpWheel({ segments, size = 112 }: { segments: { label: string; value:
     const cx = size / 2;
     const cy = size / 2;
     const r = size / 2;
-    const wedges = segments.reduce<{ acc: number; items: (typeof segments[number] & { path: string })[] }>(
+    const wedges = segments.reduce<{ acc: number; items: (typeof segments[number] & { path: string; startAngle: number; endAngle: number })[] }>(
         (state, s) => {
             const startAngle = (state.acc / total) * 360;
             const acc = state.acc + s.value;
@@ -159,35 +159,38 @@ function CorpWheel({ segments, size = 112 }: { segments: { label: string; value:
             const [x1, y1] = polarPoint(cx, cy, r, startAngle);
             const [x2, y2] = polarPoint(cx, cy, r, endAngle);
             const path = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z`;
-            return { acc, items: [...state.items, { ...s, path }] };
+            return { acc, items: [...state.items, { ...s, path, startAngle, endAngle }] };
         },
         { acc: 0, items: [] }
     ).items;
 
+    // A full-size logo image clipped to a thin wedge only ever shows a random
+    // sliver of it (whatever happened to fall in that slice), not the
+    // recognizable icon — so each slice gets a flat color fill, with the
+    // logo drawn small and fully visible, centered inside its own wedge.
+    const iconSize = Math.max(14, size * 0.16);
     return (
         <div className="relative shrink-0" style={{ width: size, height: size }}>
             <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
                 {wedges.map((w, i) => (
-                    <g key={i}>
-                        <clipPath id={`corp-wedge-${i}`}>
-                            <path d={w.path} />
-                        </clipPath>
-                        {w.logo ? (
-                            <image
-                                href={w.logo}
-                                x={0}
-                                y={0}
-                                width={size}
-                                height={size}
-                                preserveAspectRatio="xMidYMid slice"
-                                clipPath={`url(#corp-wedge-${i})`}
-                            />
-                        ) : (
-                            <path d={w.path} fill={w.color} />
-                        )}
-                        <path d={w.path} fill="none" stroke="#16151a" strokeWidth={2} />
-                    </g>
+                    <path key={i} d={w.path} fill={w.color} stroke="#16151a" strokeWidth={2} />
                 ))}
+                {wedges.map((w, i) => {
+                    if (!w.logo) return null;
+                    const midAngle = ((w.startAngle + w.endAngle) / 2);
+                    const [ix, iy] = polarPoint(cx, cy, r * 0.68, midAngle);
+                    return (
+                        <image
+                            key={`icon-${i}`}
+                            href={w.logo}
+                            x={ix - iconSize / 2}
+                            y={iy - iconSize / 2}
+                            width={iconSize}
+                            height={iconSize}
+                            preserveAspectRatio="xMidYMid meet"
+                        />
+                    );
+                })}
             </svg>
             <div className="absolute rounded-full bg-[#16151a] flex flex-col items-center justify-center" style={{ inset: size * 0.2 }}>
                 <span className="font-prototype leading-none" style={{ fontSize: size * 0.18 }}>{segments.length}</span>
