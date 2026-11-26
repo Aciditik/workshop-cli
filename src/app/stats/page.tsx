@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { BarChart3, Users, Layers, Map as MapIcon, CalendarDays, Trophy, ChevronDown, Check } from "lucide-react";
 import { canonicalCorporation } from "@/lib/corporations";
+import { shortTournamentName } from "@/lib/utils";
 import { OverviewStats, OverviewEntry } from "@/components/stats/OverviewStats";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,14 +50,6 @@ function playerKey(e: { firstname: string; name: string }) {
 
 function fullName(e: { firstname: string; name: string }) {
   return [e.firstname, e.name].filter(Boolean).join(" ") || "Joueur inconnu";
-}
-
-function shortTournamentName(name: string, eventDate?: string): string {
-  if (!name || !/\bqualif\w*/i.test(name)) return name;
-  const suffix = name.split("-").slice(1).join("-").trim();
-  const year = name.match(/\b(19|20)\d{2}\b/)?.[0] ?? (eventDate ?? "").match(/\d{4}/)?.[0];
-  if (!suffix || !year) return name;
-  return `Q${year.slice(-2)} - ${suffix}`;
 }
 
 // Season year: read from the name first ("Qualifier CdF 2027" can run in

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ArrowLeft, Gamepad2, Trophy } from "lucide-react";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
+import { shortTournamentName } from "@/lib/utils";
 import type { OverviewEntry } from "./OverviewStats";
 
 // Circuit-wide per-player aggregate — the same shape `perPlayer` already
@@ -441,7 +442,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                     <span className="shrink-0">
                                         {g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "—"}
                                     </span>
-                                    <span className="truncate">{g.tournamentName || "Tournoi"}</span>
+                                    <span className="truncate">{g.tournamentName ? shortTournamentName(g.tournamentName, g.eventDate) : "Tournoi"}</span>
                                 </div>
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="inline-flex items-center gap-2 min-w-0">
