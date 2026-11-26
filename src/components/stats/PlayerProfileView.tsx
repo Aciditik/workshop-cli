@@ -441,7 +441,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                 <div className="flex items-center justify-between gap-3 text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">
                                     <span className="shrink-0">
                                         {g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "—"}
-                                        {g.round ? ` · Ronde ${g.round}` : ""}
                                     </span>
                                     <span className="truncate">{g.tournamentName || "Tournoi"}</span>
                                 </div>
@@ -465,7 +464,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                             {g.rank}
                                         </span>
                                         <span className="text-xs font-prototype text-muted-foreground truncate">
-                                            Classement{g.board ? ` · ${g.board}` : ""}
+                                            {g.board || ""}
                                         </span>
                                     </span>
                                     <span className="text-sm font-prototype tabular-nums shrink-0" style={{ color: rankBadgeColor(g.rank) }}>
