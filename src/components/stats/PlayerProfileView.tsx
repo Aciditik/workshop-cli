@@ -429,11 +429,13 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
 
             {/* Two-column layout: match-history sidebar on the left, everything
                 else in the main column — same skeleton as the esports profile */}
-            <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-3 items-start">
-                {/* Left sidebar — recent games, match-history style */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5">
+            <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-3 lg:items-stretch">
+                {/* Left sidebar — recent games, match-history style. The card
+                    stretches to the main column's height so no empty gap shows
+                    above the full-width corporations card; the list scrolls. */}
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5 lg:h-full lg:flex lg:flex-col">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
-                    <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                    <div className="space-y-2 lg:flex-1 lg:min-h-0 lg:max-h-none max-h-[480px] overflow-y-auto pr-1">
                         {[...games].reverse().map((g, i) => (
                             <div key={i} className="rounded-md bg-white/[0.03] px-3 py-2 space-y-1.5">
                                 <div className="flex items-center justify-between gap-3 text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">
