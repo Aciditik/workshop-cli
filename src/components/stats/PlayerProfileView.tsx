@@ -206,7 +206,7 @@ function CorpWheel({ segments, size = 112 }: { segments: { label: string; value:
                     </div>
                 );
             })}
-            <div className="absolute rounded-full bg-[#16151a] flex flex-col items-center justify-center" style={{ inset: size * 0.3 }}>
+            <div className="absolute rounded-full bg-[#1f1e26] flex flex-col items-center justify-center" style={{ inset: size * 0.3 }}>
                 <span className="font-prototype leading-none" style={{ fontSize: size * 0.16 }}>{segments.length}</span>
                 <span className="text-[9px] font-prototype uppercase tracking-wider text-muted-foreground mt-0.5">corpos</span>
             </div>
@@ -363,7 +363,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
             </button>
 
             {/* Header — esports-style card: avatar, name, then an icon-dot meta row */}
-            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-5 flex items-center gap-5">
+            <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-5 flex items-center gap-5">
                 <div className="w-20 h-20 rounded-[10px] bg-[#e8743b]/15 border border-[#e8743b]/40 flex items-center justify-center text-2xl font-prototype text-[#e8743b] shrink-0">
                     {initials(stats.name)}
                 </div>
@@ -387,7 +387,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
 
             {/* Stat cards — big number + detail + optional image, like an esports profile */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-2.5">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                         <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Score moyen</p>
                         <span className={`text-[10px] font-prototype uppercase tracking-wider ${rating.cls}`}>{rating.label}</span>
@@ -400,7 +400,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                         <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-lime-400 to-emerald-400" style={{ width: `${Math.min(100, stats.winPct)}%` }} />
                     </div>
                 </div>
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 flex items-center justify-between gap-3">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 flex items-center justify-between gap-3">
                     <div className="space-y-1.5 min-w-0">
                         <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Meilleure partie</p>
                         <p className="text-3xl font-prototype leading-none">{stats.record}</p>
@@ -412,7 +412,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                         <Image src={CORPORATION_LOGOS[bestGameCorp]} alt="" width={76} height={76} className="rounded-[10px] object-cover shrink-0" />
                     ) : null}
                 </div>
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 flex items-center justify-between gap-3">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 flex items-center justify-between gap-3">
                     <div className="space-y-1.5 min-w-0">
                         <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corp la plus jouée</p>
                         <p className="text-3xl font-prototype leading-none">{favCorpCount ?? 0} <span className="text-base text-muted-foreground">partie{(favCorpCount ?? 0) > 1 ? "s" : ""}</span></p>
@@ -426,7 +426,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {/* Circuit average compare */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-4">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-4">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Comparaison à la moyenne du circuit</p>
                     <CompareBar label="Record" value={stats.record} average={circuitAverages.record} min={0} max={circuitAverages.maxRecord * 1.05} format={(v) => Math.round(v).toString()} />
                     <CompareBar label="Score moyen" value={stats.avgScore} average={circuitAverages.avgScore} min={0} max={circuitAverages.maxAvgScore * 1.05} format={(v) => Math.round(v).toString()} />
@@ -436,7 +436,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                 </div>
 
                 {/* Radar + similar players */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-3">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-3">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Profil vs moyenne du circuit</p>
                     <RadarChart axes={radarAxes} player={radarPlayer} avg={radarAvg} />
                     {similarPlayers.length > 0 && (
@@ -456,7 +456,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {/* Corporations jouées — big centered wheel on top, win-rate list below */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-5">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-5">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
                     {stats.corpEntries.length === 0 ? (
                         <p className="text-sm text-muted-foreground font-prototype">Aucune donnée.</p>
@@ -497,7 +497,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
 
                 {/* Recent games — match-history style: date/round + tournament
                     header, then corp/result rows like a match scoreline */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-2.5">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
                     <div className="space-y-2 max-h-[26rem] overflow-y-auto">
                         {[...games].reverse().map((g, i) => (
