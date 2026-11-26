@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Image from "next/image";
-import { ArrowLeft, Medal } from "lucide-react";
+import { ArrowLeft, Calendar, Gamepad2, Medal, Trophy } from "lucide-react";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
 import type { OverviewEntry } from "./OverviewStats";
@@ -252,6 +252,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
             name: games[0].playerName,
             games: n,
             record: best,
+            wins,
             avgScore,
             avgPlace: placementSum / n,
             winPct: (wins / n) * 100,
@@ -342,42 +343,111 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
         logo: CORPORATION_LOGOS[corp]?.src,
     }));
 
+    // Header meta — distinct tournaments, season-year span (name first like
+    // everywhere else, eventDate as fallback), and the most-played corp.
+    const seasonYearOf = (e: OverviewEntry) => {
+        const nameYear = e.tournamentName?.match(/\b(20\d{2})\b/)?.[1];
+        const dateYear = e.eventDate?.slice(0, 4);
+        return Number(nameYear || dateYear) || 0;
+    };
+    const tournaments = new Set(games.map((e) => e.tournamentName).filter(Boolean)).size;
+    const years = games.map(seasonYearOf).filter((y) => y > 0);
+    const yearSpan = years.length > 0 ? [Math.min(...years), Math.max(...years)] : null;
+    const [favCorp, favCorpCount] = stats.corpEntries[0] ?? [];
+    const bestGame = games.find((e) => e.totalScore === stats.record);
+    const bestGameCorp = bestGame?.corporation && bestGame.corporation !== CORPORATION_PLACEHOLDER ? bestGame.corporation : null;
+    // Rating tag relative to the circuit average score.
+    const scoreRatio = stats.avgScore / Math.max(1, circuitAverages.avgScore);
+    const rating = scoreRatio >= 1.25 ? { label: "Exceptionnel", cls: "text-emerald-400" }
+        : scoreRatio >= 1.1 ? { label: "Excellent", cls: "text-emerald-400" }
+        : scoreRatio >= 0.95 ? { label: "Bon", cls: "text-sky-400" }
+        : scoreRatio >= 0.8 ? { label: "Moyen", cls: "text-amber-400" }
+        : { label: "En progression", cls: "text-orange-400" };
+
     return (
         <div className="space-y-5">
             <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-prototype text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Retour aux statistiques
             </button>
 
-            {/* Header */}
-            <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-[#e8743b]/15 border border-[#e8743b]/40 flex items-center justify-center text-xl font-prototype text-[#e8743b] shrink-0">
+            {/* Header — esports-style card: avatar, name, then an icon-dot meta row */}
+            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-5 flex items-center gap-5">
+                <div className="w-20 h-20 rounded-[10px] bg-[#e8743b]/15 border border-[#e8743b]/40 flex items-center justify-center text-2xl font-prototype text-[#e8743b] shrink-0">
                     {initials(stats.name)}
                 </div>
-                <div>
-                    <h2 className="text-2xl font-prototype leading-tight">{stats.name}</h2>
-                    <p className="text-sm text-muted-foreground font-prototype mt-0.5">
-                        {stats.games} partie{stats.games > 1 ? "s" : ""}
-                    </p>
+                <div className="min-w-0 space-y-1.5">
+                    <h2 className="text-2xl font-prototype leading-tight truncate">{stats.name}</h2>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-prototype text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5">
+                            <Gamepad2 className="w-3.5 h-3.5" /> {stats.games} partie{stats.games > 1 ? "s" : ""}
+                        </span>
+                        {tournaments > 0 && (
+                            <>
+                                <span className="text-white/20">·</span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Trophy className="w-3.5 h-3.5" /> {tournaments} tournoi{tournaments > 1 ? "s" : ""}
+                                </span>
+                            </>
+                        )}
+                        {favCorp && (
+                            <>
+                                <span className="text-white/20">·</span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    {CORPORATION_LOGOS[favCorp] ? (
+                                        <Image src={CORPORATION_LOGOS[favCorp]} alt="" width={14} height={14} className="rounded-full object-cover shrink-0" />
+                                    ) : null}
+                                    {favCorp}
+                                </span>
+                            </>
+                        )}
+                        {yearSpan && (
+                            <>
+                                <span className="text-white/20">·</span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5" /> {yearSpan[0] === yearSpan[1] ? yearSpan[0] : `${yearSpan[0]}–${yearSpan[1]}`}
+                                </span>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4">
-                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Record</p>
-                    <p className="text-2xl font-prototype mt-1">{stats.record}</p>
+            {/* Stat cards — big number + detail + optional image, like an esports profile */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Score moyen</p>
+                        <span className={`text-[10px] font-prototype uppercase tracking-wider ${rating.cls}`}>{rating.label}</span>
+                    </div>
+                    <p className="text-3xl font-prototype leading-none">{Math.round(stats.avgScore)}</p>
+                    <p className="text-xs font-prototype text-muted-foreground">
+                        <span className="text-emerald-400">{stats.wins}V</span> {stats.games - stats.wins}D · {Math.round(stats.winPct)}% victoire
+                    </p>
+                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-lime-400 to-emerald-400" style={{ width: `${Math.min(100, stats.winPct)}%` }} />
+                    </div>
                 </div>
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4">
-                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Moyenne</p>
-                    <p className="text-2xl font-prototype mt-1">{Math.round(stats.avgScore)}</p>
+                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 flex items-center justify-between gap-3">
+                    <div className="space-y-1.5 min-w-0">
+                        <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Meilleure partie</p>
+                        <p className="text-3xl font-prototype leading-none">{stats.record}</p>
+                        <p className="text-xs font-prototype text-muted-foreground truncate">
+                            {bestGameCorp ?? "Corporation inconnue"}
+                        </p>
+                    </div>
+                    {bestGameCorp && CORPORATION_LOGOS[bestGameCorp] ? (
+                        <Image src={CORPORATION_LOGOS[bestGameCorp]} alt="" width={52} height={52} className="rounded-[10px] object-cover shrink-0" />
+                    ) : null}
                 </div>
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4">
-                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Place moy.</p>
-                    <p className="text-2xl font-prototype mt-1">{stats.avgPlace.toFixed(2)}</p>
-                </div>
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4">
-                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">% Victoire</p>
-                    <p className="text-2xl font-prototype mt-1 text-[#e8743b]">{Math.round(stats.winPct)}%</p>
+                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 flex items-center justify-between gap-3">
+                    <div className="space-y-1.5 min-w-0">
+                        <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corp la plus jouée</p>
+                        <p className="text-3xl font-prototype leading-none">{favCorpCount ?? 0} <span className="text-base text-muted-foreground">partie{(favCorpCount ?? 0) > 1 ? "s" : ""}</span></p>
+                        <p className="text-xs font-prototype text-muted-foreground truncate">{favCorp ?? "—"}</p>
+                    </div>
+                    {favCorp && CORPORATION_LOGOS[favCorp] ? (
+                        <Image src={CORPORATION_LOGOS[favCorp]} alt="" width={52} height={52} className="rounded-[10px] object-cover shrink-0" />
+                    ) : null}
                 </div>
             </div>
 
