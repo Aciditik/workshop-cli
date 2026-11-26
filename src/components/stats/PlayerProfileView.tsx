@@ -359,9 +359,10 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
         const vsBoard = clamp100(50 + ((e.totalScore - (boardAvg.get(e.board ?? "") ?? ms?.avg ?? e.totalScore)) / 40) * 50);
         return Math.round(0.4 * placement + 0.35 * vsTable + 0.25 * vsBoard);
     };
-    // Bar color by rating tier — green for a strong performance down to red.
+    // Bar color by rating tier — blue at the top down to red at the bottom,
+    // matching the reference rating chart.
     const perfBarColor = (rating: number) =>
-        rating >= 75 ? "#22c55e" : rating >= 60 ? "#84cc16" : rating >= 45 ? "#f59e0b" : "#ef4444";
+        rating >= 75 ? "#3b82f6" : rating >= 60 ? "#22c55e" : rating >= 45 ? "#f59e0b" : rating >= 35 ? "#f97316" : "#ef4444";
 
     const radarAxes = ["Score moy.", "Record", "% victoire", "Place moy.", "Régularité"];
     const regularityScore = stats.avgScore > 0 ? Math.max(0, 100 - (stats.stdev / stats.avgScore) * 100) : 0;
@@ -519,12 +520,17 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                     const perf = performanceOf(g);
                                     const color = perfBarColor(perf);
                                     const logo = CORPORATION_LOGOS[g.corporation];
+                                    // Group bars by tournament: extra gap at each
+                                    // group start and the date label only on the
+                                    // group's first bar, like the reference chart.
+                                    const groupOf = (x: OverviewEntry) => x.tournamentName || x.eventDate || "?";
+                                    const isGroupStart = i === 0 || groupOf(g) !== groupOf(games[i - 1]);
                                     return (
-                                        <div key={i} className="flex flex-col items-center gap-1.5 w-10 shrink-0" title={`${g.tournamentName || "Partie"}${g.round ? ` · Ronde ${g.round}` : ""} · ${g.totalScore} pts · ${g.corporation || "?"}`}>
+                                        <div key={i} className={`flex flex-col items-center gap-1.5 w-10 shrink-0 ${isGroupStart && i > 0 ? "ml-5" : ""}`} title={`${g.tournamentName || "Partie"}${g.round ? ` · Ronde ${g.round}` : ""} · ${g.totalScore} pts · ${g.corporation || "?"}`}>
                                             <span className="text-[9px] font-prototype uppercase tracking-wider text-muted-foreground">
-                                                {g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : `R${g.round ?? "?"}`}
+                                                {isGroupStart ? (g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : `R${g.round ?? "?"}`) : " "}
                                             </span>
-                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-prototype tabular-nums text-black" style={{ backgroundColor: color }}>
+                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-prototype tabular-nums ${perf >= 75 || perf < 45 ? "text-white" : "text-black"}`} style={{ backgroundColor: color }}>
                                                 {perf}
                                             </span>
                                             <div className="flex items-end h-24 w-5">
