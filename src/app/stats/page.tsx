@@ -84,15 +84,37 @@ export default function StatsPage() {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
+  // Player profile view — synced to a `?player=<id>` query param so it's a
+  // real, shareable/back-button-able page instead of just panel state.
+  const [playerFilter, setPlayerFilter] = useState<string | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
   useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("tournament");
-    if (!t) return;
-    const id = setTimeout(() => setTournamentFilter(t), 0);
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("tournament");
+    const p = params.get("player");
+    const id = setTimeout(() => {
+      if (t) setTournamentFilter(t);
+      if (p) setPlayerFilter(p);
+    }, 0);
     return () => clearTimeout(id);
   }, []);
+
+  // Handle browser back/forward while the player profile is open.
+  useEffect(() => {
+    const onPopState = () => setPlayerFilter(new URLSearchParams(window.location.search).get("player"));
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const handlePlayerChange = (id: string | null) => {
+    setPlayerFilter(id);
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("player", id);
+    else url.searchParams.delete("player");
+    window.history.pushState({}, "", url);
+  };
 
   useEffect(() => {
     if (!isAdmin && !isGuest && !isStreamer) {
@@ -184,9 +206,12 @@ export default function StatsPage() {
   const selectedTournament = allTournaments.find((t) => t.id === tournamentFilter);
 
   // Deep links (?tournament=<id>) pull the year filter along so the selected
-  // event stays visible even if it belongs to another season.
+  // event stays visible even if it belongs to another season. This only
+  // fires once the tournament metadata (fetched async) resolves the id to a
+  // season year different from the current filter.
   useEffect(() => {
     if (selectedTournament && seasonYear(selectedTournament) !== yearFilter) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync once async metadata resolves the deep-linked tournament's season
       setYearFilter(seasonYear(selectedTournament));
     }
   }, [selectedTournament, yearFilter]);
@@ -218,6 +243,15 @@ export default function StatsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <p className="text-destructive font-prototype">{error}</p>
       </div>
+    );
+  }
+
+  // Player profile — a full page of its own (synced to ?player=<id>),
+  // replacing the tournament/year selectors entirely rather than opening on
+  // top of them.
+  if (playerFilter) {
+    return (
+      <OverviewStats entries={entries} playerId={playerFilter} onPlayerChange={handlePlayerChange} />
     );
   }
 
@@ -386,7 +420,7 @@ export default function StatsPage() {
         </div>
       </div>
 
-      <OverviewStats entries={entries} />
+      <OverviewStats entries={entries} playerId={playerFilter} onPlayerChange={handlePlayerChange} />
     </div>
   );
 }

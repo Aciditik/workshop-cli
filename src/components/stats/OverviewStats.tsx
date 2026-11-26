@@ -4,8 +4,9 @@ import { memo, useMemo, useState } from "react";
 import Image from "next/image";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
-import { Trophy, ChevronUp, ChevronDown, ChevronsUpDown, X, Medal } from "lucide-react";
+import { Trophy, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { CorpCompare } from "./CorpCompare";
+import { PlayerProfileView } from "./PlayerProfileView";
 
 // A single flattened scorecard row — the common shape both the single-
 // tournament streamer view and the cross-tournament /stats page reduce their
@@ -29,7 +30,7 @@ export interface OverviewEntry {
     eventDate?: string;
 }
 
-const BOARD_COLORS: Record<string, string> = {
+export const BOARD_COLORS: Record<string, string> = {
     "🟠 Tharsis": "#f59e0b",
     "🟢 Elysium": "#22c55e",
     "🔵 Hellas": "#3b82f6",
@@ -80,12 +81,28 @@ function BarRow({ label, value, max, color, dotColor }: { label: string; value: 
     );
 }
 
-export const OverviewStats = memo(function OverviewStats({ entries }: { entries: OverviewEntry[] }) {
+export const OverviewStats = memo(function OverviewStats({
+    entries,
+    playerId,
+    onPlayerChange,
+}: {
+    entries: OverviewEntry[];
+    // Optional controlled player selection — lets a parent page (e.g. /stats)
+    // sync the open profile to a URL query param for a real, shareable "page".
+    // Uncontrolled (internal state) when omitted, e.g. the streamer tab.
+    playerId?: string | null;
+    onPlayerChange?: (id: string | null) => void;
+}) {
     const [selectedCols, setSelectedCols] = useState<Set<ColKey>>(new Set(DEFAULT_COLUMNS));
     const [search, setSearch] = useState("");
     const [minGames, setMinGames] = useState(1);
     const [boardFilter, setBoardFilter] = useState<string>("Tous");
-    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const [internalPlayerId, setInternalPlayerId] = useState<string | null>(null);
+    const selectedPlayerId = playerId !== undefined ? playerId : internalPlayerId;
+    const setSelectedPlayerId = (id: string | null) => {
+        if (onPlayerChange) onPlayerChange(id);
+        else setInternalPlayerId(id);
+    };
     const [showAllSmallCard, setShowAllSmallCard] = useState(false);
     // Which dataset fills the big "colonnes au choix" table — the small
     // bar card automatically shows the other one.
@@ -316,51 +333,20 @@ export const OverviewStats = memo(function OverviewStats({ entries }: { entries:
         };
     };
 
-    // ─── Player detail drawer ──────────────────────────────────────────
-    // Always built from the player's full history (ignores the "Joueurs"
-    // table's board filter — this is the player's overall profile).
-    const selectedPlayerGames = useMemo(() => {
-        if (!selectedPlayerId) return [];
-        return entries
-            .map((e, idx) => ({ e, idx }))
-            .filter(({ e }) => e.playerId === selectedPlayerId)
-            .sort((a, b) => {
-                const key = (x: typeof a) => x.e.round ?? (x.e.eventDate ? Date.parse(x.e.eventDate) : x.idx);
-                return key(a) - key(b); // chronological, oldest first
-            })
-            .map(({ e }) => e);
-    }, [entries, selectedPlayerId]);
-
-    const selectedPlayerStats = useMemo(() => {
-        if (selectedPlayerGames.length === 0) return null;
-        let totalScore = 0, best = -Infinity, wins = 0, placementSum = 0;
-        const corpCounts = new Map<string, number>();
-        for (const e of selectedPlayerGames) {
-            totalScore += e.totalScore;
-            best = Math.max(best, e.totalScore);
-            placementSum += e.rank;
-            if (e.rank === 1) wins++;
-            if (e.corporation && e.corporation !== CORPORATION_PLACEHOLDER && e.corporation !== "Pas de corporation") {
-                corpCounts.set(e.corporation, (corpCounts.get(e.corporation) || 0) + 1);
-            }
-        }
-        const games = selectedPlayerGames.length;
-        return {
-            name: selectedPlayerGames[0].playerName,
-            games,
-            record: best,
-            avgScore: totalScore / games,
-            avgPlace: placementSum / games,
-            winPct: (wins / games) * 100,
-            corpEntries: [...corpCounts.entries()].sort((a, b) => b[1] - a[1]),
-        };
-    }, [selectedPlayerGames]);
-
-    const maxPlayerGameScore = Math.max(1, ...selectedPlayerGames.map((e) => e.totalScore));
-    const rankBadgeColor = (rank: number) =>
-        rank === 1 ? "#e8b400" : rank === 2 ? "#cfd6de" : rank === 3 ? "#e06a00" : "#e8743b";
-    const initials = (name: string) =>
-        name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
+    // Selecting a player replaces the whole panel with a full profile page
+    // (own "← Retour" back button) instead of the overview — `perPlayer` is
+    // reused as the circuit-wide population for the average-comparison bars,
+    // radar chart, and similar-players ranking.
+    if (selectedPlayerId) {
+        return (
+            <PlayerProfileView
+                entries={entries}
+                circuit={perPlayer}
+                playerId={selectedPlayerId}
+                onBack={() => setSelectedPlayerId(null)}
+            />
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -628,117 +614,6 @@ export const OverviewStats = memo(function OverviewStats({ entries }: { entries:
             {/* Corporation comparator — logo picker, 2-3 corps side by side */}
             <CorpCompare entries={scopedEntries} />
 
-            {/* Player detail drawer */}
-            {selectedPlayerId && selectedPlayerStats && (
-                <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedPlayerId(null)} />
-                    <div className="relative w-full max-w-md h-full bg-[#141318] border-l border-[#26252c] overflow-y-auto p-5 space-y-5">
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-14 h-14 rounded-full bg-[#e8743b]/15 border border-[#e8743b]/40 flex items-center justify-center text-lg font-prototype text-[#e8743b] shrink-0">
-                                    {initials(selectedPlayerStats.name)}
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-prototype leading-tight">{selectedPlayerStats.name}</h3>
-                                    <p className="text-xs text-muted-foreground font-prototype mt-0.5">
-                                        {selectedPlayerStats.games} partie{selectedPlayerStats.games > 1 ? "s" : ""}
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setSelectedPlayerId(null)}
-                                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* KPI cards */}
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-3">
-                                <p className="text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">Record</p>
-                                <p className="text-xl font-prototype mt-0.5">{selectedPlayerStats.record}</p>
-                            </div>
-                            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-3">
-                                <p className="text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">Moyenne</p>
-                                <p className="text-xl font-prototype mt-0.5">{Math.round(selectedPlayerStats.avgScore)}</p>
-                            </div>
-                            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-3">
-                                <p className="text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">Place moy.</p>
-                                <p className="text-xl font-prototype mt-0.5">{selectedPlayerStats.avgPlace.toFixed(2)}</p>
-                            </div>
-                            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-3">
-                                <p className="text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">% Victoire</p>
-                                <p className="text-xl font-prototype mt-0.5 text-[#e8743b]">{Math.round(selectedPlayerStats.winPct)}%</p>
-                            </div>
-                        </div>
-
-                        {/* Performance chart */}
-                        <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-3">
-                            <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Performance — parties dans l&apos;ordre</p>
-                            <div className="flex items-end gap-1.5 h-28 overflow-x-auto">
-                                {selectedPlayerGames.map((g, i) => (
-                                    <div key={i} className="flex flex-col items-center justify-end gap-1 h-full shrink-0 w-7" title={`${g.totalScore} pts · ${g.corporation || "?"} · rang ${g.rank}`}>
-                                        <span className="text-[10px] font-prototype tabular-nums">{g.totalScore}</span>
-                                        <div
-                                            className="w-full rounded-t-sm"
-                                            style={{
-                                                height: `${(g.totalScore / maxPlayerGameScore) * 100}%`,
-                                                minHeight: 4,
-                                                backgroundColor: rankBadgeColor(g.rank),
-                                            }}
-                                        />
-                                        <Medal className="w-3 h-3" style={{ color: rankBadgeColor(g.rank) }} />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Corporations */}
-                        <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-2.5">
-                            <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
-                            {selectedPlayerStats.corpEntries.length === 0 ? (
-                                <p className="text-sm text-muted-foreground font-prototype">Aucune donnée.</p>
-                            ) : selectedPlayerStats.corpEntries.map(([corp, count]) => (
-                                <div key={corp} className="flex items-center gap-3">
-                                    {CORPORATION_LOGOS[corp] && <Image src={CORPORATION_LOGOS[corp]} alt={corp} width={18} height={18} className="shrink-0" />}
-                                    <span className="text-xs font-prototype text-muted-foreground flex-1 truncate">{corp}</span>
-                                    <span className="text-sm font-prototype tabular-nums shrink-0">{count}</span>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Recent games */}
-                        <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-2.5">
-                            <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
-                            <div className="space-y-1.5 max-h-72 overflow-y-auto">
-                                {[...selectedPlayerGames].reverse().map((g, i) => (
-                                    <div key={i} className="flex items-center gap-2.5 py-1.5 border-t border-white/5 first:border-t-0">
-                                        <span
-                                            className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold font-prototype shrink-0 text-black"
-                                            style={{ backgroundColor: rankBadgeColor(g.rank) }}
-                                        >
-                                            {g.rank}
-                                        </span>
-                                        {CORPORATION_LOGOS[g.corporation] && (
-                                            <Image src={CORPORATION_LOGOS[g.corporation]} alt={g.corporation} width={16} height={16} className="shrink-0" />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-prototype truncate">
-                                                {g.tournamentName || (g.round ? `Ronde ${g.round}` : "Partie")}
-                                                {g.tournamentName && g.round ? ` · Ronde ${g.round}` : ""}
-                                            </p>
-                                            {g.board && <p className="text-[10px] text-muted-foreground font-prototype truncate">{g.board}</p>}
-                                        </div>
-                                        <span className="text-sm font-prototype tabular-nums text-[#e8743b] shrink-0">{g.totalScore}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 });
