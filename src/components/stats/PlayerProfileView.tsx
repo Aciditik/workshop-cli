@@ -219,9 +219,15 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
         return entries
             .map((e, idx) => ({ e, idx }))
             .filter(({ e }) => e.playerId === playerId)
+            // Chronological order: event date first (round is tournament-
+            // relative and collides across tournaments), round within a day,
+            // then original API order as a last resort.
             .sort((a, b) => {
-                const key = (x: typeof a) => x.e.round ?? (x.e.eventDate ? Date.parse(x.e.eventDate) : x.idx);
-                return key(a) - key(b);
+                const da = a.e.eventDate ? Date.parse(a.e.eventDate) : 0;
+                const db = b.e.eventDate ? Date.parse(b.e.eventDate) : 0;
+                if (da !== db) return da - db;
+                if ((a.e.round ?? 0) !== (b.e.round ?? 0)) return (a.e.round ?? 0) - (b.e.round ?? 0);
+                return a.idx - b.idx;
             })
             .map(({ e }) => e);
     }, [entries, playerId]);
@@ -457,12 +463,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                 </div>
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="inline-flex items-center gap-2 min-w-0">
-                                        <span
-                                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold font-prototype shrink-0 text-black"
-                                            style={{ backgroundColor: rankBadgeColor(g.rank) }}
-                                        >
-                                            {g.rank}
-                                        </span>
                                         <span className="text-xs font-prototype text-muted-foreground truncate">
                                             {g.board || ""}
                                         </span>
