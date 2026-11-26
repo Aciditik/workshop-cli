@@ -359,13 +359,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
     const [favCorp, favCorpCount] = stats.corpEntries[0] ?? [];
     const bestGame = games.find((e) => e.totalScore === stats.record);
     const bestGameCorp = bestGame?.corporation && bestGame.corporation !== CORPORATION_PLACEHOLDER ? bestGame.corporation : null;
-    // Rating tag relative to the circuit average score.
-    const scoreRatio = stats.avgScore / Math.max(1, circuitAverages.avgScore);
-    const rating = scoreRatio >= 1.25 ? { label: "Exceptionnel", cls: "text-emerald-400" }
-        : scoreRatio >= 1.1 ? { label: "Excellent", cls: "text-emerald-400" }
-        : scoreRatio >= 0.95 ? { label: "Bon", cls: "text-sky-400" }
-        : scoreRatio >= 0.8 ? { label: "Moyen", cls: "text-amber-400" }
-        : { label: "En progression", cls: "text-orange-400" };
 
     return (
         <div className="space-y-5">
@@ -401,7 +394,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                 <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
                         <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Score moyen</p>
-                        <span className={`text-[10px] font-prototype uppercase tracking-wider ${rating.cls}`}>{rating.label}</span>
                     </div>
                     <p className="text-3xl font-prototype leading-none">{Math.round(stats.avgScore)}</p>
                     <p className="text-xs font-prototype text-muted-foreground">
@@ -441,7 +433,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                 {/* Left sidebar — recent games, match-history style */}
                 <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
-                    <div className="space-y-2 max-h-[46rem] overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
                         {[...games].reverse().map((g, i) => (
                             <div key={i} className="rounded-md bg-white/[0.03] px-3 py-2 space-y-1.5">
                                 <div className="flex items-center justify-between gap-3 text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">
@@ -546,48 +538,47 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                     )}
                 </div>
             </div>
+                </div>
+            </div>
 
-                {/* Corporations jouées — big centered wheel on top, win-rate list below */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-5">
-                    <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
-                    {stats.corpEntries.length === 0 ? (
-                        <p className="text-sm text-muted-foreground font-prototype">Aucune donnée.</p>
-                    ) : (
-                        <>
-                            <div className="flex justify-center">
-                                <CorpWheel segments={donutSegments} size={200} />
-                            </div>
-                            <div className="space-y-1 pt-2 border-t border-white/5">
-                                {stats.corpEntries.map(([corp, count]) => {
-                                    const wins = stats.corpWins.get(corp) || 0;
-                                    const winPct = count > 0 ? Math.round((wins / count) * 100) : 0;
-                                    return (
-                                        <div key={corp} className="relative rounded-md overflow-hidden">
-                                            <div
-                                                className={`absolute inset-y-0 left-0 ${winPct >= 50 ? "bg-emerald-500/15" : "bg-white/[0.04]"}`}
-                                                style={{ width: `${winPct}%` }}
-                                            />
-                                            <div className="relative flex items-center gap-2.5 px-1.5 py-1.5">
-                                                {CORPORATION_LOGOS[corp] ? (
-                                                    <Image src={CORPORATION_LOGOS[corp]} alt="" width={24} height={24} className="shrink-0 rounded-full object-cover" />
-                                                ) : (
-                                                    <span className="w-6 h-6 rounded-full bg-white/10 shrink-0" />
-                                                )}
-                                                <span className="text-xs font-prototype text-muted-foreground flex-1 truncate">{corp}</span>
-                                                <span className={`text-xs font-prototype tabular-nums shrink-0 w-10 text-right ${winPct >= 50 ? "text-emerald-400" : "text-muted-foreground"}`}>
-                                                    {winPct}%
-                                                </span>
-                                                <span className="text-sm font-prototype tabular-nums shrink-0 w-6 text-right">{count}</span>
-                                            </div>
+            {/* Corporations jouées — full width, under the whole two-column block */}
+            <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-5">
+                <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
+                {stats.corpEntries.length === 0 ? (
+                    <p className="text-sm text-muted-foreground font-prototype">Aucune donnée.</p>
+                ) : (
+                    <>
+                        <div className="flex justify-center">
+                            <CorpWheel segments={donutSegments} size={200} />
+                        </div>
+                        <div className="space-y-1 pt-2 border-t border-white/5">
+                            {stats.corpEntries.map(([corp, count]) => {
+                                const wins = stats.corpWins.get(corp) || 0;
+                                const winPct = count > 0 ? Math.round((wins / count) * 100) : 0;
+                                return (
+                                    <div key={corp} className="relative rounded-md overflow-hidden">
+                                        <div
+                                            className={`absolute inset-y-0 left-0 ${winPct >= 50 ? "bg-emerald-500/15" : "bg-white/[0.04]"}`}
+                                            style={{ width: `${winPct}%` }}
+                                        />
+                                        <div className="relative flex items-center gap-2.5 px-1.5 py-1.5">
+                                            {CORPORATION_LOGOS[corp] ? (
+                                                <Image src={CORPORATION_LOGOS[corp]} alt="" width={24} height={24} className="shrink-0 rounded-full object-cover" />
+                                            ) : (
+                                                <span className="w-6 h-6 rounded-full bg-white/10 shrink-0" />
+                                            )}
+                                            <span className="text-xs font-prototype text-muted-foreground flex-1 truncate">{corp}</span>
+                                            <span className={`text-xs font-prototype tabular-nums shrink-0 w-10 text-right ${winPct >= 50 ? "text-emerald-400" : "text-muted-foreground"}`}>
+                                                {winPct}%
+                                            </span>
+                                            <span className="text-sm font-prototype tabular-nums shrink-0 w-6 text-right">{count}</span>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
