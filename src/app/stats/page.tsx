@@ -17,6 +17,7 @@ type Entry = {
   tournamentName: string;
   eventDate: string;
   matchId: string;
+  round?: number;
   rank: number;
   corporation: string;
   nt: number;
@@ -178,6 +179,7 @@ export default function StatsPage() {
         villes: e.villes,
         cartes: e.cartes,
         matchId: e.matchId,
+        round: e.round,
         board: e.board || undefined,
         tournamentName: e.tournamentName || undefined,
         eventDate: e.eventDate || undefined,
