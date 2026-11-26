@@ -5,7 +5,7 @@ import Image from "next/image";
 import { ArrowLeft, Medal } from "lucide-react";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
-import { BOARD_COLORS, type OverviewEntry } from "./OverviewStats";
+import type { OverviewEntry } from "./OverviewStats";
 
 // Circuit-wide per-player aggregate — the same shape `perPlayer` already
 // computes in OverviewStats, reused here for the average-comparison bars,
@@ -145,9 +145,8 @@ function polarPoint(cx: number, cy: number, r: number, angleDeg: number) {
     return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)] as const;
 }
 
-function CorpWheel({ segments }: { segments: { label: string; value: number; color: string; logo?: string }[] }) {
+function CorpWheel({ segments, size = 112 }: { segments: { label: string; value: number; color: string; logo?: string }[]; size?: number }) {
     const total = segments.reduce((a, s) => a + s.value, 0) || 1;
-    const size = 112;
     const cx = size / 2;
     const cy = size / 2;
     const r = size / 2;
@@ -190,8 +189,8 @@ function CorpWheel({ segments }: { segments: { label: string; value: number; col
                     </g>
                 ))}
             </svg>
-            <div className="absolute inset-[22px] rounded-full bg-[#16151a] flex flex-col items-center justify-center">
-                <span className="text-xl font-prototype leading-none">{segments.length}</span>
+            <div className="absolute rounded-full bg-[#16151a] flex flex-col items-center justify-center" style={{ inset: size * 0.2 }}>
+                <span className="font-prototype leading-none" style={{ fontSize: size * 0.18 }}>{segments.length}</span>
                 <span className="text-[9px] font-prototype uppercase tracking-wider text-muted-foreground mt-0.5">corpos</span>
             </div>
         </div>
@@ -413,45 +412,43 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {/* Corporation donut + board tags */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-4">
+                {/* Corporations jouées — win-rate list on top, big centered wheel below */}
+                <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-5">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
                     {stats.corpEntries.length === 0 ? (
                         <p className="text-sm text-muted-foreground font-prototype">Aucune donnée.</p>
                     ) : (
-                        <div className="flex items-start gap-4">
-                            <CorpWheel segments={donutSegments} />
-                            <div className="flex-1 min-w-0 space-y-2">
+                        <>
+                            <div className="space-y-1">
                                 {stats.corpEntries.map(([corp, count]) => {
                                     const wins = stats.corpWins.get(corp) || 0;
                                     const winPct = count > 0 ? Math.round((wins / count) * 100) : 0;
                                     return (
-                                        <div key={corp} className="flex items-center gap-2.5">
-                                            {CORPORATION_LOGOS[corp] ? (
-                                                <Image src={CORPORATION_LOGOS[corp]} alt="" width={22} height={22} className="shrink-0 rounded-full object-cover" />
-                                            ) : (
-                                                <span className="w-[22px] h-[22px] rounded-full bg-white/10 shrink-0" />
-                                            )}
-                                            <span className="text-xs font-prototype text-muted-foreground flex-1 truncate">{corp}</span>
-                                            <span className={`text-xs font-prototype tabular-nums shrink-0 ${winPct >= 50 ? "text-emerald-400" : "text-muted-foreground"}`}>
-                                                {winPct}%
-                                            </span>
-                                            <span className="text-sm font-prototype tabular-nums shrink-0 w-6 text-right">{count}</span>
+                                        <div key={corp} className="relative rounded-md overflow-hidden">
+                                            <div
+                                                className={`absolute inset-y-0 left-0 ${winPct >= 50 ? "bg-emerald-500/15" : "bg-white/[0.04]"}`}
+                                                style={{ width: `${winPct}%` }}
+                                            />
+                                            <div className="relative flex items-center gap-2.5 px-1.5 py-1.5">
+                                                {CORPORATION_LOGOS[corp] ? (
+                                                    <Image src={CORPORATION_LOGOS[corp]} alt="" width={24} height={24} className="shrink-0 rounded-full object-cover" />
+                                                ) : (
+                                                    <span className="w-6 h-6 rounded-full bg-white/10 shrink-0" />
+                                                )}
+                                                <span className="text-xs font-prototype text-muted-foreground flex-1 truncate">{corp}</span>
+                                                <span className={`text-xs font-prototype tabular-nums shrink-0 w-10 text-right ${winPct >= 50 ? "text-emerald-400" : "text-muted-foreground"}`}>
+                                                    {winPct}%
+                                                </span>
+                                                <span className="text-sm font-prototype tabular-nums shrink-0 w-6 text-right">{count}</span>
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </div>
-                        </div>
-                    )}
-                    {stats.boardEntries.length > 0 && (
-                        <div className="pt-3 border-t border-white/5 flex flex-wrap gap-1.5">
-                            {stats.boardEntries.map(([board, count]) => (
-                                <span key={board} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 text-[11px] font-prototype">
-                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: BOARD_COLORS[board] || "#e8743b" }} />
-                                    {board} · {count}
-                                </span>
-                            ))}
-                        </div>
+                            <div className="pt-2 border-t border-white/5 flex justify-center">
+                                <CorpWheel segments={donutSegments} size={200} />
+                            </div>
+                        </>
                     )}
                 </div>
 
