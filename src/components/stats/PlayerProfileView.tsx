@@ -190,7 +190,7 @@ function CorpWheel({ segments, size = 112 }: { segments: { label: string; value:
                             {/* White backdrop so the logo stays legible against any wedge color */}
                             <circle cx={ix} cy={iy} r={iconSize / 2 + 1.5} fill="#fff" />
                             <image
-                                href={w.logo}
+                                href={encodeURI(w.logo)}
                                 x={ix - iconSize / 2}
                                 y={iy - iconSize / 2}
                                 width={iconSize}
