@@ -197,7 +197,7 @@ function CorpWheel({ segments, size = 112 }: { segments: { label: string; value:
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src={w.logo}
+                            src={encodeURI(w.logo)}
                             alt=""
                             width={iconSize}
                             height={iconSize}
