@@ -176,31 +176,36 @@ function CorpWheel({ segments, size = 112 }: { segments: { label: string; value:
                 {wedges.map((w, i) => (
                     <path key={i} d={w.path} fill={w.color} stroke="#16151a" strokeWidth={2} />
                 ))}
-                {wedges.map((w, i) => {
-                    if (!w.logo) return null;
-                    const midAngle = (w.startAngle + w.endAngle) / 2;
-                    const angleSpan = w.endAngle - w.startAngle;
-                    // Narrow slices (many corporations) get a smaller icon so it
-                    // doesn't spill into neighbouring wedges.
-                    const fitSize = (angleSpan / 360) * 2 * Math.PI * iconRadius * 0.85;
-                    const iconSize = Math.max(11, Math.min(maxIconSize, fitSize));
-                    const [ix, iy] = polarPoint(cx, cy, iconRadius, midAngle);
-                    return (
-                        <g key={`icon-${i}`}>
-                            {/* White backdrop so the logo stays legible against any wedge color */}
-                            <circle cx={ix} cy={iy} r={iconSize / 2 + 1.5} fill="#fff" />
-                            <image
-                                href={encodeURI(w.logo)}
-                                x={ix - iconSize / 2}
-                                y={iy - iconSize / 2}
-                                width={iconSize}
-                                height={iconSize}
-                                preserveAspectRatio="xMidYMid meet"
-                            />
-                        </g>
-                    );
-                })}
             </svg>
+            {/* Icons as HTML <img> overlays — same rendering pipeline as the
+                legend rows (which handle accented filenames correctly), unlike
+                SVG <image href> which failed to load some corp files. */}
+            {wedges.map((w, i) => {
+                if (!w.logo) return null;
+                const midAngle = (w.startAngle + w.endAngle) / 2;
+                const angleSpan = w.endAngle - w.startAngle;
+                // Narrow slices (many corporations) get a smaller icon so it
+                // doesn't spill into neighbouring wedges.
+                const fitSize = (angleSpan / 360) * 2 * Math.PI * iconRadius * 0.85;
+                const iconSize = Math.max(11, Math.min(maxIconSize, fitSize));
+                const [ix, iy] = polarPoint(cx, cy, iconRadius, midAngle);
+                return (
+                    <div
+                        key={`icon-${i}`}
+                        className="absolute rounded-full bg-[#1e1c22] border border-white/15 flex items-center justify-center overflow-hidden"
+                        style={{ left: ix - iconSize / 2 - 2, top: iy - iconSize / 2 - 2, width: iconSize + 4, height: iconSize + 4 }}
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={w.logo}
+                            alt=""
+                            width={iconSize}
+                            height={iconSize}
+                            className="object-contain"
+                        />
+                    </div>
+                );
+            })}
             <div className="absolute rounded-full bg-[#16151a] flex flex-col items-center justify-center" style={{ inset: size * 0.3 }}>
                 <span className="font-prototype leading-none" style={{ fontSize: size * 0.16 }}>{segments.length}</span>
                 <span className="text-[9px] font-prototype uppercase tracking-wider text-muted-foreground mt-0.5">corpos</span>
