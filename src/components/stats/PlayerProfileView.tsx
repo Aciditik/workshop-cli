@@ -192,7 +192,7 @@ function CorpWheel({ segments, size = 112 }: { segments: { label: string; value:
                 return (
                     <div
                         key={`icon-${i}`}
-                        className="absolute rounded-full bg-[#1e1c22] border border-white/15 flex items-center justify-center overflow-hidden"
+                        className="absolute rounded-full bg-zinc-300/90 flex items-center justify-center overflow-hidden"
                         style={{ left: ix - iconSize / 2 - 2, top: iy - iconSize / 2 - 2, width: iconSize + 4, height: iconSize + 4 }}
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -429,14 +429,17 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {/* Corporations jouées — win-rate list on top, big centered wheel below */}
+                {/* Corporations jouées — big centered wheel on top, win-rate list below */}
                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-5">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Corporations jouées</p>
                     {stats.corpEntries.length === 0 ? (
                         <p className="text-sm text-muted-foreground font-prototype">Aucune donnée.</p>
                     ) : (
                         <>
-                            <div className="space-y-1">
+                            <div className="flex justify-center">
+                                <CorpWheel segments={donutSegments} size={200} />
+                            </div>
+                            <div className="space-y-1 pt-2 border-t border-white/5">
                                 {stats.corpEntries.map(([corp, count]) => {
                                     const wins = stats.corpWins.get(corp) || 0;
                                     const winPct = count > 0 ? Math.round((wins / count) * 100) : 0;
@@ -461,9 +464,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                         </div>
                                     );
                                 })}
-                            </div>
-                            <div className="pt-2 border-t border-white/5 flex justify-center">
-                                <CorpWheel segments={donutSegments} size={200} />
                             </div>
                         </>
                     )}
