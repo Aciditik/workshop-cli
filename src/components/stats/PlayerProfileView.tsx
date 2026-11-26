@@ -433,7 +433,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                 {/* Left sidebar — recent games, match-history style. The card
                     stretches to the main column's height so no empty gap shows
                     above the full-width corporations card; the list scrolls. */}
-                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5 lg:h-full lg:flex lg:flex-col">
+                <div className="rounded-[10px] border border-[#26252c] bg-[#1f1e26] p-4 space-y-2.5 lg:h-full lg:min-h-0 lg:flex lg:flex-col">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
                     <div className="space-y-2 lg:flex-1 lg:min-h-0 lg:max-h-none max-h-[480px] overflow-y-auto pr-1">
                         {[...games].reverse().map((g, i) => (
