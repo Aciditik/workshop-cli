@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Image from "next/image";
-import { ArrowLeft, Calendar, Gamepad2, Medal, Trophy } from "lucide-react";
+import { ArrowLeft, Gamepad2, Trophy } from "lucide-react";
 import { CORPORATION_LOGOS } from "@/lib/corporation-logos";
 import { CORPORATION_PLACEHOLDER } from "@/lib/corporations";
 import type { OverviewEntry } from "./OverviewStats";
@@ -316,7 +316,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
         );
     }
 
-    const maxGameScore = Math.max(1, ...games.map((e) => e.totalScore));
 
     const radarAxes = ["Score moy.", "Record", "% victoire", "Place moy.", "Régularité"];
     const regularityScore = stats.avgScore > 0 ? Math.max(0, 100 - (stats.stdev / stats.avgScore) * 100) : 0;
@@ -345,14 +344,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
 
     // Header meta — distinct tournaments, season-year span (name first like
     // everywhere else, eventDate as fallback), and the most-played corp.
-    const seasonYearOf = (e: OverviewEntry) => {
-        const nameYear = e.tournamentName?.match(/\b(20\d{2})\b/)?.[1];
-        const dateYear = e.eventDate?.slice(0, 4);
-        return Number(nameYear || dateYear) || 0;
-    };
     const tournaments = new Set(games.map((e) => e.tournamentName).filter(Boolean)).size;
-    const years = games.map(seasonYearOf).filter((y) => y > 0);
-    const yearSpan = years.length > 0 ? [Math.min(...years), Math.max(...years)] : null;
     const [favCorp, favCorpCount] = stats.corpEntries[0] ?? [];
     const bestGame = games.find((e) => e.totalScore === stats.record);
     const bestGameCorp = bestGame?.corporation && bestGame.corporation !== CORPORATION_PLACEHOLDER ? bestGame.corporation : null;
@@ -389,25 +381,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                                 </span>
                             </>
                         )}
-                        {favCorp && (
-                            <>
-                                <span className="text-white/20">·</span>
-                                <span className="inline-flex items-center gap-1.5">
-                                    {CORPORATION_LOGOS[favCorp] ? (
-                                        <Image src={CORPORATION_LOGOS[favCorp]} alt="" width={14} height={14} className="rounded-full object-cover shrink-0" />
-                                    ) : null}
-                                    {favCorp}
-                                </span>
-                            </>
-                        )}
-                        {yearSpan && (
-                            <>
-                                <span className="text-white/20">·</span>
-                                <span className="inline-flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5" /> {yearSpan[0] === yearSpan[1] ? yearSpan[0] : `${yearSpan[0]}–${yearSpan[1]}`}
-                                </span>
-                            </>
-                        )}
                     </div>
                 </div>
             </div>
@@ -436,7 +409,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                         </p>
                     </div>
                     {bestGameCorp && CORPORATION_LOGOS[bestGameCorp] ? (
-                        <Image src={CORPORATION_LOGOS[bestGameCorp]} alt="" width={52} height={52} className="rounded-[10px] object-cover shrink-0" />
+                        <Image src={CORPORATION_LOGOS[bestGameCorp]} alt="" width={76} height={76} className="rounded-[10px] object-cover shrink-0" />
                     ) : null}
                 </div>
                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 flex items-center justify-between gap-3">
@@ -446,7 +419,7 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                         <p className="text-xs font-prototype text-muted-foreground truncate">{favCorp ?? "—"}</p>
                     </div>
                     {favCorp && CORPORATION_LOGOS[favCorp] ? (
-                        <Image src={CORPORATION_LOGOS[favCorp]} alt="" width={52} height={52} className="rounded-[10px] object-cover shrink-0" />
+                        <Image src={CORPORATION_LOGOS[favCorp]} alt="" width={76} height={76} className="rounded-[10px] object-cover shrink-0" />
                     ) : null}
                 </div>
             </div>
@@ -478,23 +451,6 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                             ))}
                         </div>
                     )}
-                </div>
-            </div>
-
-            {/* Performance chart */}
-            <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-3">
-                <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Performance — parties dans l&apos;ordre</p>
-                <div className="flex items-end gap-1.5 h-32 overflow-x-auto">
-                    {games.map((g, i) => (
-                        <div key={i} className="flex flex-col items-center justify-end gap-1 h-full shrink-0 w-8" title={`${g.totalScore} pts · ${g.corporation || "?"} · rang ${g.rank}`}>
-                            <span className="text-[10px] font-prototype tabular-nums">{g.totalScore}</span>
-                            <div
-                                className="w-full rounded-t-sm"
-                                style={{ height: `${(g.totalScore / maxGameScore) * 100}%`, minHeight: 4, backgroundColor: rankBadgeColor(g.rank) }}
-                            />
-                            <Medal className="w-3.5 h-3.5" style={{ color: rankBadgeColor(g.rank) }} />
-                        </div>
-                    ))}
                 </div>
             </div>
 
@@ -539,29 +495,47 @@ export function PlayerProfileView({ entries, circuit, playerId, onBack }: Props)
                     )}
                 </div>
 
-                {/* Recent games */}
+                {/* Recent games — match-history style: date/round + tournament
+                    header, then corp/result rows like a match scoreline */}
                 <div className="rounded-[10px] border border-[#26252c] bg-[#16151a] p-4 space-y-2.5">
                     <p className="text-[11px] font-prototype uppercase tracking-wider text-muted-foreground">Parties récentes</p>
-                    <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                    <div className="space-y-2 max-h-[26rem] overflow-y-auto">
                         {[...games].reverse().map((g, i) => (
-                            <div key={i} className="flex items-center gap-2.5 py-1.5 border-t border-white/5 first:border-t-0">
-                                <span
-                                    className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold font-prototype shrink-0 text-black"
-                                    style={{ backgroundColor: rankBadgeColor(g.rank) }}
-                                >
-                                    {g.rank}
-                                </span>
-                                {CORPORATION_LOGOS[g.corporation] && (
-                                    <Image src={CORPORATION_LOGOS[g.corporation]} alt={g.corporation} width={16} height={16} className="shrink-0" />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-prototype truncate">
-                                        {g.tournamentName || (g.round ? `Ronde ${g.round}` : "Partie")}
-                                        {g.tournamentName && g.round ? ` · Ronde ${g.round}` : ""}
-                                    </p>
-                                    {g.board && <p className="text-[10px] text-muted-foreground font-prototype truncate">{g.board}</p>}
+                            <div key={i} className="rounded-md bg-white/[0.03] px-3 py-2 space-y-1.5">
+                                <div className="flex items-center justify-between gap-3 text-[10px] font-prototype uppercase tracking-wider text-muted-foreground">
+                                    <span className="shrink-0">
+                                        {g.eventDate ? new Date(g.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "—"}
+                                        {g.round ? ` · Ronde ${g.round}` : ""}
+                                    </span>
+                                    <span className="truncate">{g.tournamentName || "Tournoi"}</span>
                                 </div>
-                                <span className="text-sm font-prototype tabular-nums text-[#e8743b] shrink-0">{g.totalScore}</span>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="inline-flex items-center gap-2 min-w-0">
+                                        {CORPORATION_LOGOS[g.corporation] ? (
+                                            <Image src={CORPORATION_LOGOS[g.corporation]} alt="" width={18} height={18} className="rounded-full object-cover shrink-0" />
+                                        ) : (
+                                            <span className="w-[18px] h-[18px] rounded-full bg-white/10 shrink-0" />
+                                        )}
+                                        <span className="text-xs font-prototype truncate">{g.corporation || "Corporation inconnue"}</span>
+                                    </span>
+                                    <span className="text-sm font-prototype tabular-nums text-[#e8743b] shrink-0">{g.totalScore}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="inline-flex items-center gap-2 min-w-0">
+                                        <span
+                                            className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold font-prototype shrink-0 text-black"
+                                            style={{ backgroundColor: rankBadgeColor(g.rank) }}
+                                        >
+                                            {g.rank}
+                                        </span>
+                                        <span className="text-xs font-prototype text-muted-foreground truncate">
+                                            Classement{g.board ? ` · ${g.board}` : ""}
+                                        </span>
+                                    </span>
+                                    <span className="text-sm font-prototype tabular-nums shrink-0" style={{ color: rankBadgeColor(g.rank) }}>
+                                        {g.rank === 1 ? "Victoire" : `${g.rank}e`}
+                                    </span>
+                                </div>
                             </div>
                         ))}
                     </div>
