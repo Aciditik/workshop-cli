@@ -1,6 +1,6 @@
 import { StaticImageData } from "next/image";
 
-import arcadian from "@/assets/corpos/Communautés_Arcadiennes.png";
+import arcadian from "@/assets/corpos/Communautes_Arcadiennes.png";
 import astrodrill from "@/assets/corpos/AstroDrill.png";
 import athenades from "@/assets/corpos/Athenades.png";
 import cheungshing from "@/assets/corpos/Cheung_Shing_Mars.png";
@@ -12,7 +12,7 @@ import greenpower from "@/assets/corpos/Green_Power.png";
 import guildevoleurs from "@/assets/corpos/Guildes_Voleurs.png";
 import guildeouvriere from "@/assets/corpos/Guilde_Ouvriere.png";
 import helion from "@/assets/corpos/helion.png";
-import interplanetarycinematics from "@/assets/corpos/Cinématiques_Interplanétaires.png";
+import interplanetarycinematics from "@/assets/corpos/Cinematiques_Interplanetaires.png";
 import inventrix from "@/assets/corpos/inventrix.png";
 import kuiper from "@/assets/corpos/Kuiper_Cooperative.png";
 import ludophile from "@/assets/corpos/Ludophiles.png";
@@ -29,7 +29,7 @@ import soleilvert from "@/assets/corpos/Soleil_Vert.png";
 import spire from "@/assets/corpos/Spire.png";
 import splice from "@/assets/corpos/Splice.png";
 import teractor from "@/assets/corpos/teractor.png";
-import tharsisrepublic from "@/assets/corpos/République_de_Tharsis.png";
+import tharsisrepublic from "@/assets/corpos/Republique_de_Tharsis.png";
 import thorgate from "@/assets/corpos/thorgate.png";
 import tycho from "@/assets/corpos/Tycho_Magnetics.png";
 import unionpharma from "@/assets/corpos/Union_Pharmaceutique.png";
