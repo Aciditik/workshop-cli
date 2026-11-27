@@ -9,8 +9,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { isLeagueForced } from "@/lib/utils";
 
-const APP_TITLE = isLeagueForced() ? "Terraforming Mars Ligue" : "CdF Terraforming Mars";
-
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const pathname = usePathname();
@@ -95,6 +93,13 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = user?.role === "admin";
   const isGuest = user?.role === "guest";
 
+  // Hostname-based: identical on server/first client render (always "CdF")
+  // to avoid a hydration mismatch, flips after mount if on the Ligue domain.
+  const [appTitle, setAppTitle] = useState("CdF Terraforming Mars");
+  useEffect(() => {
+    if (isLeagueForced()) setAppTitle("Terraforming Mars Ligue");
+  }, []);
+
   // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
@@ -150,7 +155,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             />
           </div>
           <h1 className="text-xl font-prototype bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
-            {APP_TITLE}
+            {appTitle}
           </h1>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -259,7 +264,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 className="object-contain"
               />
             </div>
-            <span className="text-sm font-prototype">{APP_TITLE}</span>
+            <span className="text-sm font-prototype">{appTitle}</span>
           </div>
           <div className="w-9" aria-hidden="true" />
         </div>

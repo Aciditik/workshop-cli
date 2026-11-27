@@ -21,17 +21,18 @@ export function shortTournamentName(name: string, eventDate?: string): string {
 // an X-League header so league tournaments stay invisible to everyone else.
 export type LeagueMode = "cdf" | "ligue";
 
-// Build-time pin: NEXT_PUBLIC_LEAGUE=ligue produces a dedicated Ligue bundle.
-const FORCED_LEAGUE = process.env.NEXT_PUBLIC_LEAGUE;
-
-export function getLeagueMode(): LeagueMode {
-  if (FORCED_LEAGUE === "ligue") return "ligue";
-  if (typeof window === "undefined") return "cdf";
-  return localStorage.getItem("leagueMode") === "ligue" ? "ligue" : "cdf";
+// Same build, same server process, two hostnames: visiting
+// ligue.terraformingmars.fr pins the Ligue scope automatically — no separate
+// build/deploy needed. The CdF domain keeps the super-admin toggle/modal.
+export function isLeagueForced(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.startsWith("ligue.");
 }
 
-export function isLeagueForced(): boolean {
-  return FORCED_LEAGUE === "ligue";
+export function getLeagueMode(): LeagueMode {
+  if (isLeagueForced()) return "ligue";
+  if (typeof window === "undefined") return "cdf";
+  return localStorage.getItem("leagueMode") === "ligue" ? "ligue" : "cdf";
 }
 
 export function leagueHeader(): Record<string, string> {
