@@ -12,6 +12,7 @@ import { OverviewStats, OverviewEntry } from "@/components/stats/OverviewStats";
 
 type Entry = {
   participantId: string;
+  playerId?: string | null;
   firstname: string;
   name: string;
   tournamentId: string;
@@ -44,8 +45,11 @@ type StatsData = {
   totalMatches: number;
 };
 
-function playerKey(e: { firstname: string; name: string }) {
-  return `${e.firstname} ${e.name}`.trim().toLowerCase();
+// Canonical identity is the real Player row (playerId) now that it's
+// backfilled server-side; the old name-string key only remains as a
+// fallback for rows that somehow never got linked (shouldn't happen).
+function playerKey(e: { playerId?: string | null; firstname: string; name: string }) {
+  return e.playerId || `${e.firstname} ${e.name}`.trim().toLowerCase();
 }
 
 function fullName(e: { firstname: string; name: string }) {
