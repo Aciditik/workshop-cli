@@ -17,20 +17,12 @@ export function shortTournamentName(name: string, eventDate?: string): string {
 }
 
 // League scope: "ligue" = Terraforming Mars Ligue data space, "cdf" (default)
-// = the normal CdF space. The choice is stored locally and sent to the API as
-// an X-League header so league tournaments stay invisible to everyone else.
+// = the normal CdF space. One site, one deployment — the super admin picks
+// the space after login (stored locally) and it's sent as an X-League header
+// on every API call so league tournaments stay invisible to everyone else.
 export type LeagueMode = "cdf" | "ligue";
 
-// Same build, same server process, two hostnames: visiting
-// ligue.terraformingmars.fr pins the Ligue scope automatically — no separate
-// build/deploy needed. The CdF domain keeps the super-admin toggle/modal.
-export function isLeagueForced(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.location.hostname.startsWith("ligue.");
-}
-
 export function getLeagueMode(): LeagueMode {
-  if (isLeagueForced()) return "ligue";
   if (typeof window === "undefined") return "cdf";
   return localStorage.getItem("leagueMode") === "ligue" ? "ligue" : "cdf";
 }

@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { isLeagueForced } from "@/lib/utils";
+import { getLeagueMode } from "@/lib/utils";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -97,7 +97,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   // to avoid a hydration mismatch, flips after mount if on the Ligue domain.
   const [appTitle, setAppTitle] = useState("CdF Terraforming Mars");
   useEffect(() => {
-    if (isLeagueForced()) setAppTitle("Terraforming Mars Ligue");
+    if (getLeagueMode() === "ligue") setAppTitle("Terraforming Mars Ligue");
   }, []);
 
   // Close sidebar on route change (mobile)
