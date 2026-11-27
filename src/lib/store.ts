@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Tournament } from "./types";
 import { getApiUrl } from "./auth";
+import { leagueHeader } from "./utils";
 
 const API_URL = getApiUrl();
 
@@ -13,7 +14,7 @@ function getToken(): string | null {
 
 function authHeaders(): Record<string, string> {
     const token = getToken();
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const headers: Record<string, string> = { "Content-Type": "application/json", ...leagueHeader() };
     if (token) headers["Authorization"] = `Bearer ${token}`;
     return headers;
 }

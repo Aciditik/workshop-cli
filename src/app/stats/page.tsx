@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { BarChart3, Users, Layers, Map as MapIcon, CalendarDays, Trophy, ChevronDown, Check } from "lucide-react";
 import { canonicalCorporation } from "@/lib/corporations";
-import { shortTournamentName } from "@/lib/utils";
+import { shortTournamentName, leagueHeader } from "@/lib/utils";
 import { OverviewStats, OverviewEntry } from "@/components/stats/OverviewStats";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ export default function StatsPage() {
       router.push("/");
       return;
     }
-    fetch(`${apiUrl}/api/public/stats?meta=1`)
+    fetch(`${apiUrl}/api/public/stats?meta=1`, { headers: leagueHeader() })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setMeta)
       .catch(() => {});
@@ -135,7 +135,7 @@ export default function StatsPage() {
       }
 
       setLoading(true);
-      fetch(url)
+      fetch(url, { headers: leagueHeader() })
         .then((r) => {
           if (!r.ok) throw new Error();
           return r.json();

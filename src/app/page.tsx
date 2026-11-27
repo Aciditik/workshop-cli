@@ -7,8 +7,9 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import Image from "next/image";
-import { Trophy, Calendar, Users, ChevronRight, ChevronDown, Check, Trash2, BarChart3, LogOut, QrCode } from "lucide-react";
+import { Trophy, Calendar, Users, ChevronRight, ChevronDown, Check, Trash2, BarChart3, LogOut, QrCode, Shield } from "lucide-react";
 import { QRCodeModal } from "@/components/QRCodeModal";
+import { getLeagueMode, SUPER_ADMIN_EMAIL, type LeagueMode } from "@/lib/utils";
 
 const isFinaleTournament = (name: string) => /finale/i.test(name);
 
@@ -31,6 +32,21 @@ export default function Dashboard() {
   const isAdmin = user?.role === "admin";
   const isGuest = user?.role === "guest";
   const isStreamer = user?.role === "streamer";
+  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
+
+  // Super admin picks a data space on first login: CdF (default) or the
+  // Terraforming Mars Ligue (same app, separate tournaments). The choice is
+  // sent as X-League on every API call; reloading re-runs all fetches.
+  const [leagueModalOpen, setLeagueModalOpen] = useState(false);
+  const [leagueMode, setLeagueMode] = useState<LeagueMode>("cdf");
+  useEffect(() => {
+    setLeagueMode(getLeagueMode());
+    if (isSuperAdmin && !localStorage.getItem("leagueMode")) setLeagueModalOpen(true);
+  }, [isSuperAdmin]);
+  const chooseSpace = (mode: LeagueMode) => {
+    localStorage.setItem("leagueMode", mode);
+    window.location.reload();
+  };
 
   // Guest/streamer home: the authenticated /api/tournaments list is
   // ownership-filtered (and guests have no JWT anyway), so browse via the
@@ -230,6 +246,39 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {leagueModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-[#26252c] bg-[#1f1e26] p-6 sm:p-8 shadow-2xl">
+            <div className="flex justify-center mb-4">
+              <Image src="/cdf-logo.png" alt="CdF Logo" width={56} height={56} className="object-contain" />
+            </div>
+            <h2 className="text-xl font-prototype tracking-tight text-center">Choisissez votre espace</h2>
+            <p className="text-sm text-muted-foreground font-prototype text-center mt-2 mb-6">
+              Même application, données séparées — les tournois de la Ligue ne mélangent pas ceux du CdF.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => chooseSpace("cdf")}
+                className="flex flex-col items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 hover:bg-primary/15 p-5 transition-colors"
+              >
+                <Trophy className="w-8 h-8 text-primary" />
+                <span className="font-prototype text-sm">CDF Terraforming Mars</span>
+                <span className="text-[11px] text-muted-foreground font-prototype">Espace classique</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseSpace("ligue")}
+                className="flex flex-col items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/5 hover:bg-red-500/15 p-5 transition-colors"
+              >
+                <Shield className="w-8 h-8 text-red-400" />
+                <span className="font-prototype text-sm">Terraforming Mars Ligue</span>
+                <span className="text-[11px] text-muted-foreground font-prototype">Espace dédié</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl sm:text-4xl font-prototype tracking-tight mb-2">Tableau de bord</h1>
@@ -238,6 +287,21 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => chooseSpace(leagueMode === "ligue" ? "cdf" : "ligue")}
+              title="Changer d'espace"
+              className={`h-11 px-4 rounded-md border font-prototype text-sm inline-flex items-center gap-2 transition-colors ${
+                leagueMode === "ligue"
+                  ? "border-red-500/40 text-red-400 hover:bg-red-500/10"
+                  : "border-border bg-card/50 hover:bg-accent/50"
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              {leagueMode === "ligue" ? "LIGUE" : "CDF"}
+            </button>
+          )}
           {tournaments.length > 0 && (
             <div className="relative">
               <button

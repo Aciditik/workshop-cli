@@ -13,6 +13,7 @@ import { BracketTreeView } from "@/components/BracketTreeView";
 import { BoardSelectModal } from "@/components/BoardSelectModal";
 import { Participant, Tournament, TournamentFormat, TableMatch } from "@/lib/types";
 import { playerDisplayName } from "@/lib/playerName";
+import { leagueHeader } from "@/lib/utils";
 import {
     generateEliminationRound2,
     generateSwissRound,
@@ -1038,6 +1039,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
+                        ...leagueHeader(),
                         ...(token ? { Authorization: `Bearer ${token}` } : {}),
                     },
                     body: JSON.stringify({ participants: newParticipants, year: finaleYear }),

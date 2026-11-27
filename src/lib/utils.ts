@@ -15,3 +15,19 @@ export function shortTournamentName(name: string, eventDate?: string): string {
   if (!suffix || !year) return name;
   return `Q${year.slice(-2)} - ${suffix}`;
 }
+
+// League scope: "ligue" = Terraforming Mars Ligue data space, "cdf" (default)
+// = the normal CdF space. The choice is stored locally and sent to the API as
+// an X-League header so league tournaments stay invisible to everyone else.
+export type LeagueMode = "cdf" | "ligue";
+
+export function getLeagueMode(): LeagueMode {
+  if (typeof window === "undefined") return "cdf";
+  return localStorage.getItem("leagueMode") === "ligue" ? "ligue" : "cdf";
+}
+
+export function leagueHeader(): Record<string, string> {
+  return getLeagueMode() === "ligue" ? { "X-League": "ligue" } : {};
+}
+
+export const SUPER_ADMIN_EMAIL = "spadmin@tm.com";
