@@ -215,7 +215,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               <p className="text-sm font-prototype truncate">{user?.name}</p>
               <div className="flex items-center gap-1">
                 {user?.role === "admin" && (
-                  <Shield className="w-3 h-3 text-yellow-500" />
+                  <Shield className={`w-3 h-3 ${user?.email === "spadmin@tm.com" ? "text-red-500" : "text-yellow-500"}`} />
                 )}
                 <p className="text-xs font-prototype text-muted-foreground capitalize">
                   {user?.role === "guest" ? "Invité" : user?.role}
