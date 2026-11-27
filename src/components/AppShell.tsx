@@ -1,13 +1,13 @@
 "use client";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3, Timer, HelpCircle, Phone, UserPlus } from "lucide-react";
+import { Trophy, LayoutDashboard, PlusCircle, LogOut, Shield, Menu, X, BarChart3, Timer, HelpCircle, Phone, UserPlus, ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { getLeagueMode } from "@/lib/utils";
+import { getLeagueMode, SUPER_ADMIN_EMAIL } from "@/lib/utils";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -92,6 +92,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const [organizerOpen, setOrganizerOpen] = useState(false);
   const isAdmin = user?.role === "admin";
   const isGuest = user?.role === "guest";
+  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
 
   // Identical on server/first client render (always "CdF") to avoid a
   // hydration mismatch, flips after mount for the super admin's Ligue space.
@@ -152,8 +153,8 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
         <div className="p-6 flex items-center gap-3">
           <div className="w-10 h-10 relative shrink-0">
             <Image 
-              src="/cdf-logo.png" 
-              alt="CdF Logo"
+              src={isLigue ? "/icone-tm.webp" : "/cdf-logo.png"} 
+              alt={isLigue ? "Terraforming Mars Ligue Logo" : "CdF Logo"}
               width={40}
               height={40}
               className="object-contain"
@@ -224,6 +225,19 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               <span className="font-prototype">Ajouter un compte</span>
             </button>
           )}
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem("leagueMode", isLigue ? "cdf" : "ligue");
+                window.location.href = "/";
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group text-left"
+            >
+              <ArrowLeftRight className="w-5 h-5 group-hover:text-primary transition-colors" />
+              <span className="font-prototype">{isLigue ? "Passer en CDF" : "Passer en Ligue"}</span>
+            </button>
+          )}
           <div className="flex items-center gap-3 px-2 pt-3 border-t border-border/50">
             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-prototype shrink-0">
               {user?.name?.charAt(0).toUpperCase()}
@@ -232,7 +246,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               <p className="text-sm font-prototype truncate">{user?.name}</p>
               <div className="flex items-center gap-1">
                 {user?.role === "admin" && (
-                  <Shield className={`w-3 h-3 ${user?.email === "spadmin@tm.com" ? "text-red-500" : "text-yellow-500"}`} />
+                  <Shield className={`w-3 h-3 ${isSuperAdmin ? "text-red-500" : "text-yellow-500"}`} />
                 )}
                 <p className="text-xs font-prototype text-muted-foreground capitalize">
                   {user?.role === "guest" ? "Invité" : user?.role}
@@ -266,8 +280,8 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 relative shrink-0">
               <Image 
-                src="/cdf-logo.png" 
-                alt="CdF Logo"
+                src={isLigue ? "/icone-tm.webp" : "/cdf-logo.png"} 
+                alt={isLigue ? "Terraforming Mars Ligue Logo" : "CdF Logo"}
                 width={32}
                 height={32}
                 className="object-contain"
