@@ -7,6 +7,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { isLeagueForced } from "@/lib/utils";
+
+const APP_TITLE = isLeagueForced() ? "Terraforming Mars Ligue" : "CdF Terraforming Mars";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -147,7 +150,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             />
           </div>
           <h1 className="text-xl font-prototype bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent">
-            CdF Terraforming Mars
+            {APP_TITLE}
           </h1>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -256,7 +259,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 className="object-contain"
               />
             </div>
-            <span className="text-sm font-prototype">CdF Terraforming Mars</span>
+            <span className="text-sm font-prototype">{APP_TITLE}</span>
           </div>
           <div className="w-9" aria-hidden="true" />
         </div>

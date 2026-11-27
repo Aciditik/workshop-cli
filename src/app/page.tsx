@@ -9,7 +9,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Trophy, Calendar, Users, ChevronRight, ChevronDown, Check, Trash2, BarChart3, LogOut, QrCode, Shield } from "lucide-react";
 import { QRCodeModal } from "@/components/QRCodeModal";
-import { getLeagueMode, SUPER_ADMIN_EMAIL, type LeagueMode } from "@/lib/utils";
+import { isLeagueForced, SUPER_ADMIN_EMAIL, type LeagueMode } from "@/lib/utils";
 
 const isFinaleTournament = (name: string) => /finale/i.test(name);
 
@@ -38,10 +38,8 @@ export default function Dashboard() {
   // Terraforming Mars Ligue (same app, separate tournaments). The choice is
   // sent as X-League on every API call; reloading re-runs all fetches.
   const [leagueModalOpen, setLeagueModalOpen] = useState(false);
-  const [leagueMode, setLeagueMode] = useState<LeagueMode>("cdf");
   useEffect(() => {
-    setLeagueMode(getLeagueMode());
-    if (isSuperAdmin && !localStorage.getItem("leagueMode")) setLeagueModalOpen(true);
+    if (isSuperAdmin && !isLeagueForced() && !localStorage.getItem("leagueMode")) setLeagueModalOpen(true);
   }, [isSuperAdmin]);
   const chooseSpace = (mode: LeagueMode) => {
     localStorage.setItem("leagueMode", mode);
@@ -287,21 +285,6 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          {isSuperAdmin && (
-            <button
-              type="button"
-              onClick={() => chooseSpace(leagueMode === "ligue" ? "cdf" : "ligue")}
-              title="Changer d'espace"
-              className={`h-11 px-4 rounded-md border font-prototype text-sm inline-flex items-center gap-2 transition-colors ${
-                leagueMode === "ligue"
-                  ? "border-red-500/40 text-red-400 hover:bg-red-500/10"
-                  : "border-border bg-card/50 hover:bg-accent/50"
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              {leagueMode === "ligue" ? "LIGUE" : "CDF"}
-            </button>
-          )}
           {tournaments.length > 0 && (
             <div className="relative">
               <button

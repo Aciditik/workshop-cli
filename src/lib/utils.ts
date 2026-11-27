@@ -21,9 +21,17 @@ export function shortTournamentName(name: string, eventDate?: string): string {
 // an X-League header so league tournaments stay invisible to everyone else.
 export type LeagueMode = "cdf" | "ligue";
 
+// Build-time pin: NEXT_PUBLIC_LEAGUE=ligue produces a dedicated Ligue bundle.
+const FORCED_LEAGUE = process.env.NEXT_PUBLIC_LEAGUE;
+
 export function getLeagueMode(): LeagueMode {
+  if (FORCED_LEAGUE === "ligue") return "ligue";
   if (typeof window === "undefined") return "cdf";
   return localStorage.getItem("leagueMode") === "ligue" ? "ligue" : "cdf";
+}
+
+export function isLeagueForced(): boolean {
+  return FORCED_LEAGUE === "ligue";
 }
 
 export function leagueHeader(): Record<string, string> {
