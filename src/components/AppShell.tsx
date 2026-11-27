@@ -93,11 +93,16 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = user?.role === "admin";
   const isGuest = user?.role === "guest";
 
-  // Hostname-based: identical on server/first client render (always "CdF")
-  // to avoid a hydration mismatch, flips after mount if on the Ligue domain.
+  // Identical on server/first client render (always "CdF") to avoid a
+  // hydration mismatch, flips after mount for the super admin's Ligue space.
   const [appTitle, setAppTitle] = useState("CdF Terraforming Mars");
+  const [isLigue, setIsLigue] = useState(false);
   useEffect(() => {
-    if (getLeagueMode() === "ligue") setAppTitle("Terraforming Mars Ligue");
+    const ligue = getLeagueMode() === "ligue";
+    setIsLigue(ligue);
+    if (ligue) setAppTitle("Terraforming Mars Ligue");
+    document.documentElement.classList.toggle("league-ligue", ligue);
+    return () => document.documentElement.classList.remove("league-ligue");
   }, []);
 
   // Close sidebar on route change (mobile)
@@ -171,8 +176,12 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             href="/"
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors group"
           >
-            <LayoutDashboard className="w-5 h-5 group-hover:text-primary transition-colors" />
-            <span className="font-prototype">Tableau de bord</span>
+            {isLigue ? (
+              <Trophy className="w-5 h-5 group-hover:text-primary transition-colors" />
+            ) : (
+              <LayoutDashboard className="w-5 h-5 group-hover:text-primary transition-colors" />
+            )}
+            <span className="font-prototype">{isLigue ? "Ligue" : "Tableau de bord"}</span>
           </Link>
           {(isAdmin || isGuest) && (
             <Link

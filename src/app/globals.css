@@ -51,6 +51,11 @@
     background-repeat: no-repeat;
     min-height: 100vh;
   }
+  html.league-ligue {
+    background-image:
+      linear-gradient(rgba(9, 9, 11, 0.7), rgba(9, 9, 11, 0.85)),
+      url('/background_ligue.webp');
+  }
   body {
     @apply text-foreground antialiased;
     font-family: var(--font-prototype), ui-sans-serif, system-ui, sans-serif;
