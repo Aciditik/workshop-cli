@@ -46,10 +46,14 @@ type StatsData = {
 };
 
 // Canonical identity is the real Player row (playerId) now that it's
-// backfilled server-side; the old name-string key only remains as a
-// fallback for rows that somehow never got linked (shouldn't happen).
+// backfilled server-side; the name-string key only remains as a fallback
+// for rows that somehow never got linked — normalized the same way as the
+// server's playerKeyOf (accents/case/spaces stripped) so "Côme"/"Come"
+// still map to one player.
 function playerKey(e: { playerId?: string | null; firstname: string; name: string }) {
-  return e.playerId || `${e.firstname} ${e.name}`.trim().toLowerCase();
+  const norm = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  return e.playerId || `${norm(e.firstname)} ${norm(e.name)}`.trim();
 }
 
 function fullName(e: { firstname: string; name: string }) {
