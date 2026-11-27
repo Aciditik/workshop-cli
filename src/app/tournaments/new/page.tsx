@@ -8,7 +8,7 @@ import { Tournament, Participant, TournamentFormat } from "@/lib/types";
 import { getFormat, getMaxRounds, getQualifiedCount, getFormatLabel, isRecommendedSize, generateRound1, generateBracketRound1 } from "@/lib/qualifier-rules";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Trophy, ChevronLeft, Upload, Info, Plus, X, Play, Users } from "lucide-react";
+import { Trophy, ChevronLeft, Upload, Info, Plus, X, Play, Users, Check } from "lucide-react";
 import Icon from "@mdi/react";
 import { mdiTournament } from "@mdi/js";
 import Link from "next/link";
@@ -21,12 +21,44 @@ export default function NewTournament() {
     const [logoUrl, setLogoUrl] = useState("");
     const [logoFileName, setLogoFileName] = useState("");
     const [eventDate, setEventDate] = useState("");
-    const [players, setPlayers] = useState<Array<{firstname: string; name: string; pseudo: string; email: string; phone: string}>>([]);
+    const [players, setPlayers] = useState<Array<{firstname: string; name: string; pseudo: string; email: string; phone: string; playerId?: string}>>([]);
     const [firstnameInput, setFirstnameInput] = useState("");
     const [playerInput, setPlayerInput] = useState("");
     const [pseudoInput, setPseudoInput] = useState("");
     const [emailInput, setEmailInput] = useState("");
     const [phoneInput, setPhoneInput] = useState("");
+
+    // Existing-player registry autocomplete — same as the tournament edit
+    // page: picking a suggestion links the participant to a canonical Player.
+    const [playerSuggestions, setPlayerSuggestions] = useState<Array<{id: string; firstname: string; name: string; pseudo?: string; email: string; phone: string; tournamentCount: number}>>([]);
+    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (!token) return;
+        const q = `${firstnameInput} ${playerInput}`.trim();
+        if (q.length < 2) { setPlayerSuggestions([]); return; }
+        if (suggestTimer.current) clearTimeout(suggestTimer.current);
+        suggestTimer.current = setTimeout(() => {
+            fetch(`${getApiUrl()}/api/players/search?q=${encodeURIComponent(q)}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+                .then(r => (r.ok ? r.json() : { players: [] }))
+                .then(d => setPlayerSuggestions(d.players || []))
+                .catch(() => setPlayerSuggestions([]));
+        }, 300);
+        return () => { if (suggestTimer.current) clearTimeout(suggestTimer.current); };
+    }, [firstnameInput, playerInput, token]);
+
+    const pickPlayerSuggestion = (s: typeof playerSuggestions[number]) => {
+        setFirstnameInput(s.firstname);
+        setPlayerInput(s.name);
+        setPseudoInput(s.pseudo || "");
+        setEmailInput(s.email);
+        setPhoneInput(s.phone);
+        setSelectedPlayerId(s.id);
+        setPlayerSuggestions([]);
+    };
     const inputRef = useRef<HTMLInputElement>(null);
     const [organizers, setOrganizers] = useState<{ id: string; name: string; email: string; city?: string }[]>([]);
     const [selectedOwnerId, setSelectedOwnerId] = useState("");
@@ -69,12 +101,14 @@ export default function NewTournament() {
         const email = emailInput.trim();
         const phone = phoneInput.trim();
         if (!firstname || !name || !email || !phone) return;
-        setPlayers(prev => [...prev, { firstname, name, pseudo, email, phone }]);
+        setPlayers(prev => [...prev, { firstname, name, pseudo, email, phone, playerId: selectedPlayerId || undefined }]);
         setFirstnameInput("");
         setPlayerInput("");
         setPseudoInput("");
         setEmailInput("");
         setPhoneInput("");
+        setSelectedPlayerId(null);
+        setPlayerSuggestions([]);
         inputRef.current?.focus();
     };
 
@@ -98,6 +132,7 @@ export default function NewTournament() {
             email: p.email,
             phone: p.phone,
             score: 0,
+            playerId: p.playerId,
         }));
 
         const newTournament: Tournament = {
@@ -132,6 +167,7 @@ export default function NewTournament() {
             email: p.email,
             phone: p.phone,
             score: 0,
+            playerId: p.playerId,
         }));
 
         const tournamentId = crypto.randomUUID();
@@ -269,7 +305,7 @@ export default function NewTournament() {
                                 ref={inputRef}
                                 type="text"
                                 value={firstnameInput}
-                                onChange={(e) => setFirstnameInput(e.target.value)}
+                                onChange={(e) => { setFirstnameInput(e.target.value); setSelectedPlayerId(null); }}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Prénom *"
                                 required
@@ -278,7 +314,7 @@ export default function NewTournament() {
                             <input
                                 type="text"
                                 value={playerInput}
-                                onChange={(e) => setPlayerInput(e.target.value)}
+                                onChange={(e) => { setPlayerInput(e.target.value); setSelectedPlayerId(null); }}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Nom *"
                                 required
@@ -311,6 +347,33 @@ export default function NewTournament() {
                                 className="flex h-10 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             />
                         </div>
+                        {playerSuggestions.length > 0 && !selectedPlayerId && (
+                            <ul className="rounded-md border border-orange-500/30 bg-background divide-y divide-border overflow-hidden">
+                                {playerSuggestions.map(s => (
+                                    <li key={s.id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => pickPlayerSuggestion(s)}
+                                            className="w-full text-left px-3 py-2 text-sm font-prototype hover:bg-orange-500/10 transition-colors flex items-center justify-between gap-2"
+                                        >
+                                            <span>
+                                                {s.firstname} {s.name}
+                                                {s.pseudo ? ` (${s.pseudo})` : ""}
+                                                <span className="text-muted-foreground"> — {s.email}</span>
+                                            </span>
+                                            <span className="text-xs text-muted-foreground shrink-0">
+                                                {s.tournamentCount} tournoi{s.tournamentCount > 1 ? "s" : ""}
+                                            </span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        {selectedPlayerId && (
+                            <p className="text-xs font-prototype text-emerald-400 flex items-center gap-1">
+                                <Check className="w-3.5 h-3.5" /> Joueur existant lié — ses statistiques cumuleront sur tous ses tournois
+                            </p>
+                        )}
                         <Button type="button" onClick={addPlayer} className="gap-1 w-full md:w-auto font-prototype">
                             <Plus className="w-4 h-4" /> Ajouter le joueur
                         </Button>

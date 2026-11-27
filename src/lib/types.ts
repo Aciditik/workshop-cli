@@ -17,6 +17,7 @@ export interface Participant {
     isDefendingChampion?: boolean; // Finale only: last year's champion — seated at Table 1 for Day 1 Round 1
     sourceTournamentId?: string; // Finale only: qualifier tournament this player came from (persisted server-side)
     teamId?: string; // Finale only: references a Team in Tournament.teams
+    playerId?: string; // Canonical Player identity — set when picked from the player registry
 }
 
 export interface Team {

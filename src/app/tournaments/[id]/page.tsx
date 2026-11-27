@@ -39,6 +39,18 @@ import Image from "next/image";
 import { TeamManagerModal } from "@/components/TeamManagerModal";
 import { TEAM_TAGS } from "@/lib/team-tags";
 
+// One row of the /api/players/search dropdown — an existing person already
+// known to the Player registry.
+type PlayerSuggestion = {
+    id: string;
+    firstname: string;
+    name: string;
+    pseudo?: string;
+    email: string;
+    phone: string;
+    tournamentCount: number;
+};
+
 // Human-readable label for the round about to be generated, used as the
 // board-selection modal title (bracket format uses Quart/Demi/Finale).
 function roundLabel(format: TournamentFormat, round: number): string {
@@ -102,6 +114,43 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
     const [playerPseudo, setPlayerPseudo] = useState("");
     const [playerEmail, setPlayerEmail] = useState("");
     const [playerPhone, setPlayerPhone] = useState("");
+
+    // Existing-player registry autocomplete: suggests known Players while the
+    // organizer types firstname/name; picking one links the participant to a
+    // canonical Player (playerId) so identity never depends on the spelling
+    // typed into this form.
+    const [playerSuggestions, setPlayerSuggestions] = useState<PlayerSuggestion[]>([]);
+    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (!token) return;
+        const q = `${playerFirstname} ${playerName}`.trim();
+        if (q.length < 2) {
+            setPlayerSuggestions([]);
+            return;
+        }
+        if (suggestTimer.current) clearTimeout(suggestTimer.current);
+        suggestTimer.current = setTimeout(() => {
+            fetch(`${getApiUrl()}/api/players/search?q=${encodeURIComponent(q)}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+                .then(r => (r.ok ? r.json() : { players: [] }))
+                .then(d => setPlayerSuggestions(d.players || []))
+                .catch(() => setPlayerSuggestions([]));
+        }, 300);
+        return () => { if (suggestTimer.current) clearTimeout(suggestTimer.current); };
+    }, [playerFirstname, playerName, token]);
+
+    const pickPlayerSuggestion = (s: PlayerSuggestion) => {
+        setPlayerFirstname(s.firstname);
+        setPlayerName(s.name);
+        setPlayerPseudo(s.pseudo || "");
+        setPlayerEmail(s.email);
+        setPlayerPhone(s.phone);
+        setSelectedPlayerId(s.id);
+        setPlayerSuggestions([]);
+    };
     // View preference, persisted in localStorage (survives reloads): show
     // each player's pseudo instead of firstname+name wherever names appear.
     const [showPseudos, setShowPseudosState] = useState(false);
@@ -765,6 +814,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
             email,
             phone,
             score: 0,
+            playerId: selectedPlayerId || undefined,
             // Finale-only: persist the qualifier tournament server-side so the
             // origin is visible from any device (not just the one that added it).
             ...(isFinale && sourceTournamentId ? { sourceTournamentId } : {}),
@@ -781,6 +831,8 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
         setPlayerPseudo("");
         setPlayerEmail("");
         setPlayerPhone("");
+        setSelectedPlayerId(null);
+        setPlayerSuggestions([]);
         setSourceTournamentId("");
         playerInputRef.current?.focus();
     };
@@ -1614,7 +1666,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     ref={playerInputRef}
                                     type="text"
                                     value={playerFirstname}
-                                    onChange={(e) => setPlayerFirstname(e.target.value)}
+                                    onChange={(e) => { setPlayerFirstname(e.target.value); setSelectedPlayerId(null); }}
                                     onKeyDown={handlePlayerKeyDown}
                                     placeholder="Prénom *"
                                     required
@@ -1623,7 +1675,7 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                 <input
                                     type="text"
                                     value={playerName}
-                                    onChange={(e) => setPlayerName(e.target.value)}
+                                    onChange={(e) => { setPlayerName(e.target.value); setSelectedPlayerId(null); }}
                                     onKeyDown={handlePlayerKeyDown}
                                     placeholder="Nom *"
                                     required
@@ -1656,6 +1708,33 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                                     className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                             </div>
+                            {playerSuggestions.length > 0 && !selectedPlayerId && (
+                                <ul className="rounded-md border border-orange-500/30 bg-background divide-y divide-border overflow-hidden">
+                                    {playerSuggestions.map(s => (
+                                        <li key={s.id}>
+                                            <button
+                                                type="button"
+                                                onClick={() => pickPlayerSuggestion(s)}
+                                                className="w-full text-left px-3 py-2 text-sm font-prototype hover:bg-orange-500/10 transition-colors flex items-center justify-between gap-2"
+                                            >
+                                                <span>
+                                                    {s.firstname} {s.name}
+                                                    {s.pseudo ? ` (${s.pseudo})` : ""}
+                                                    <span className="text-muted-foreground"> — {s.email}</span>
+                                                </span>
+                                                <span className="text-xs text-muted-foreground shrink-0">
+                                                    {s.tournamentCount} tournoi{s.tournamentCount > 1 ? "s" : ""}
+                                                </span>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            {selectedPlayerId && (
+                                <p className="text-xs font-prototype text-emerald-400 flex items-center gap-1">
+                                    <Check className="w-3.5 h-3.5" /> Joueur existant lié — ses statistiques cumuleront sur tous ses tournois
+                                </p>
+                            )}
                             {isFinaleTournament && (
                                 <div className="space-y-1">
                                     <label className="text-xs font-prototype text-muted-foreground">
