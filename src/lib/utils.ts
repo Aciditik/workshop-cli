@@ -22,8 +22,12 @@ export function shortTournamentName(name: string, eventDate?: string): string {
 // on every API call so league tournaments stay invisible to everyone else.
 export type LeagueMode = "cdf" | "ligue";
 
+// Guarded by the logged-in account, not just the raw flag — a stale
+// "leagueMode" value left in localStorage (e.g. from a previous session on
+// a shared browser) must never scope a different, non-super-admin account.
 export function getLeagueMode(): LeagueMode {
   if (typeof window === "undefined") return "cdf";
+  if (localStorage.getItem("authEmail") !== SUPER_ADMIN_EMAIL) return "cdf";
   return localStorage.getItem("leagueMode") === "ligue" ? "ligue" : "cdf";
 }
 

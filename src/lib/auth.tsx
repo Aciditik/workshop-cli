@@ -55,12 +55,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+        localStorage.setItem("authEmail", data.user.email);
       } else {
         localStorage.removeItem("token");
+        localStorage.removeItem("authEmail");
         setToken(null);
       }
     } catch {
       localStorage.removeItem("token");
+      localStorage.removeItem("authEmail");
       setToken(null);
     } finally {
       setIsLoading(false);
@@ -81,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await res.json();
     localStorage.setItem("token", data.token);
+    localStorage.setItem("authEmail", data.user.email);
     setToken(data.token);
     setUser(data.user);
     router.push("/");
@@ -113,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem(GUEST_KEY);
+    localStorage.removeItem("authEmail");
+    localStorage.removeItem("leagueMode");
     setToken(null);
     setUser(null);
     router.push("/login");
