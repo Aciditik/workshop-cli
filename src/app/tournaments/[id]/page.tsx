@@ -352,6 +352,56 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
 
     const tournament = isLoaded ? getTournament(id) : null;
 
+    // The top "Rechercher un joueur" box doubles as a registry search:
+    // results here can be added to the tournament in one click.
+    const [registrySuggestions, setRegistrySuggestions] = useState<PlayerSuggestion[]>([]);
+    const registryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (!token || tournament?.status !== "brouillon") {
+            setRegistrySuggestions([]);
+            return;
+        }
+        const q = playerListSearch.trim();
+        if (q.length < 2) {
+            setRegistrySuggestions([]);
+            return;
+        }
+        if (registryTimer.current) clearTimeout(registryTimer.current);
+        registryTimer.current = setTimeout(() => {
+            fetch(`${getApiUrl()}/api/players/search?q=${encodeURIComponent(q)}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+                .then(r => (r.ok ? r.json() : { players: [] }))
+                .then(d => setRegistrySuggestions(d.players || []))
+                .catch(() => setRegistrySuggestions([]));
+        }, 300);
+        return () => { if (registryTimer.current) clearTimeout(registryTimer.current); };
+    }, [playerListSearch, token, tournament?.status]);
+
+    const addPlayerFromRegistry = (s: PlayerSuggestion) => {
+        if (!tournament || tournament.status !== "brouillon") return;
+        const isFinale = /finale/i.test(tournament.name);
+        const newParticipant: Participant = {
+            id: crypto.randomUUID(),
+            firstname: s.firstname,
+            name: s.name,
+            pseudo: s.pseudo || undefined,
+            email: s.email,
+            phone: s.phone,
+            score: 0,
+            playerId: s.id,
+            ...(isFinale && sourceTournamentId ? { sourceTournamentId } : {}),
+        };
+        updateTournament({
+            ...tournament,
+            participants: [...tournament.participants, newParticipant],
+            size: tournament.participants.length + 1,
+        });
+        setPlayerListSearch("");
+        setRegistrySuggestions([]);
+    };
+
     // Finale only, draft stage: mark last year's champion so Round 1 of
     // Day 1 seats them at Table 1. Only one player can hold the title at a
     // time — toggling it on for someone clears it from anyone else.
@@ -1638,6 +1688,35 @@ export default function TournamentView({ params }: { params: Promise<{ id: strin
                             placeholder="Rechercher un joueur..."
                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-prototype ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         />
+                        {registrySuggestions.length > 0 && (
+                            <ul className="rounded-md border border-orange-500/30 bg-background divide-y divide-border overflow-hidden">
+                                {registrySuggestions.map(s => {
+                                    const alreadyIn = tournament.participants.some(p =>
+                                        p.playerId === s.id ||
+                                        ((p.email || "").trim().toLowerCase() !== "" && (p.email || "").trim().toLowerCase() === s.email.trim().toLowerCase())
+                                    );
+                                    return (
+                                        <li key={s.id}>
+                                            <button
+                                                type="button"
+                                                disabled={alreadyIn}
+                                                onClick={() => addPlayerFromRegistry(s)}
+                                                className="w-full text-left px-3 py-2 text-sm font-prototype transition-colors flex items-center justify-between gap-2 disabled:opacity-40 hover:bg-orange-500/10 disabled:hover:bg-transparent"
+                                            >
+                                                <span>
+                                                    {s.firstname} {s.name}
+                                                    {s.pseudo ? ` (${s.pseudo})` : ""}
+                                                    <span className="text-muted-foreground"> — {s.email}</span>
+                                                </span>
+                                                <span className="text-xs text-muted-foreground shrink-0">
+                                                    {alreadyIn ? "déjà inscrit" : `${s.tournamentCount} tournoi${s.tournamentCount > 1 ? "s" : ""}`}
+                                                </span>
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
                         {isFinaleTournament && originTournamentOptions.length > 0 && (
                             <select
                                 value={playerListOriginFilter}
