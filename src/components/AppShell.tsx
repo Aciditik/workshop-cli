@@ -101,9 +101,21 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const ligue = getLeagueMode() === "ligue";
     setIsLigue(ligue);
-    if (ligue) setAppTitle("Terraforming Mars Ligue");
     document.documentElement.classList.toggle("league-ligue", ligue);
-    return () => document.documentElement.classList.remove("league-ligue");
+    if (ligue) {
+      setAppTitle("Terraforming Mars Ligue");
+      document.title = "Terraforming Mars Ligue";
+      document
+        .querySelectorAll<HTMLLinkElement>('link[rel*="icon"]')
+        .forEach((l) => { l.href = "/favicon.webp"; });
+    }
+    return () => {
+      document.documentElement.classList.remove("league-ligue");
+      document.title = "CdF Terraforming Mars";
+      document
+        .querySelectorAll<HTMLLinkElement>('link[rel*="icon"]')
+        .forEach((l) => { l.href = "/favicon.ico"; });
+    };
   }, []);
 
   // Close sidebar on route change (mobile)
